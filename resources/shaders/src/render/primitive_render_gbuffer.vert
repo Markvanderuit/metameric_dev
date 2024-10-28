@@ -27,7 +27,7 @@ layout(binding = 1) uniform b_buff_objects {
 } buff_objects;
 
 void main() {
-  // Extract packed vertex data to obtain local position
+  /* // Extract packed vertex data to obtain local position
   Vertex vt = unpack(to_mesh_vert_pack(in_vert_pack));
   
   // Store object ID in object record
@@ -42,5 +42,5 @@ void main() {
   // Apply camera transformation for vertex position output
   gl_Position = buff_sensor.full_trf 
               * buff_objects.data[gl_DrawID].trf_mesh
-              * vec4(vt.p, 1);
+              * vec4(vt.p, 1); */
 }

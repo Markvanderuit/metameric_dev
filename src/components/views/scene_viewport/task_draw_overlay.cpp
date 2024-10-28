@@ -126,78 +126,82 @@ namespace met {
   void MeshViewportDrawOverlayTask::eval_draw_frustrum(SchedulerHandle &info) {
     met_trace_full();
 
-    const auto &e_scene   = info.global("scene").getr<Scene>();
-    const auto &e_view_i  = info.parent()("view_settings_i").getr<uint>();
-    const auto &e_arcball = info.relative("viewport_input_camera")("arcball").getr<detail::Arcball>();
-    const auto &e_view    = e_scene.components.views[e_view_i].value;
-    
     // Compute viewport offset and size, minus ImGui's tab bars etc
     eig::Array2f viewport_offs = static_cast<eig::Array2f>(ImGui::GetWindowPos()) 
                                + static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
     eig::Array2f viewport_size = static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax())
                                - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
 
-    // Transform a view quad into world space
-    eig::Projective3f full_trf;
-    {
-      eig::Affine3f trf_rot = eig::Affine3f::Identity();
-      trf_rot *= eig::AngleAxisf(e_view.camera_trf.rotation.x(), eig::Vector3f::UnitY());
-      trf_rot *= eig::AngleAxisf(e_view.camera_trf.rotation.y(), eig::Vector3f::UnitX());
-      trf_rot *= eig::AngleAxisf(e_view.camera_trf.rotation.z(), eig::Vector3f::UnitZ());
+    // Get external resources
+    const auto &e_scene   = info.global("scene").getr<Scene>();
+    const auto &e_arcball = info.relative("viewport_input_camera")("arcball").getr<detail::Arcball>();
 
-      auto dir = (trf_rot * eig::Vector3f(0, 0, 1)).normalized().eval();
-      auto eye = -dir; 
-      auto cen = (e_view.camera_trf.position + dir).eval();
-      auto ab = e_arcball;
+    // Iterate views with the draw_frustrum flag enabled
+    for (const auto [e_view, _] : e_scene.components.views) {
+      guard_continue(e_view.draw_frustrum);
 
-      ab.set_zoom(1);
-      ab.set_fov_y(e_view.camera_fov_y * std::numbers::pi_v<float> / 180.f);
-      ab.set_eye(eye);
-      ab.set_center(cen);
-      ab.set_aspect(static_cast<float>(e_view.film_size.x()) / static_cast<float>(e_view.film_size.y()));
+      // Transform a view quad into world space
+      eig::Projective3f full_trf;
+      {
+        eig::Affine3f trf_rot = eig::Affine3f::Identity();
+        trf_rot *= eig::AngleAxisf(e_view.camera_trf.rotation.x(), eig::Vector3f::UnitY());
+        trf_rot *= eig::AngleAxisf(e_view.camera_trf.rotation.y(), eig::Vector3f::UnitX());
+        trf_rot *= eig::AngleAxisf(e_view.camera_trf.rotation.z(), eig::Vector3f::UnitZ());
 
-      full_trf = ab.full();
-    }
+        auto dir = (trf_rot * eig::Vector3f(0, 0, 1)).normalized().eval();
+        auto eye = -dir; 
+        auto cen = (e_view.camera_trf.position + dir).eval();
+        auto ab = e_arcball;
 
-    std::vector quad = { eig::Array4f(0.f, 0.f, 1, 1), eig::Array4f(1.f, 0.f, 1, 1),
-                         eig::Array4f(1.f, 1.f, 1, 1), eig::Array4f(0.f, 1.f, 1, 1) };
+        ab.set_zoom(1);
+        ab.set_fov_y(e_view.camera_fov_y * std::numbers::pi_v<float> / 180.f);
+        ab.set_eye(eye);
+        ab.set_center(cen);
+        ab.set_aspect(static_cast<float>(e_view.film_size.x()) / static_cast<float>(e_view.film_size.y()));
 
-    // Determine rectangle of points around the image plane in world space
-    auto image_world = quad | vws::transform([full_trf](const auto &v) { 
-      return eig::screen_to_world_space(v.head<2>().eval(), full_trf);
-    }) | rng::to<std::vector>();
-    
-    // Determine second rectangle of points, offset into camera frustrum
-    auto frust_world = image_world | vws::transform([center = e_view.camera_trf.position](const auto &v) {
-      return (center + 0.25 * (v - center).matrix().normalized()).array().eval();
-    }) | rng::to<std::vector>();
+        full_trf = ab.full();
+      }
 
-    // Compute window-space representations
-    auto image_window = image_world | vws::transform([&](const auto &v) {
-      auto trf = (e_arcball.full() * (eig::Vector4f() << v, 1).finished()).array().eval();
-      trf /= trf.w();
-      if (trf.z() > 1.f)
-        return eig::Vector2f(0);
-      else
-        return eig::screen_to_window_space(trf.head<2>() * .5f + .5f, viewport_offs, viewport_size);
-    }) | rng::to<std::vector>();
-    auto frust_window = frust_world | vws::transform([&](const auto &v) {
-      auto trf = (e_arcball.full() * (eig::Vector4f() << v, 1).finished()).array().eval();
-      trf /= trf.w();
-      if (trf.z() > 1.f)
-        return eig::Vector2f(0);
-      else
-        return eig::screen_to_window_space(trf.head<2>() * .5f + .5f, viewport_offs, viewport_size);
-    }) | rng::to<std::vector>();
+      std::vector quad = { eig::Array4f(0.f, 0.f, 1, 1), eig::Array4f(1.f, 0.f, 1, 1),
+                          eig::Array4f(1.f, 1.f, 1, 1), eig::Array4f(0.f, 1.f, 1, 1) };
 
-    // Draw frustrum
-    auto dl = ImGui::GetWindowDrawList();
-    dl->AddQuad(image_window[0], image_window[1], image_window[2], image_window[3], vertex_color_white, 1.f);
-    dl->AddQuad(frust_window[0], frust_window[1], frust_window[2], frust_window[3], vertex_color_white, 1.f);
-    for (uint i = 0; i < 4; ++i) {
-      guard_continue(!image_window[i].isZero() && !frust_window[i].isZero());
-      dl->AddLine(image_window[i], frust_window[i], vertex_color_white, 1.f);
-    }
+      // Determine rectangle of points around the image plane in world space
+      auto image_world = quad | vws::transform([full_trf](const auto &v) { 
+        return eig::screen_to_world_space(v.head<2>().eval(), full_trf);
+      }) | rng::to<std::vector>();
+      
+      // Determine second rectangle of points, offset into camera frustrum
+      auto frust_world = image_world | vws::transform([center = e_view.camera_trf.position](const auto &v) {
+        return (center + 0.25 * (v - center).matrix().normalized()).array().eval();
+      }) | rng::to<std::vector>();
+
+      // Compute window-space representations
+      auto image_window = image_world | vws::transform([&](const auto &v) {
+        auto trf = (e_arcball.full() * (eig::Vector4f() << v, 1).finished()).array().eval();
+        trf /= trf.w();
+        if (trf.z() > 1.f)
+          return eig::Vector2f(0);
+        else
+          return eig::screen_to_window_space(trf.head<2>() * .5f + .5f, viewport_offs, viewport_size);
+      }) | rng::to<std::vector>();
+      auto frust_window = frust_world | vws::transform([&](const auto &v) {
+        auto trf = (e_arcball.full() * (eig::Vector4f() << v, 1).finished()).array().eval();
+        trf /= trf.w();
+        if (trf.z() > 1.f)
+          return eig::Vector2f(0);
+        else
+          return eig::screen_to_window_space(trf.head<2>() * .5f + .5f, viewport_offs, viewport_size);
+      }) | rng::to<std::vector>();
+
+      // Draw frustrum
+      auto dl = ImGui::GetWindowDrawList();
+      dl->AddQuad(image_window[0], image_window[1], image_window[2], image_window[3], vertex_color_white, 1.f);
+      dl->AddQuad(frust_window[0], frust_window[1], frust_window[2], frust_window[3], vertex_color_white, 1.f);
+      for (uint i = 0; i < 4; ++i) {
+        guard_continue(!image_window[i].isZero() && !frust_window[i].isZero());
+        dl->AddLine(image_window[i], frust_window[i], vertex_color_white, 1.f);
+      }
+    } // for (e_view)
   }
 
   void MeshViewportDrawOverlayTask::eval_draw_info(SchedulerHandle &info) {

@@ -5,7 +5,7 @@
 #include <render/shape/primitive.glsl>
 
 vec3 detail_gen_barycentric_coords(in vec3 p, in Primitive prim) {
-  vec3 ab = prim.v1.p - prim.v0.p;
+  vec3 ab = prim.v1.p - prim.v0.p; 
   vec3 ac = prim.v2.p - prim.v0.p;
 
   float a_tri = abs(.5f * length(cross(ac,            ab           )));
@@ -19,6 +19,7 @@ vec3 detail_gen_barycentric_coords(in vec3 p, in Primitive prim) {
 void detail_fill_surface_info_object(inout SurfaceInfo si, in Ray ray) {
   // On a valid surface, fill in surface info
   ObjectInfo object_info = scene_object_info(record_get_object(si.data));
+  MeshInfo   mesh_info   = scene_mesh_info(object_info.mesh_i);
 
   // Obtain and unpack intersected primitive data
   Primitive prim = unpack(scene_mesh_prim(record_get_object_primitive(ray.data)));
@@ -27,11 +28,11 @@ void detail_fill_surface_info_object(inout SurfaceInfo si, in Ray ray) {
   si.n = cross(prim.v1.p - prim.v0.p, prim.v2.p - prim.v1.p);
   
   // Reinterpolate surface position, texture coordinates, shading normal using barycentrics
-  vec3 p  = (object_info.trf_mesh_inv * vec4(ray_get_position(ray), 1)).xyz;
-  vec3 b  = detail_gen_barycentric_coords(p, prim);
-  vec3 ns = b.x * prim.v0.n  + b.y * prim.v1.n  + b.z * prim.v2.n;
-  si.p    = b.x * prim.v0.p  + b.y * prim.v1.p  + b.z * prim.v2.p;
-  si.tx   = b.x * prim.v0.tx + b.y * prim.v1.tx + b.z * prim.v2.tx;
+  vec3 p = (inverse(object_info.trf) * vec4(ray_get_position(ray), 1)).xyz;
+  vec3 b = detail_gen_barycentric_coords(p, prim);
+  si.p  = b.x * prim.v0.p  + b.y * prim.v1.p  + b.z * prim.v2.p;
+  si.tx = b.x * prim.v0.tx + b.y * prim.v1.tx + b.z * prim.v2.tx;
+  si.ns = b.x * prim.v0.n  + b.y * prim.v1.n  + b.z * prim.v2.n;
   
   // Offset surface position as shading point, as per
   // "Hacking the Shadow Terminator, J. Hanika, 2021"
@@ -51,17 +52,12 @@ void detail_fill_surface_info_object(inout SurfaceInfo si, in Ray ray) {
   } */
 
   // Transform relevant data to world-space
-  ns   = (object_info.trf      * vec4(ns, 0)).xyz;
-  si.p = (object_info.trf_mesh * vec4(si.p, 1)).xyz;
-  si.n = (object_info.trf_mesh * vec4(si.n, 0)).xyz;
+  si.p  =          (object_info.trf * vec4(si.p,  1)).xyz;
+  si.n  = normalize(object_info.trf * vec4(si.n,  0)).xyz;
+  si.ns = normalize(object_info.trf * vec4(si.ns, 0)).xyz;
 
-  // Renormalize vectors
-  si.n = normalize(si.n);
-  ns   = normalize(ns);
-  
   // Generate shading frame based on shading normal
-  si.sh = get_frame(ns);
-  si.wi = to_local(si.sh, -ray.d);
+  si.wi = to_local(get_frame(si.ns), -ray.d);
   si.t  = ray.t;
 }
 
@@ -80,8 +76,8 @@ void detail_fill_surface_info_emitter(inout SurfaceInfo si, in Ray ray) {
   }
 
   // Generate shading frame based on geometric normal
-  si.sh = get_frame(si.n);
-  si.wi = to_local(si.sh, -ray.d);
+  si.ns = si.n;
+  si.wi = to_local(get_frame(si.ns), -ray.d);
   si.t  = ray.t;
 }
 

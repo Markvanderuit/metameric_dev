@@ -71,8 +71,9 @@ layout(binding = 8) uniform b_buff_coeffs {
 } buff_coeffs;
 
 // Storage buffer declarations
-layout(binding = 0) restrict readonly buffer b_buff_bvhs_node { BVHNodePack  data[]; } buff_bvhs_node;
-layout(binding = 1) restrict readonly buffer b_buff_bvhs_prim { MeshPrimPack data[]; } buff_bvhs_prim;
+layout(binding = 0) restrict readonly buffer b_buff_bvhs_node0 { BVHNode0Pack data[]; } buff_bvhs_node0;
+layout(binding = 1) restrict readonly buffer b_buff_bvhs_node1 { BVHNode1Pack data[]; } buff_bvhs_node1;
+layout(binding = 2) restrict readonly buffer b_buff_bvhs_prim  { MeshPrimPack data[]; } buff_bvhs_prim;
 
 // Texture/image units, ergo samplers and output images
 layout(binding = 0)          uniform sampler1DArray   b_illm_1f; // Illuminant function data, 1 component
@@ -109,6 +110,12 @@ declare_distr_sampler(wavelength, buff_wvls_distr, wavelength_samples)
 declare_distr_sampler(emitters, buff_emitters_distr, met_max_emitters)
 declare_scene_cmfs_data(b_cmfs_3f);
 declare_scene_illuminant_data(b_illm_1f);
+declare_scene_emitter_data(buff_emitters.data, buff_emitters.n, buff_envmap_info);
+declare_scene_object_data(buff_objects.data, buff_objects.n);
+declare_scene_reflectance_data(buff_coeffs.data, b_bsis_1f, b_coef_4f);
+declare_scene_bvh_data(buff_bvhs_prim.data, buff_bvhs_node0.data, buff_bvhs_node1.data, buff_meshes.data, buff_meshes.n);
+
+
 // declare_scene_cmfs_data(s_bucket_cmfs, bucket_i);
 // declare_scene_illuminant_data(s_bucket_illm, bucket_i);
 
@@ -116,11 +123,6 @@ declare_scene_illuminant_data(b_illm_1f);
 // declare_scene_object_data(s_objc_info, buff_objects.n);
 // declare_scene_reflectance_data(s_coef_info, s_bucket_basis, b_coef_4f, bucket_i);
 // declare_scene_bvh_data(buff_bvhs_prim.data, buff_bvhs_node.data, s_mesh_info, buff_meshes.n);
-
-declare_scene_emitter_data(buff_emitters.data, buff_emitters.n, buff_envmap_info);
-declare_scene_object_data(buff_objects.data, buff_objects.n);
-declare_scene_reflectance_data(buff_coeffs.data, b_bsis_1f, b_coef_4f);
-declare_scene_bvh_data(buff_bvhs_prim.data, buff_bvhs_node.data, buff_meshes.data, buff_meshes.n);
 
 // All includes from and in here rely on buffers/samplers to be declared
 #include <render/path.glsl>
@@ -211,32 +213,33 @@ declare_scene_bvh_data(buff_bvhs_prim.data, buff_bvhs_node.data, buff_meshes.dat
 } */
 
 // Initial sample state is seeded from pixel index, and rotated by multiplication
-SamplerState get_sampler_state(uvec2 xy, uint i) {
-  uint state = 1 + xy.x + xy.y * gl_NumWorkGroups.x * gl_WorkGroupSize.x;
+SamplerState get_sampler_state(ivec2 xy, uint i) {
+  uint state = 1 + uint(xy.x) + uint(xy.y) * gl_NumWorkGroups.x * gl_WorkGroupSize.x;
   return state * (1 + i);
 }
 
-void main() {
-  // load_shared();
-
-  // Select the correct pixel to render for e.g. checkerboarding
+// Select the correct pixel to render for e.g. checkerboarding
+ivec2 xy() {
   uvec2 xy = gl_GlobalInvocationID.xy;
   if (bool(buff_sampler_state.pixel_checkerboard))
     xy = xy 
        * uvec2(2, 1) 
        + uvec2((xy.y + buff_sampler_state.pixel_curr) % 2, 0);
+  return ivec2(xy);
+}
 
+void main() {
   // Take spp_per_iter samples and add to target measure
   for (uint i = buff_sampler_state.spp_curr;
             i < buff_sampler_state.spp_curr + buff_sampler_state.spp_per_iter;
           ++i) {
     // Initialize sampler state
-    SamplerState state = get_sampler_state(xy, i);
+    SamplerState state = get_sampler_state(xy(), i);
 
     // Generate a sensor sample; initial ray and such
     SensorSample sensor_sample = sample_sensor(
       FilmSensor(buff_sensor.proj_trf, buff_sensor.view_trf, buff_sensor.film_size), 
-      ivec2(xy), i, next_3d(state));
+      xy(), i, next_3d(state));
 
     // Handle bucketed wavelength data load into shared memory
     // Set sensor sample wavelength data from a sampled bucket
@@ -261,14 +264,14 @@ void main() {
     
     // Ignore invocations above requested film size; we keep invocations
     // alive and path-tracing - even outside the exact film size - for subgroup shenanigans
-    guard_continue(all(lessThan(xy, buff_sensor.film_size)));
+    guard_continue(all(lessThan(xy(), buff_sensor.film_size)));
 
     // The accumulated rgba measure is the current value in the film. We integrate
     // over the color system and add to this measure in a running average.
-    vec4 measure = imageLoad(b_film, ivec2(xy));
+    vec4 measure = imageLoad(b_film, xy());
     measure += (vec4(sensor_apply(sensor_sample, L), alpha) - measure) / float(i + 1);
     if (!use_alpha)
       measure.w = 1.f;
-    imageStore(b_film, ivec2(xy), measure);
+    imageStore(b_film, xy(), measure);
   } // for (uint spp_iter)
 }

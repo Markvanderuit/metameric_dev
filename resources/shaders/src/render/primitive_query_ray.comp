@@ -7,7 +7,7 @@
 #include <render/detail/path_types.glsl>
 #include <render/detail/scene_types.glsl>
 #include <render/load/bvh.glsl>
-#include <render/load/tlas.glsl>
+// #include <render/load/tlas.glsl>
 #include <render/load/emitter.glsl>
 #include <render/load/object.glsl>
 #include <render/load/defaults.glsl>
@@ -42,18 +42,12 @@ layout(binding = 5) uniform b_buff_scene {
 } buff_scene;
 
 // Storage buffer declarations
-layout(binding = 0) restrict readonly buffer b_buff_bvhs_node { 
-  BVHNodePack  data[]; 
-} buff_bvhs_node;
-layout(binding = 1) restrict readonly buffer b_buff_bvhs_prim { 
-  MeshPrimPack data[]; 
-} buff_bvhs_prim;
-layout(binding = 2) restrict coherent buffer b_buff_output { 
+layout(binding = 0) restrict readonly buffer b_buff_bvhs_node0 { BVHNode0Pack data[]; } buff_bvhs_node0;
+layout(binding = 1) restrict readonly buffer b_buff_bvhs_node1 { BVHNode1Pack data[]; } buff_bvhs_node1;
+layout(binding = 2) restrict readonly buffer b_buff_bvhs_prim  { MeshPrimPack data[]; } buff_bvhs_prim;
+layout(binding = 3) restrict coherent buffer b_buff_output { 
   Ray data;
 } buff_output;
-layout(binding = 3) restrict readonly buffer b_buff_tlas_node { 
-  BVHNodePack data[]; 
-} buff_tlas_node;
 layout(binding = 4) restrict readonly buffer b_buff_tlas_prim { 
   uint data[]; 
 } buff_tlas_prim;
@@ -63,12 +57,12 @@ shared ObjectInfo  s_objc_info[met_max_objects];
 shared EmitterInfo s_emtr_info[met_max_emitters];
 shared MeshInfo    s_mesh_info[met_max_meshes];
 
-declare_scene_traversal_stack(6); 
-declare_scene_tlas_stack(4); 
+// declare_scene_traversal_stack(6); 
+// declare_scene_tlas_stack(4); 
 declare_scene_emitter_data(s_emtr_info, buff_emitters.n, buff_envmap_info);
 declare_scene_object_data(s_objc_info, buff_objects.n);
-declare_scene_bvh_data(buff_bvhs_prim.data, buff_bvhs_node.data, s_mesh_info, buff_meshes.n);
-declare_scene_tlas_data(buff_tlas_prim.data, buff_tlas_node.data, buff_scene.data);
+declare_scene_bvh_data(buff_bvhs_prim.data, buff_bvhs_node0.data, buff_bvhs_node1.data, buff_meshes.data, buff_meshes.n);
+// declare_scene_tlas_data(buff_tlas_prim.data, buff_tlas_node.data, buff_scene.data);
 declare_distr_sampler_default(wavelength, buff_wvls_distr, wavelength_samples)
 declare_distr_sampler_default(emitters, buff_emitters_distr, met_max_emitters)
 

@@ -2,6 +2,7 @@
 #define BRDF_GLSL_GUARD
 
 #include <render/reflectance.glsl>
+#include <render/sample.glsl>
 #include <render/surface.glsl>
 #include <render/brdf/null.glsl>
 #include <render/brdf/diffuse.glsl>

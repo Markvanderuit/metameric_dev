@@ -20,8 +20,8 @@ namespace met {
 
   bool View::operator==(const View &o) const {
     guard(film_size.isApprox(o.film_size), false);
-    return std::tie(observer_i, camera_trf, camera_fov_y)
-        == std::tie(o.observer_i, o.camera_trf, o.camera_fov_y);
+    return std::tie(draw_frustrum, observer_i, camera_trf, camera_fov_y)
+        == std::tie(o.draw_frustrum, o.observer_i, o.camera_trf, o.camera_fov_y);
   }
  
   bool Object::operator==(const Object &o) const {

@@ -12,7 +12,7 @@
   MeshVertPack scene_mesh_vert(uint i) { return scene_buff_mesh_vert[i]; } \
   uvec3 scene_mesh_elem(uint i)       { return scene_buff_mesh_elem[i]; }  \
   MeshPrimPack scene_mesh_prim(uint i) { return scene_buff_mesh_prim[i]; } \
-  BVHNodePack scene_mesh_node(uint i) { return scene_buff_mesh_node[i]; }  \
+  BVHNode  scene_mesh_node(uint i) { return scene_buff_mesh_node[i]; }  \
   MeshInfo scene_mesh_info(uint i) { return scene_buff_mesh_info[i]; }     \
   uint scene_mesh_count() { return scene_buff_mesh_count; }
 

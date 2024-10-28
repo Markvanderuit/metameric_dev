@@ -14,9 +14,9 @@ struct SurfaceInfo {
   vec2 tx; // Surface texture coordinates
 
   // Local shading information
-  Frame sh; // Surface local shading frame, including shading normal
-  vec3 wi;  // Incident direction in local shading frame
-  float t;  // Distance traveled along ray in incident direction
+  vec3 ns; // Surface shading normal; defines local shading frame
+  vec3 wi; // Incident direction in local shading frame
+  float t; // Distance traveled along ray in incident direction
   
   // Intersected object record; object/emitter index, primitive index
   uint data;
@@ -53,9 +53,9 @@ vec3 surface_offset(in SurfaceInfo si, in vec3 d) {
   return fma(vec3(M_RAY_EPS), si.n, si.p);
 }
 
-// Shorthands for frame transofrmation
-vec3 to_local(in SurfaceInfo si, in vec3 v) { return to_local(si.sh, v); }
-vec3 to_world(in SurfaceInfo si, in vec3 v) { return to_world(si.sh, v); }
+// Shorthands for frame transformation
+vec3 to_local(in SurfaceInfo si, in vec3 v) { return to_local(get_frame(si.ns), v); }
+vec3 to_world(in SurfaceInfo si, in vec3 v) { return to_world(get_frame(si.ns), v); }
 
 Ray ray_towards_direction(in SurfaceInfo si, in vec3 d) {
   return init_ray(surface_offset(si, d), d);
@@ -72,19 +72,6 @@ Ray ray_towards_point(in SurfaceInfo si, in vec3 p) {
   ray.data = RECORD_INVALID_DATA;
 
   return ray;
-}
-
-PositionSample get_position_sample(in SurfaceInfo si) {
-  PositionSample ps;
-
-  ps.is_delta = false;
-  ps.p        = si.p;
-  ps.n        = si.n;
-  ps.d        = -to_world(si, si.wi);
-  ps.data     = si.data;
-  ps.t        = si.t;
-
-  return ps;
 }
 
 #endif // GLSL_SURFACE_GUARD

@@ -6,7 +6,7 @@
 #include <render/detail/path_types.glsl>
 #include <render/detail/scene_types.glsl>
 #include <render/load/bvh.glsl>
-#include <render/load/tlas.glsl>
+// #include <render/load/tlas.glsl>
 #include <render/load/cmfs.glsl>
 #include <render/load/emitter.glsl>
 #include <render/load/illuminant.glsl>
@@ -68,12 +68,11 @@ layout(binding = 9) uniform b_buff_coeffs {
   TextureAtlasInfo data[met_max_textures];
 } buff_coeffs;
 
-// Storage buffer declaration
-layout(binding = 0) restrict readonly buffer b_buff_bvhs_node { BVHNodePack  data[]; } buff_bvhs_node;
-layout(binding = 1) restrict readonly buffer b_buff_bvhs_prim { MeshPrimPack data[]; } buff_bvhs_prim;
-layout(binding = 2) restrict readonly buffer b_buff_tlas_node { BVHNodePack  data[]; } buff_tlas_node;
-layout(binding = 3) restrict readonly buffer b_buff_tlas_prim { uint         data[]; } buff_tlas_prim;
-layout(binding = 4) restrict coherent buffer b_buff_output { 
+// Storage buffer declarations
+layout(binding = 0) restrict readonly buffer b_buff_bvhs_node0 { BVHNode0Pack data[]; } buff_bvhs_node0;
+layout(binding = 1) restrict readonly buffer b_buff_bvhs_node1 { BVHNode1Pack data[]; } buff_bvhs_node1;
+layout(binding = 2) restrict readonly buffer b_buff_bvhs_prim  { MeshPrimPack data[]; } buff_bvhs_prim;
+layout(binding = 3) restrict coherent buffer b_buff_output { 
   uint head;
   uint padd[3]; /* align head to 16 bytes */ 
   Path data[];
@@ -96,13 +95,12 @@ shared MeshInfo    s_mesh_info[met_max_meshes];
 // Wavelength/emitter sampling distributions draw from uniform buffers
 // Color system spectra and illuminant spectra draw from sampler arrays
 // Part of mesh data comes from storage buffers, part from shared memory
-declare_scene_traversal_stack(6); 
-declare_scene_tlas_stack(4); 
+// declare_scene_traversal_stack(6); 
+// declare_scene_tlas_stack(4); 
 declare_scene_cmfs_data(b_cmfs_3f);
 declare_scene_illuminant_data(b_illm_1f);
 declare_scene_object_data(s_objc_info, buff_objects.n);
-declare_scene_bvh_data(buff_bvhs_prim.data, buff_bvhs_node.data, s_mesh_info, buff_meshes.n);
-declare_scene_tlas_data(buff_tlas_prim.data, buff_tlas_node.data, buff_scene.data);
+declare_scene_bvh_data(buff_bvhs_prim.data, buff_bvhs_node0.data, buff_bvhs_node1.data, buff_meshes.data, buff_meshes.n);
 declare_scene_emitter_data(s_emtr_info, buff_emitters.n, buff_envmap_info);
 declare_scene_reflectance_data(buff_coeffs.data, b_bsis_1f, b_coef_4f);
 declare_distr_sampler(wavelength, buff_wvls_distr, wavelength_samples)

@@ -111,14 +111,17 @@ namespace met {
 
   void to_json(json &js, const View &view) {
     met_trace();
-    js = {{ "observer_i",    view.observer_i   },
-          { "camera_trf",    view.camera_trf   },
-          { "camera_fov_y",  view.camera_fov_y },
-          { "film_size",     view.film_size    }};
+    js = {{ "draw_frustrum", view.draw_frustrum },
+          { "observer_i",    view.observer_i    },
+          { "camera_trf",    view.camera_trf    },
+          { "camera_fov_y",  view.camera_fov_y  },
+          { "film_size",     view.film_size     }};
   }
 
   void from_json(const json &js, View &view) {
     met_trace();
+    if (js.contains("draw_frustrum"))
+      js.at("draw_frustrum").get_to(view.draw_frustrum);
     js.at("observer_i").get_to(view.observer_i);
     js.at("camera_trf").get_to(view.camera_trf);
     js.at("camera_fov_y").get_to(view.camera_fov_y);

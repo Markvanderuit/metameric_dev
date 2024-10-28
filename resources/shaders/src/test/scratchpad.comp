@@ -1,0 +1,37 @@
+#include <preamble.glsl>
+
+layout(local_size_x = 1) in;
+layout(std140)           uniform;
+layout(std430)           buffer;
+
+struct Object {
+  bool is_active;
+  vec4 v;
+  mat4 trf;
+};
+
+layout(binding = 0) uniform b_buff_objects {
+  uint n;
+  Object data[256];
+} buff_objects;
+
+layout(binding = 0) buffer b_buff_output {
+  uint i;
+  vec4 v;
+} buff_work;
+
+Object get_object(uint i) {
+  return buff_objects.data[i];
+}
+
+vec4 mult_object(in Object object) {
+  vec4 v = object.trf 
+         * vec4(0, 0, 0, 1);
+  return v;
+}
+
+void main() {
+  Object object = get_object(buff_work.i);
+  vec4 v = mult_object(object);
+  buff_work.v = v * object.v;
+}

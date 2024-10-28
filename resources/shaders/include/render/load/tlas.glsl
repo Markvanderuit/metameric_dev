@@ -7,7 +7,7 @@
                                 scene_buff_tlas_node,                     \
                                 scene_buff)                               \
   uint        scene_tlas_prim(uint i) { return scene_buff_tlas_prim[i]; } \
-  BVHNodePack scene_tlas_node(uint i) { return scene_buff_tlas_node[i]; } \
+  BVHNode     scene_tlas_node(uint i) { return scene_buff_tlas_node[i]; } \
   SceneInfo   scene_info()            { return scene_buff;              }
   
 #define declare_scene_tlas_stack(stack_depth)                                                        \

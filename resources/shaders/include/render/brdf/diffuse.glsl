@@ -28,7 +28,7 @@ vec4 eval_brdf_diffuse(in BRDFInfo brdf, in SurfaceInfo si, in vec3 wo) {
 }
 
 float pdf_brdf_diffuse(in BRDFInfo brdf, in SurfaceInfo si, in vec3 wo) {
-  if (cos_theta(si.wi) <= 0.f ||  cos_theta(wo) <= 0.f)
+  if (cos_theta(si.wi) <= 0.f || cos_theta(wo) <= 0.f)
     return 0.f;
   return square_to_cos_hemisphere_pdf(wo);
 }

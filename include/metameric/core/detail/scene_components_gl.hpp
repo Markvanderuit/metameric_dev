@@ -19,14 +19,13 @@ namespace met::detail {
     // Per-object block layout for std140 uniform buffer
     struct alignas(16) BlockLayout {
       alignas(16) eig::Matrix4f trf;
-      alignas(16) eig::Matrix4f trf_mesh;
-      alignas(16) eig::Matrix4f trf_mesh_inv;
       alignas(4)  bool          is_active;
       alignas(4)  uint          mesh_i;
       alignas(4)  uint          uplifting_i;
       alignas(4)  uint          brdf_type;
-      alignas(16) eig::Array4u  albedo_data;
+      alignas(8)  eig::Array2u  albedo_data;
     };
+    static_assert(sizeof(BlockLayout) == 64 + 16 + 16);
     
     // All-object block layout for std140 uniform buffer, mapped for write
     struct BufferLayout {
@@ -53,13 +52,12 @@ namespace met::detail {
     // Per-object block layout for std140 uniform buffer
     struct alignas(16) EmBlockLayout {
       alignas(16) eig::Matrix4f trf;
-      alignas(16) eig::Matrix4f trf_inv;
       alignas(4)  uint          type;
       alignas(4)  bool          is_active;
       alignas(4)  uint          illuminant_i;
       alignas(4)  float         illuminant_scale;
     };
-    static_assert(sizeof(EmBlockLayout) == 144);
+    static_assert(sizeof(EmBlockLayout) == 80);
     
     // All-object block layout for std140 uniform buffer, mapped for write
     struct EmBufferLayout {
@@ -124,19 +122,10 @@ namespace met::detail {
   class SceneGLHandler<met::Mesh> : public SceneGLHandlerBase {
     // Per-mesh block layout for std140 uniform buffer
     struct alignas(16) MeshBlockLayout {
-      // Offset/extent into mesh_verts buffer
-      alignas(4) uint verts_offs;
-      alignas(4) uint verts_size;
-
-      // Offset/extent into mesh_elems buffer
-      alignas(4) uint elems_offs;
-      alignas(4) uint elems_size;
-
-      // Offset/extent into bvh_nodes buffer
-      alignas(4) uint nodes_offs;
-      alignas(4) uint nodes_size;
+      alignas(4) uint prims_offs; // Offset/extent into mesh_elems buffer
+      alignas(4) uint nodes_offs; // Offset/extent into bvh_nodes buffer
     };
-    static_assert(sizeof(MeshBlockLayout) == 32);
+    static_assert(sizeof(MeshBlockLayout) == 16);
     
     // All-mesh block layout for std140 uniform buffer, mapped for write
     struct MeshBufferLayout {
@@ -160,6 +149,8 @@ namespace met::detail {
 
     // Packed BVH data, used during render/query operations
     gl::Buffer bvh_nodes;
+    gl::Buffer bvh_nodes_0;
+    gl::Buffer bvh_nodes_1;
     gl::Buffer bvh_prims;
 
     // CPU-side packed bvh data and original texture coordinates
@@ -173,8 +164,8 @@ namespace met::detail {
     gl::Array array;
     std::vector<gl::MultiDrawInfo::DrawCommand> draw_commands;
     
-    // Cache of mesh transforms, pre-applied to object transforms
-    std::vector<eig::Matrix4f> transforms;
+    // Cache of data to undo mesh transform into a unit cube
+    std::vector<eig::Matrix4f> unit_transforms;
     
   public:
     // Class constructor
@@ -268,7 +259,7 @@ namespace met::detail {
     void update(const Scene &) override;
   };
 
-  template <>
+  /* template <>
   class SceneGLHandler<met::Scene> : public SceneGLHandlerBase {
     // Block layout for std140 uniform buffer
     struct alignas(16) BufferLayout {
@@ -289,5 +280,5 @@ namespace met::detail {
 
     // Update GL-side data for objects indicated as changed
     void update(const Scene &) override;
-  };
+  }; */
 } // namespace met::detail

@@ -1,29 +1,20 @@
 #ifndef RENDER_EMITTER_POINT_GLSL_GUARD
 #define RENDER_EMITTER_POINT_GLSL_GUARD
 
-PositionSample sample_emitter_point(in EmitterInfo em, in SurfaceInfo si, in vec2 sample_2d) {
-  PositionSample ps;
-
-  ps.p = em.trf[3].xyz;
-  ps.n = vec3(0, 0, 1); // Indeterminate?
-  
-  ps.d = ps.p - si.p;
-  ps.t = length(ps.d);
-  ps.d /= ps.t;
-  
-  ps.pdf      = 1.f;
-  ps.is_delta = true;
-
-  return ps;
+EmitterSample sample_emitter_point(in EmitterInfo em, in SurfaceInfo si, in vec4 wvls, in vec2 sample_2d) {
+  EmitterSample es;
+  es.ray      = ray_towards_point(si, em.trf[3].xyz);
+  es.L        = scene_illuminant(em.illuminant_i, wvls) * em.illuminant_scale / sdot(es.ray.t);
+  es.pdf      = 1.f;
+  es.is_delta = true;
+  return es;
 }
 
-vec4 eval_emitter_point(in EmitterInfo em, in PositionSample ps, in vec4 wvls) {
-  return scene_illuminant(em.illuminant_i, wvls) 
-    * em.illuminant_scale 
-    / sdot(ps.t);
+vec4 eval_emitter_point(in EmitterInfo em, in SurfaceInfo si, in vec4 wvls) {
+  return scene_illuminant(em.illuminant_i, wvls) * em.illuminant_scale / sdot(si.t);
 }
 
-float pdf_emitter_point(in EmitterInfo em, in PositionSample ps) {
+float pdf_emitter_point(in EmitterInfo em, in SurfaceInfo si) {
   return 1.f;
 }
 

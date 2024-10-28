@@ -46,10 +46,11 @@ namespace met {
   /* Camera and render settings data layout; a simple description
      of how to render the current scene, either to screen or film. */
   struct View {
-    uint         observer_i   = 0;    // Referral to underlying CMFS
-    Transform    camera_trf;          // Transform applied to scene camera
-    float        camera_fov_y = 45.f; // Vertical field of view
-    eig::Array2u film_size    = 256;  // Pixel count of film target
+    bool         draw_frustrum = false; // Draw frustrum in viewport?
+    uint         observer_i    = 0;     // Referral to underlying CMFS
+    Transform    camera_trf;            // Transform applied to scene camera
+    float        camera_fov_y  = 45.f;  // Vertical field of view
+    eig::Array2u film_size     = 256;   // Pixel count of film target
 
   public: // Boilerplate
     bool operator==(const View &o) const;

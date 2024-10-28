@@ -192,29 +192,6 @@ namespace met {
     return bvh;
   }
 
-  // Wrapper function to do templated generation with a runtime constant
-  /* template <uint... Ks>
-  BVH create_bvh_internal_varargs(BVHCreateInternalInfo info) {
-    using FTy = BVH(*)(BVHCreateInternalInfo);
-    constexpr FTy f[] = { create_bvh_internal<Ks>... };
-    return f[0](info);
-  } */
-
-
-  /* template <uint K>
-  BVH create_bvh_internal_fwd(BVHCreateInternalInfo info) {
-    switch (info.n_node_children) {
-      case 2:
-        return create_bvh_internal<2>(info);
-      case 4:
-        return create_bvh_internal<4>(info);
-      case 8:
-        return create_bvh_internal<8>(info);
-      default:
-        debug::check_expr(false, "BVH node fan-out not supported");
-    }
-  } */
-
   template <uint K>
   BVH<K>::BVH(CreateMeshInfo info) {
     met_trace();

@@ -3,6 +3,7 @@
 
 #include <render/record.glsl>
 #include <render/warp.glsl>
+#include <render/sample.glsl>
 
 // Mostly a carbon copy of the implementation in mitsuba 3
 vec2 sincos_phi(in vec3 v) {

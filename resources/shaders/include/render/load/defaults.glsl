@@ -5,12 +5,13 @@
 #include <render/detail/scene_types.glsl>
 
 #ifndef SCENE_DATA_MESH
-MeshVertPack scene_mesh_vert(uint i) { MeshVertPack d; return d; }
-uvec3 scene_mesh_elem(uint i)        { return uvec3(0);          }
-MeshPrimPack scene_mesh_prim(uint i) { MeshPrimPack d; return d; }
-BVHNodePack scene_mesh_node(uint i)  { BVHNodePack d; return d;  } 
-MeshInfo scene_mesh_info(uint i)     { MeshInfo d; return d;     }
-uint scene_mesh_count()              { return 0;                 }
+MeshVertPack scene_mesh_vert(uint i) { MeshVertPack d; return d;  }
+uvec3 scene_mesh_elem(uint i)        { return uvec3(0);           }
+MeshPrimPack scene_mesh_prim(uint i) { MeshPrimPack d; return d;  }
+BVHNode0Pack scene_mesh_node0(uint i) { BVHNode0Pack d; return d; } 
+BVHNode1Pack scene_mesh_node1(uint i) { BVHNode1Pack d; return d; } 
+MeshInfo scene_mesh_info(uint i)     { MeshInfo d; return d;      }
+uint scene_mesh_count()              { return 0;                  }
 #endif // !SCENE_DATA_MESH
 
 #ifndef SCENE_DATA_BVH
@@ -18,13 +19,13 @@ void scene_set_stack_value(uint i, uint v) {            }
 uint scene_get_stack_value(uint i)         {  return 0; }
 #endif // !SCENE_DATA_BVH
 
-#ifndef SCENE_DATA_TLAS
+/* #ifndef SCENE_DATA_TLAS
 BVHNodePack scene_tlas_node(uint i)             { BVHNodePack d; return d; } 
 uint scene_tlas_prim(uint i)                    { uint d; return d;        }
 void scene_set_tlas_stack_value(uint i, uint v) {                          }
 uint scene_get_tlas_stack_value(uint i)         { return 0;                }
 SceneInfo scene_info()                          { SceneInfo d; return d;   }
-#endif // !SCENE_DATA_TLAS
+#endif // !SCENE_DATA_TLAS */
 
 #ifndef SCENE_DATA_EMITTER
 EmitterInfo scene_emitter_info(uint i) { EmitterInfo d; return d; }

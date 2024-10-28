@@ -465,15 +465,19 @@ namespace met {
                                     mesh.verts[0],
                                     [](auto a, auto b) { return a.cwiseMax(b).eval(); });
     
-    // Generate transformation to move vertices to a [0, 1] bbox
+    // Generate transformation to place vertices in a unit cube
     auto scale = (maxb - minb).eval();
     scale = (scale.array().abs() > 0.00001f).select(1.f / scale, eig::Array3f(1));
     auto trf = (eig::Scaling((scale).matrix().eval()) * eig::Translation3f(-minb)).matrix().eval();
-    
-    // Apply transformation to each point
-    std::for_each(std::execution::par_unseq, range_iter(mesh.verts), [&](auto &v) {
-      v = (trf * (eig::Vector4f() << v, 1).finished()).head<3>().eval();
-    });
+
+    // Apply transformation to verts
+    std::for_each(std::execution::par_unseq, range_iter(mesh.verts), 
+      [&](auto &v) { v = ((v - minb) * scale).eval(); });
+
+    // Apply transformation to normals
+    if (mesh.has_norms())
+      std::for_each(std::execution::par_unseq, range_iter(mesh.norms), 
+        [&](auto &n) { n = (n * scale).matrix().normalized().eval(); });
 
     return trf.inverse().eval();
   }

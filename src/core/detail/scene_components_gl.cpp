@@ -9,44 +9,45 @@
 #include <numeric>
 
 namespace met::detail {
-  eig::Array4u pack_material_3f(const std::variant<Colr,  uint> &v) {
-    union {
-      struct {
-        uint is_sampled;
-        float value[3];
-      } in_0;
-      struct {
-        uint is_sampled;
-        uint sample_i;
-        float padd[2];
-      } in_1;
-      uint out[4];
-    } u;
-    static_assert(sizeof(decltype(u)) == 16);
-    if (v.index()) u.in_1 = { 1, std::get<1>(v), { 0, 0} };
-    else           u.in_0 = { 0, { std::get<0>(v)[0], std::get<0>(v)[1], std::get<0>(v)[2] } };
-    return { u.out[0], u.out[1], u.out[2], u.out[3] };
+  eig::Array2u pack_material_3f(const std::variant<Colr, uint> &v) {
+    met_trace();
+    std::array<uint, 2> u;
+    if (v.index()) {
+      u[0] = std::get<1>(v);
+      u[1] = 0x00010000;
+    } else {
+      Colr c = std::get<0>(v);
+      u[0] = detail::pack_half_2x16(c.head<2>());
+      u[1] = detail::pack_half_2x16({ c.z(), 0 });
+    }
+    return { u[0], u[1] };
   }
 
-  eig::Array2u pack_material_1f(const std::variant<float,  uint> &v) {
-    union {
-      struct {
-        uint is_sampled;
-        float value;
-      } in_0;
-      struct {
-        uint is_sampled;
-        uint value;
-      } in_1;
-      uint out[2];
-    } u;
-    static_assert(sizeof(decltype(u)) == 8);
-    if (v.index()) u.in_1 = { 1, std::get<1>(v) };
-    else           u.in_0 = { 0, std::get<0>(v) };
-    return { u.out[0], u.out[1] };
+  uint pack_material_1f(const std::variant<float, uint> &v) {
+    met_trace();
+    uint u;
+    if (v.index()) {
+      u = (0x0000FFFF & static_cast<ushort>(std::get<1>(v))) | 0x00010000;
+    } else {
+      u = (0x0000FFFF & detail::to_float16(std::get<0>(v)));
+    }
+    return u;
   }
-  
-  // Packed BVH node data
+
+  struct NodePack0 {
+    uint aabb_pack_0; // lo.x, lo.y
+    uint aabb_pack_1; // hi.x, hi.y
+    uint aabb_pack_2; // lo.z, hi.z
+    uint data_pack;   // leaf | size | offs
+  };
+  static_assert(sizeof(NodePack0) == 16);
+  struct NodePack1 {
+    std::array<uint, 8> child_pack_0; // per child: lo.x | lo.y | hi.x | hi.y
+    std::array<uint, 4> child_pack_1; // per child: lo.z | hi.z
+  };
+  static_assert(sizeof(NodePack1) == 48);
+
+
   struct NodePack {
     uint aabb_pack_0;                 // lo.x, lo.y
     uint aabb_pack_1;                 // hi.x, hi.y
@@ -56,6 +57,48 @@ namespace met::detail {
     std::array<uint, 4> child_pack_1; // per child: lo.z | hi.z
   };
   static_assert(sizeof(NodePack) == 64);
+
+  // Helper method to pack BVH node data tightly
+  std::pair<NodePack0, NodePack1> pack_pair(const BVH<8>::Node &node) {
+    met_trace();
+
+    // Output node pack
+    NodePack0 p0;
+    NodePack1 p1;
+
+    // Generate a AABB over child AABBs
+    auto aabb = *rng::fold_left_first(std::span(node.child_aabb.begin(), node.size()), 
+    [](const AABB &a, const AABB &b) -> AABB {
+      return { .minb = a.minb.cwiseMin(b.minb), .maxb = a.maxb.cwiseMax(b.maxb) };
+    });
+    
+    // 3xu32 packs AABB lo, ex
+    auto b_lo_in = aabb.minb;
+    auto b_ex_in = (aabb.maxb - aabb.minb).eval();
+    p0.aabb_pack_0 = detail::pack_unorm_2x16_floor({ b_lo_in.x(), b_lo_in.y() });
+    p0.aabb_pack_1 = detail::pack_unorm_2x16_ceil ({ b_ex_in.x(), b_ex_in.y() });
+    p0.aabb_pack_2 = detail::pack_unorm_2x16_floor({ b_lo_in.z(), 0 }) 
+                   | detail::pack_unorm_2x16_ceil ({ 0, b_ex_in.z() });
+
+    // 1xu32 packs node type, child offset, child count
+    p0.data_pack = node.offs_data | (node.size_data << 27);
+
+    // Child AABBs are packed in 6 bytes per child
+    p1.child_pack_0.fill(0);
+    p1.child_pack_1.fill(0);
+    for (uint i = 0; i < node.size(); ++i) {
+      auto b_lo_safe = ((node.child_aabb[i].minb - b_lo_in) / b_ex_in).eval();
+      auto b_hi_safe = ((node.child_aabb[i].maxb - b_lo_in) / b_ex_in).eval();
+      auto pack_0 = detail::pack_unorm_4x8_floor((eig::Array4f() << b_lo_safe.head<2>(), 0, 0).finished())
+                  | detail::pack_unorm_4x8_ceil ((eig::Array4f() << 0, 0, b_hi_safe.head<2>()).finished());
+      auto pack_1 = detail::pack_unorm_4x8_floor((eig::Array4f() << b_lo_safe.z(), 0, 0, 0).finished())
+                  | detail::pack_unorm_4x8_ceil ((eig::Array4f() << 0, b_hi_safe.z(), 0, 0).finished());
+      p1.child_pack_0[i    ] |= pack_0;
+      p1.child_pack_1[i / 2] |= (pack_1 << ((i % 2) ? 16 : 0));
+    }
+
+    return { p0, p1 };
+  }
 
   // Helper method to pack BVH node data tightly
   NodePack pack(const BVH<8>::Node &node) {
@@ -69,7 +112,7 @@ namespace met::detail {
     [](const AABB &a, const AABB &b) -> AABB {
       return { .minb = a.minb.cwiseMin(b.minb), .maxb = a.maxb.cwiseMax(b.maxb) };
     });
-
+    
     // 3xu32 packs AABB lo, ex
     auto b_lo_in = aabb.minb;
     auto b_ex_in = (aabb.maxb - aabb.minb).eval();
@@ -161,18 +204,18 @@ namespace met::detail {
       
       // Get mesh transform, incorporate into gl-side object transform
       auto object_trf = object.transform.affine().matrix().eval();
-      auto mesh_trf   = (object_trf * scene.resources.meshes.gl.transforms[object.mesh_i]).eval();
+      auto mesh_trf   = scene.resources.meshes.gl.unit_transforms[object.mesh_i];
+      auto trf        = (object_trf * mesh_trf).eval();
+
 
       // Fill in object struct data
       m_object_info_map->data[i] = {
-        .trf               = object_trf,
-        .trf_mesh          = mesh_trf,
-        .trf_mesh_inv      = mesh_trf.inverse().eval(),
-        .is_active         = object.is_active,
-        .mesh_i            = object.mesh_i,
-        .uplifting_i       = object.uplifting_i,
-        .brdf_type         = static_cast<uint>(object.brdf_type),
-        .albedo_data       = pack_material_3f(object.diffuse),
+        .trf         = trf,
+        .is_active   = object.is_active,
+        .mesh_i      = object.mesh_i,
+        .uplifting_i = object.uplifting_i,
+        .brdf_type   = static_cast<uint>(object.brdf_type),
+        .albedo_data = pack_material_3f(object.diffuse),
       };
 
       // Flush change to buffer; most changes to objects are local,
@@ -294,11 +337,8 @@ namespace met::detail {
       const auto &[emitter, state] = emitters[i];
       guard_continue(state);
 
-      auto trf = emitter.transform.affine();
-      
       m_em_info_map->data[i] = {
-        .trf              = trf.matrix(),
-        .trf_inv          = trf.matrix().inverse().eval(),
+        .trf              = emitter.transform.affine().matrix(),
         .type             = static_cast<uint>(emitter.type),
         .is_active        = emitter.is_active,
         .illuminant_i     = emitter.illuminant_i,
@@ -356,7 +396,7 @@ namespace met::detail {
     // Resize cache vectors, which keep cleaned, simplified mesh data around 
     m_meshes.resize(meshes.size());
     m_bvhs.resize(meshes.size());
-    transforms.resize(meshes.size());
+    unit_transforms.resize(meshes.size());
 
     // Keep around old, unparameterized texture coordinates for now
     std::vector<std::vector<eig::Array2f>> txuvs(meshes.size());
@@ -371,116 +411,113 @@ namespace met::detail {
       guard_continue(state);
 
       // We simplify a copy of the mesh, reparameterize it so texture UVs are
-      // unique and non-overlapping, unitize it to a [0, 1] cube, and finally
-      // build a bvh acceleration structure over this mess
-      m_meshes[i]   = simplified_mesh<met::Mesh>(value, 12288, 1e-3);
-      txuvs[i]      = parameterize_mesh<met::Mesh>(m_meshes[i]);
-      transforms[i] = unitize_mesh<met::Mesh>(m_meshes[i]);
-      m_bvhs[i]     = {{ .mesh = m_meshes[i], .n_leaf_children = 4 }};
-    }
-
-    for (int i = 0; i < meshes.size(); ++i) {
-      fmt::print("Mesh {} has {} nodes\n", meshes[i].name, m_bvhs[i].nodes.size());
-      fmt::print("{}\n", m_bvhs[i].nodes[0].offs());
+      // unique and non-overlapping, fit it to a [0, 1] cube, and finally
+      // build a bvh to represent this mess
+      m_meshes[i]        = simplified_mesh<met::Mesh>(value, 12288, 1e-3);
+      txuvs[i]           = parameterize_mesh<met::Mesh>(m_meshes[i]);
+      unit_transforms[i] = unitize_mesh<met::Mesh>(m_meshes[i]);
+      m_bvhs[i]          = {{ .mesh = m_meshes[i], .n_leaf_children = 4 }};
     }
 
     // Pack mesh/BVH data tightly and fill in corresponding mesh layout info
-    {
-      // Temporary layout data
-      std::vector<uint> verts_size(meshes.size()), // Nr. of verts in mesh i
-                        verts_offs(meshes.size()), // Nr. of elems in mesh i
-                        nodes_size(meshes.size()), // Nr. of elems in bvh i
-                        nodes_offs(meshes.size()), // Nr. of nodes prior to bvh i
-                        elems_size(meshes.size()), // Nr. of elems in mesh i
-                        elems_offs(meshes.size()); // Nr. of elems prior to mesh i
-      
-      // Fill in vert/node/elem sizes and scans
-      rng::transform(m_meshes, verts_size.begin(), [](const auto &m) -> uint { return m.verts.size(); });
-      rng::transform(m_bvhs,   nodes_size.begin(), [](const auto &m) -> uint { return m.nodes.size(); });
-      rng::transform(m_meshes, elems_size.begin(), [](const auto &m) -> uint { return m.elems.size(); });
-      std::exclusive_scan(range_iter(verts_size), verts_offs.begin(), 0u);
-      std::exclusive_scan(range_iter(nodes_size), nodes_offs.begin(), 0u);
-      std::exclusive_scan(range_iter(elems_size), elems_offs.begin(), 0u);
-      
-      // Fill in remainder of mesh layout info
-      for (int i = 0; i < meshes.size(); ++i) {
-        auto &layout = m_mesh_info_map->data[i];
-        layout.verts_offs = verts_offs[i];
-        layout.nodes_offs = nodes_offs[i];
-        layout.elems_offs = elems_offs[i];
-        layout.verts_size = verts_size[i];
-        layout.nodes_size = nodes_size[i];
-        layout.elems_size = elems_size[i];
-      }
-
-      // Mostly temporary data packing vectors; will be copied to gpu-side buffers after
-      std::vector<VertexPack>     verts_packed(verts_size.back() + verts_offs.back()); // Compressed and packed
-      std::vector<NodePack>       nodes_packed(nodes_size.back() + nodes_offs.back()); // Compressed and packed
-      std::vector<uint>           txuvs_packed(verts_size.back() + verts_offs.back()); // Compressed and packed
-      std::vector<eig::Array3u>   elems_packed(elems_size.back() + elems_offs.back()); // Not compressed, just packed
-      bvh_prims_cpu.resize(elems_size.back() + elems_offs.back());                     // Compressed and packed
-      bvh_txuvs_cpu.resize(elems_size.back() + elems_offs.back());                     // Compressed and packed
-
-      // Pack data tightly into pack data vectors
-      #pragma omp parallel for
-      for (int i = 0; i < meshes.size(); ++i) {
-        const auto &bvh  = m_bvhs[i];
-        const auto &mesh = m_meshes[i];
-
-        // Pack vertex data tightly and copy to the correctly offset range
-        #pragma omp parallel for
-        for (int j = 0; j < mesh.verts.size(); ++j) {
-          auto norm = mesh.has_norms() ? mesh.norms[j] : eig::Array3f(0, 0, 1);
-          auto txuv = mesh.has_txuvs() ? mesh.txuvs[j] : eig::Array2f(0.5);
-          txuv = txuv.unaryExpr([](float f) {
-            int i = static_cast<int>(f);
-            return (i % 2) ? 1.f - (f - i) : f - i;
-          });
-
-          // Vertices are compressed as well as packed
-          Vertex v = { .p = mesh.verts[j], .n = norm, .tx = txuv };
-          verts_packed[verts_offs[i] + j] = v.pack();
-
-          // We keep the unparameterized texture UVs around; set to 0.5 if not present
-          txuvs_packed[verts_offs[i] + j] = pack_unorm_2x16(!txuvs[i].empty() ? txuvs[i][j] : txuv);
-        }
-
-        // Pack node data tightly and copy to the correctly offset range
-        #pragma omp parallel for
-        for (int j = 0; j < bvh.nodes.size(); ++j) {
-          nodes_packed[nodes_offs[i] + j] = pack(bvh.nodes[j]);
-        }
-
-        // Pack primitive data tightly and copy to the correctly offset range
-        // while scattering data into leaf node order for the BVH
-        #pragma omp parallel for
-        for (int j = 0; j < bvh.prims.size(); ++j) {
-          // BVH primitives are packed in bvh order
-          auto el = mesh.elems[bvh.prims[j]];
-          bvh_prims_cpu[elems_offs[i] + j] = PrimitivePack {
-            .v0 = verts_packed[verts_offs[i] + el[0]],
-            .v1 = verts_packed[verts_offs[i] + el[1]],
-            .v2 = verts_packed[verts_offs[i] + el[2]]
-          };
-          bvh_txuvs_cpu[elems_offs[i] + j] = eig::Array3u {
-            txuvs_packed[verts_offs[i] + el[0]],
-            txuvs_packed[verts_offs[i] + el[1]],
-            txuvs_packed[verts_offs[i] + el[2]]
-          };
-        }
-        
-        // Copy element indices and adjust to refer to the correctly offset range
-        rng::transform(mesh.elems, elems_packed.begin() + elems_offs[i], 
-          [o = verts_offs[i]](const auto &v) -> eig::AlArray3u { return v + o; });
-      }
-
-      // Copy data to buffers
-      mesh_verts = {{ .data = cnt_span<const std::byte>(verts_packed)  }};
-      mesh_elems = {{ .data = cnt_span<const std::byte>(elems_packed)  }};
-      mesh_txuvs = {{ .data = cnt_span<const std::byte>(txuvs_packed)  }};
-      bvh_nodes  = {{ .data = cnt_span<const std::byte>(nodes_packed)  }};
-      bvh_prims  = {{ .data = cnt_span<const std::byte>(bvh_prims_cpu) }};
+    // Temporary layout data
+    std::vector<uint> verts_size(meshes.size()), // Nr. of verts in mesh i
+                      verts_offs(meshes.size()), // Nr. of elems in mesh i
+                      nodes_size(meshes.size()), // Nr. of elems in bvh i
+                      nodes_offs(meshes.size()), // Nr. of nodes prior to bvh i
+                      elems_size(meshes.size()), // Nr. of elems in mesh i
+                      elems_offs(meshes.size()); // Nr. of elems prior to mesh i
+    
+    // Fill in vert/node/elem sizes and scans
+    rng::transform(m_meshes, verts_size.begin(), [](const auto &m) -> uint { return m.verts.size(); });
+    rng::transform(m_bvhs,   nodes_size.begin(), [](const auto &m) -> uint { return m.nodes.size(); });
+    rng::transform(m_meshes, elems_size.begin(), [](const auto &m) -> uint { return m.elems.size(); });
+    std::exclusive_scan(range_iter(verts_size), verts_offs.begin(), 0u);
+    std::exclusive_scan(range_iter(nodes_size), nodes_offs.begin(), 0u);
+    std::exclusive_scan(range_iter(elems_size), elems_offs.begin(), 0u);
+    
+    // Fill in gl-side mesh layout info
+    for (int i = 0; i < meshes.size(); ++i) {
+      auto &layout = m_mesh_info_map->data[i];
+      layout.nodes_offs = nodes_offs[i];
+      layout.prims_offs = elems_offs[i];
     }
+
+    // Mostly temporary data packing vectors; will be copied to gpu-side buffers after
+    std::vector<VertexPack>   verts_packed(verts_size.back() + verts_offs.back());   // Compressed and packed
+    std::vector<NodePack>     nodes_packed(nodes_size.back() + nodes_offs.back());   // Partially compressed 8-way
+    std::vector<NodePack0>    nodes_0_packed(nodes_size.back() + nodes_offs.back()); // Partially compressed 8-way
+    std::vector<NodePack1>    nodes_1_packed(nodes_size.back() + nodes_offs.back()); // Partially compressed 8-way
+    std::vector<uint>         txuvs_packed(verts_size.back() + verts_offs.back());   // Compressed and packed
+    std::vector<eig::Array3u> elems_packed(elems_size.back() + elems_offs.back());   // Not compressed, just packed
+    bvh_prims_cpu.resize(elems_size.back() + elems_offs.back());                     // Compressed and packed
+    bvh_txuvs_cpu.resize(elems_size.back() + elems_offs.back());                     // Compressed and packed
+
+    // Pack data tightly into pack data vectors
+    #pragma omp parallel for
+    for (int i = 0; i < meshes.size(); ++i) {
+      const auto &bvh  = m_bvhs[i];
+      const auto &mesh = m_meshes[i];
+
+      // Pack vertex data tightly and copy to the correctly offset range
+      #pragma omp parallel for
+      for (int j = 0; j < mesh.verts.size(); ++j) {
+        auto norm = mesh.has_norms() ? mesh.norms[j] : eig::Array3f(0, 0, 1);
+        auto txuv = mesh.has_txuvs() ? mesh.txuvs[j] : eig::Array2f(0.5);
+
+        // Force UV to [0, 1]
+        txuv = txuv.unaryExpr([](float f) {
+          int i = static_cast<int>(f);
+          return (i % 2) ? 1.f - (f - i) : f - i;
+        });
+
+        // Vertices are compressed as well as packed
+        Vertex v = { .p = mesh.verts[j], .n = norm, .tx = txuv };
+        verts_packed[verts_offs[i] + j] = v.pack();
+
+        // We keep the unparameterized texture UVs around; set to 0.5 if not present
+        txuvs_packed[verts_offs[i] + j] = pack_unorm_2x16(!txuvs[i].empty() ? txuvs[i][j] : txuv);
+      }
+
+      // Pack primitive data tightly and copy to the correctly offset range
+      // while scattering data into leaf node order for the BVH
+      #pragma omp parallel for
+      for (int j = 0; j < bvh.prims.size(); ++j) {
+        // BVH primitives are packed in bvh order
+        auto el = mesh.elems[bvh.prims[j]];
+        bvh_prims_cpu[elems_offs[i] + j] = PrimitivePack {
+          .v0 = verts_packed[verts_offs[i] + el[0]],
+          .v1 = verts_packed[verts_offs[i] + el[1]],
+          .v2 = verts_packed[verts_offs[i] + el[2]]
+        };
+        bvh_txuvs_cpu[elems_offs[i] + j] = eig::Array3u {
+          txuvs_packed[verts_offs[i] + el[0]],
+          txuvs_packed[verts_offs[i] + el[1]],
+          txuvs_packed[verts_offs[i] + el[2]]
+        };
+      }
+
+      // Pack node data tightly and copy to the correctly offset range
+      #pragma omp parallel for
+      for (int j = 0; j < bvh.nodes.size(); ++j) {
+        nodes_packed[nodes_offs[i] + j] = pack(bvh.nodes[j]);
+        std::tie(nodes_0_packed[nodes_offs[i] + j], 
+                 nodes_1_packed[nodes_offs[i] + j]) = pack_pair(bvh.nodes[j]);
+      }
+      
+      // Copy element indices and adjust to refer to the correctly offset range
+      rng::transform(mesh.elems, elems_packed.begin() + elems_offs[i], 
+        [o = verts_offs[i]](const auto &v) -> eig::AlArray3u { return v + o; });
+    }
+
+    // Copy data to buffers
+    mesh_verts  = {{ .data = cnt_span<const std::byte>(verts_packed)   }};
+    mesh_elems  = {{ .data = cnt_span<const std::byte>(elems_packed)   }};
+    mesh_txuvs  = {{ .data = cnt_span<const std::byte>(txuvs_packed)   }};
+    bvh_nodes   = {{ .data = cnt_span<const std::byte>(nodes_packed)   }};
+    bvh_nodes_0 = {{ .data = cnt_span<const std::byte>(nodes_0_packed) }};
+    bvh_nodes_1 = {{ .data = cnt_span<const std::byte>(nodes_1_packed) }};
+    bvh_prims   = {{ .data = cnt_span<const std::byte>(bvh_prims_cpu)  }};
 
     // Define corresponding vertex array object and generate multidraw command info
     array = {{
@@ -492,8 +529,7 @@ namespace met::detail {
     }};
     draw_commands.resize(meshes.size());
     for (uint i = 0; i < meshes.size(); ++i) {
-      draw_commands[i] = { .vertex_count = m_mesh_info_map->data[i].elems_size * 3,
-                           .vertex_first = m_mesh_info_map->data[i].elems_offs * 3 };
+      draw_commands[i] = { .vertex_count = elems_size[i] * 3, .vertex_first = elems_offs[i] * 3 };
     }
 
     // Flush changes to layout data
@@ -643,7 +679,7 @@ namespace met::detail {
     cmfs_texture.set(cmfs_buffer);
   }
 
-  SceneGLHandler<met::Scene>::SceneGLHandler() {
+  /* SceneGLHandler<met::Scene>::SceneGLHandler() {
     met_trace_full();
 
     // Obtain writeable/flushable mapping for scene layout
@@ -754,5 +790,5 @@ namespace met::detail {
     // Push BVH data to buffer
     tlas_nodes = {{ .data = cnt_span<const std::byte>(nodes_packed) }};
     tlas_prims = {{ .data = cnt_span<const std::byte>(prims_packed) }};
-  }
+  } */
 } // namespace met::detail

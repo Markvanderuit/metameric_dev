@@ -3,6 +3,7 @@
 
 #include <math.glsl>
 #include <render/record.glsl>
+#include <render/detail/mesh_packing.glsl>
 #include <sampler/uniform.glsl>
 
 // An object defining a 3-dimensional ray.
@@ -28,27 +29,27 @@ Ray init_ray(vec3 d) {
 
 Ray init_ray(vec3 d, float t_max) {
   Ray ray;
-  ray.o    = vec3(0);
-  ray.d    = d;
-  ray.t    = t_max;
+  ray.o = vec3(0);
+  ray.d = d;
+  ray.t = t_max;
   record_clear(ray.data);
   return ray;
 }
 
 Ray init_ray(vec3 o, vec3 d) {
   Ray ray;
-  ray.o    = o;
-  ray.d    = d;
-  ray.t    = FLT_MAX;
+  ray.o = o;
+  ray.d = d;
+  ray.t = FLT_MAX;
   record_clear(ray.data);
   return ray;
 }
 
 Ray init_ray(vec3 o, vec3 d, float t_max) {
   Ray ray;
-  ray.o    = o;
-  ray.d    = d;
-  ray.t    = t_max;
+  ray.o = o;
+  ray.d = d;
+  ray.t = t_max;
   record_clear(ray.data);
   return ray;
 }
@@ -70,14 +71,7 @@ bool hit_emitter(in Ray ray) {
 }
 
 vec3 ray_get_position(in Ray ray) {
-  return ray.t == FLT_MAX ? vec3(FLT_MAX) : ray.o + ray.d * ray.t;
-}
-
-void ray_transform_inplace(inout Ray ray_world, in Ray ray_local, in mat4 to_world) {
-  ray_world.t    = ray_local.t == FLT_MAX
-                 ? FLT_MAX
-                 : length((to_world * vec4(ray_local.d * ray_local.t, 0)).xyz);
-  ray_world.data = ray_local.data;
+  return ray.t == FLT_MAX ? vec3(FLT_MAX) : fma(ray.d, vec3(ray.t), ray.o);
 }
 
 Ray ray_transform(in Ray ray_world, in mat4 to_local) {  
@@ -96,6 +90,13 @@ Ray ray_transform(in Ray ray_world, in mat4 to_local) {
   ray_local.data = ray_world.data;
   
   return ray_local;
+}
+
+void ray_transform_inplace(inout Ray ray_world, in Ray ray_local, in mat4 to_world) {
+  ray_world.t    = ray_local.t == FLT_MAX
+                 ? FLT_MAX
+                 : length((to_world * vec4(ray_local.d * ray_local.t, 0)).xyz);
+  ray_world.data = ray_local.data;
 }
 
 #endif // RAY_GLSL_GUARD

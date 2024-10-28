@@ -61,9 +61,10 @@ function(compile_glsl_to_spirv glsl_src_fp spirv_dependencies)
   
   # Generate spir-v binary using glslangValidator, store in .temp file
   add_custom_command(
-    OUTPUT  ${spirv_temp_fp}
+    OUTPUT  ${spirv_bin_fp}
     COMMAND ${glslangValidator} ${spirv_parse_fp} 
-            -o ${spirv_temp_fp} 
+            # -o ${spirv_temp_fp} 
+            -o ${spirv_bin_fp}
             --client opengl100 
             --target-env spirv1.5 
             --glsl-version 460
@@ -71,23 +72,32 @@ function(compile_glsl_to_spirv glsl_src_fp spirv_dependencies)
     VERBATIM
   )
 
-  # Generate optimized spir-v binary using spirv-opt from spirv-tools
-  add_custom_command(
-    OUTPUT  ${spirv_bin_fp}
-    COMMAND ${spirv-opt} ${spirv_temp_fp} 
-            -o ${spirv_bin_fp} 
-            -O 
-            # -Os
-    DEPENDS ${spirv_temp_fp}
-    VERBATIM 
-  )
+  # # Generate optimized spir-v binary using spirv-opt from spirv-tools
+  # add_custom_command(
+  #   OUTPUT  ${spirv_bin_fp}
+  #   COMMAND ${spirv-opt} ${spirv_temp_fp} 
+  #           -o ${spirv_bin_fp} 
+  #           -O 
+  #           # -Os
+  #   DEPENDS ${spirv_temp_fp}
+  #   VERBATIM 
+  # )
+
+  # # Generate spir-v reflection information in .json files using spirv-cross
+  # add_custom_command(
+  #   OUTPUT  ${spirv_refl_fp}
+  #   COMMAND ${spirv-cross} ${spirv_temp_fp} 
+  #           --output ${spirv_refl_fp} --reflect
+  #   DEPENDS ${spirv_temp_fp}
+  #   VERBATIM
+  # )
 
   # Generate spir-v reflection information in .json files using spirv-cross
   add_custom_command(
     OUTPUT  ${spirv_refl_fp}
-    COMMAND ${spirv-cross} ${spirv_temp_fp} 
+    COMMAND ${spirv-cross} ${spirv_bin_fp} 
             --output ${spirv_refl_fp} --reflect
-    DEPENDS ${spirv_temp_fp}
+    DEPENDS ${spirv_bin_fp}
     VERBATIM
   )
 

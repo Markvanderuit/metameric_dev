@@ -24,8 +24,8 @@
 
   // Finalize the path object, as if an emitter was hit by illuminant sampling,
   // and store to buffer
-  void path_query_finalize_emitter(in Path pt, in PositionSample r, in vec4 L, in vec4 wvls) {
-    pt.data[pt.path_depth++] = PathVertex(r.p, r.data);
+  void path_query_finalize_emitter(in Path pt, in EmitterSample r, in vec4 L, in vec4 wvls) {
+    pt.data[pt.path_depth++] = PathVertex(ray_get_position(r.ray), r.ray.data);
     pt.wvls = wvls;
     pt.L    = L;
     set_path(pt, get_next_path_id());

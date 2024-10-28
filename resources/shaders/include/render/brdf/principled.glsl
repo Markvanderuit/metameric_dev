@@ -93,7 +93,7 @@ vec4 eval_brdf_principled(in BRDFInfo brdf, in SurfaceInfo si, in vec3 wo) {
 }
 
 float pdf_brdf_principled(in BRDFInfo brdf, in SurfaceInfo si, in vec3 wo) {
-  if (cos_theta(si.wi) <= 0.f ||  cos_theta(wo) <= 0.f)
+  if (cos_theta(si.wi) <= 0.f || cos_theta(wo) <= 0.f)
     return 0.f;
 
   // Sample probabilities [spec, diffuse] for the two lobes

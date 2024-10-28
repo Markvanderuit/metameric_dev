@@ -91,16 +91,18 @@ namespace met::detail {
 
   template <>
   struct SceneStateHandler<View> : public SceneStateHandlerBase<View> {
-    SceneStateHandler<decltype(View::observer_i)>   observer_i;
-    SceneStateHandler<decltype(View::camera_trf)>   camera_trf;
-    SceneStateHandler<decltype(View::camera_fov_y)> camera_fov_y;
-    SceneStateHandler<decltype(View::film_size)>    film_size;
+    SceneStateHandler<decltype(View::draw_frustrum)> draw_frustrum;
+    SceneStateHandler<decltype(View::observer_i)>    observer_i;
+    SceneStateHandler<decltype(View::camera_trf)>    camera_trf;
+    SceneStateHandler<decltype(View::camera_fov_y)>  camera_fov_y;
+    SceneStateHandler<decltype(View::film_size)>     film_size;
 
   public:
     bool update(const View &o) override {
       met_trace();
       return m_mutated = 
-      ( observer_i.update(o.observer_i)
+      ( draw_frustrum.update(o.draw_frustrum)
+      | observer_i.update(o.observer_i)
       | camera_trf.update(o.camera_trf) 
       | camera_fov_y.update(o.camera_fov_y)
       | film_size.update(o.film_size)

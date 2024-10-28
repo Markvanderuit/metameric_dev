@@ -17,7 +17,6 @@ float fresnel_schlick(float f_0, float f_90, float lambert) {
 
 vec4 Li_debug(in SensorSample ss, in SamplerState state) {
   // Ray-trace first. If no surface is intersected by the ray, return early
-  scene_intersect(ss.ray);
   if (!scene_intersect(ss.ray))
     return vec4(0);
 
@@ -101,6 +100,17 @@ vec4 Li_debug(in SensorSample ss, in SamplerState state) {
   return vec4(L * 4.f / float(wavelength_samples));
 }
 
+/* // Path throughput and other global variables are forced into shared memory
+shared vec4  s_spec[gl_WorkGroupSize.x * gl_WorkGroupSize.y * gl_WorkGroupSize.z];
+shared vec4  s_beta[gl_WorkGroupSize.x * gl_WorkGroupSize.y * gl_WorkGroupSize.z];
+shared float s_bs_pdf[gl_WorkGroupSize.x * gl_WorkGroupSize.y * gl_WorkGroupSize.z];
+shared bool  s_bs_is_delta[gl_WorkGroupSize.x * gl_WorkGroupSize.y * gl_WorkGroupSize.z];
+
+#define beta        s_beta[gl_LocalInvocationIndex]
+#define S           s_spec[gl_LocalInvocationIndex]
+#define bs_pdf      s_bs_pdf[gl_LocalInvocationIndex]
+#define bs_is_delta s_bs_is_delta[gl_LocalInvocationIndex] */
+
 vec4 Li(in SensorSample ss, in SamplerState state, inout float alpha) {
   // Initialize path store if requested for path queries
   path_query_initialize(pt);
@@ -120,10 +130,11 @@ vec4 Li(in SensorSample ss, in SamplerState state, inout float alpha) {
     if (!scene_intersect(ss.ray)) {
       if (scene_has_envm_emitter()) {
         float em_pdf = bs_is_delta ? 0.f : pdf_env_emitter(ss.ray.d);
-            
-        vec4 s = beta
-               * eval_env_emitter(ss.wvls)
-               * mis_power(bs_pdf, em_pdf);
+        
+        // No division by sample density, as this is incorporated in path throughput
+        vec4 s = beta                       // throughput
+               * eval_env_emitter(ss.wvls)  // emitted value
+               * mis_power(bs_pdf, em_pdf); // mis weight
 
         // Store current path query if requested
         path_query_finalize_envmap(pt, s, ss.wvls);
@@ -147,12 +158,11 @@ vec4 Li(in SensorSample ss, in SamplerState state, inout float alpha) {
     // If an emissive object is hit, add its contribution to the 
     // current path, and then terminate said path
     if (is_emitter(si)) {
-      PositionSample ps     = get_position_sample(si);
-      float          em_pdf = bs_is_delta ? 0.f : pdf_emitters(ps);
+      float em_pdf = bs_is_delta ? 0.f : pdf_emitters(si);
 
       // No division by sample density, as this is incorporated in path throughput
       vec4 s = beta                       // throughput 
-             * eval_emitter(ps, ss.wvls)  // emitted value
+             * eval_emitter(si, ss.wvls)  // emitted value
              * mis_power(bs_pdf, em_pdf); // mis weight
 
       // Store current path query if requested
@@ -173,31 +183,34 @@ vec4 Li(in SensorSample ss, in SamplerState state, inout float alpha) {
     
     // Direct illumination sampling
     {
-      // Generate position sample on emitter
-      // Importance sample emitter position
-      PositionSample pe       = sample_emitters(si, next_3d(state));
-      vec3           wo       = to_local(si, pe.d);
-      float          bsrf_pdf = bs_pdf * pdf_brdf(brdf, si, wo);
+      // Generate position sample on emitter, with ray towards sample
+      EmitterSample es = sample_emitters(si, ss.wvls, next_3d(state));
       
+      // Exitant direction in local frame
+      vec3 wo = to_local(si, es.ray.d);
+      
+      // Accumulated sample density of brdf sampling for this sample
+      float brdf_pdf = bs_pdf * pdf_brdf(brdf, si, wo);
+
       // If the sample position has potential throughput, 
       // evaluate a ray towards the position and add contribution to output
-      if (pe.pdf != 0.f && bsrf_pdf != 0.f && cos_theta(wo) > 0.f) {
+      if (es.pdf > 0 && brdf_pdf > 0) {
         // Test for any hit closer than sample position
-        if (!scene_intersect_any(ray_towards_point(si, pe.p))) {
+        if (!scene_intersect_any(es.ray)) {
           // Avoid diracs when calculating mis weight
-          float mis_weight = pe.is_delta 
-                           ? 1.f / pe.pdf 
-                           : mis_power(pe.pdf, bsrf_pdf) / pe.pdf;
+          float mis_weight = es.is_delta 
+                           ? 1.f / es.pdf 
+                           : mis_power(es.pdf, brdf_pdf) / es.pdf;
 
           // Assemble path throughput
-          vec4 s = beta                       // Throughput
-                 * eval_brdf(brdf, si, wo)    // brdf value
-                 * abs(cos_theta(wo))         // cosine attenuation
-                 * eval_emitter(pe, ss.wvls)  // emitted value
-                 * mis_weight;                // mis weight
+          vec4 s = beta                    // current path throughput
+                 * es.L                    // emitter response
+                 * eval_brdf(brdf, si, wo) // brdf response
+                 * cos_theta(wo)           // cosine attenuation
+                 * mis_weight;             // mis weight
 
           // Store current path query if requested
-          path_query_finalize_emitter(pt, pe, s, ss.wvls);
+          path_query_finalize_emitter(pt, es, s, ss.wvls);
 
           // Add to output radiance
           S += s;
