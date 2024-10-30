@@ -74,13 +74,13 @@ namespace met {
     Transform transform;
 
     // Indices to underlying mesh/uplifting
-    uint mesh_i;
-    uint uplifting_i;
+    uint mesh_i      = 0;
+    uint uplifting_i = 0;
 
     // Material data is packed with object; 
     // some values are variant of a specified value, or a texture index
-    BRDFType                  brdf_type;
-    std::variant<Colr,  uint> diffuse;
+    BRDFType                  brdf_type = BRDFType::eDiffuse;
+    std::variant<Colr,  uint> diffuse   = Colr(.5f);
 
   public: // Boilerplate
     bool operator==(const Object &o) const;

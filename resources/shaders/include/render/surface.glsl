@@ -41,15 +41,14 @@ SurfaceInfo get_surface_info(in Ray ray) {
       detail_fill_surface_info_object(si, ray);
     } else if (is_emitter(si)) {
       detail_fill_surface_info_emitter(si, ray);
-    } /* else {
-      // ...
-    } */
+    }
   }
 
   return si;
 }
 
 vec3 surface_offset(in SurfaceInfo si, in vec3 d) {
+  // return fma(vec3(M_RAY_EPS), si.ns, si.p);
   return fma(vec3(M_RAY_EPS), si.n, si.p);
 }
 

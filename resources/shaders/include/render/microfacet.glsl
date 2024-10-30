@@ -5,104 +5,183 @@
 #include <render/warp.glsl>
 #include <render/sample.glsl>
 
-// Mostly a carbon copy of the implementation in mitsuba 3
-vec2 sincos_phi(in vec3 v) {
-  float sin_theta_2   = fma(v.x, v.x, v.y * v.y);
-  float inv_sin_theta = 1.f / sqrt(sin_theta_2);
-  vec2 res = (abs(sin_theta_2) <= 4.f * M_EPS)
-           ? vec2(1, 0)
-           : clamp(v.xy * inv_sin_theta, -1, 1);
-  return res.yx;
+vec3 sample_ggx_vndf(vec3 out_dir, vec2 roughness, vec2 randoms) {
+	// This implementation is based on:
+	// https://gist.github.com/jdupuy/4c6e782b62c92b9cb3d13fbb0a5bd7a0
+	// It is described in detail here:
+	// https://doi.org/10.1111/cgf.14867
+
+	// Warp to the hemisphere configuration
+	vec3 out_dir_std = normalize(vec3(out_dir.xy * roughness, out_dir.z));
+  if (out_dir_std.z < 0)
+    out_dir_std = -out_dir_std;
+  
+	// Sample a spherical cap in (-out_dir_std.z, 1]
+	float azimuth = (2.0 * M_PI) * randoms[0] - M_PI;
+	float z = 1.0 - randoms[1] * (1.0 + out_dir_std.z);
+	float sine = sqrt(max(0.0, 1.0 - z * z));
+	vec3 cap = vec3(sine * cos(azimuth), sine * sin(azimuth), z);
+	// Compute the half vector in the hemisphere configuration
+	vec3 half_dir_std = cap + out_dir_std;
+	// Warp back to the ellipsoid configuration
+	
+  vec3 in_dir = normalize(vec3(half_dir_std.xy * roughness, half_dir_std.z));
+  if (in_dir.z < 0)
+    in_dir = -in_dir;
+
+  return in_dir;
 }
 
-float _Lambda(in vec3 w, in float alpha) {
-  float tan_2_theta = max(0.f, 1.f - sdot(w)) / sdot(w);
-  if (isinf(tan_2_theta))
+vec3 sample_ggx_in_dir(vec3 out_dir, float roughness, vec2 randoms) {
+	vec3 half_dir = sample_ggx_vndf(out_dir, vec2(roughness), randoms);
+	return -reflect(out_dir, half_dir);
+}
+
+// https://auzaiffe.wordpress.com/2024/04/15/vndf-importance-sampling-an-isotropic-distribution/
+/* float pdf_vndf_isotropic(vec3 wo, vec3 n, vec3 wi, float alpha) {
+  float alpha_2 = alpha * alpha;
+  vec3  wm = normalize(wo + wi);
+  float zm = dot(wm, n);
+  float zi = dot(wi, n);
+  float nrm = 1.f / sqrt((zi * zi) * (1.0f - alpha_2) + alpha_2);
+  float sigmaStd = (zi * nrm) * 0.5f + 0.5f;
+  float sigmaI = sigmaStd / nrm;
+  float nrmN = (zm * zm) * (alpha_2 - 1.0f) + 1.0f;
+  return alpha_2 / (M_PI * 4.0f * nrmN * nrmN * sigmaI);
+} */
+
+float get_ggx_vndf_density(float lambert_out, float half_dot_normal, float half_dot_out, float roughness) {
+	// Based on Equation 2 in this paper: https://doi.org/10.1111/cgf.14867
+	// A few factors have been cancelled to optimize evaluation.
+	if (half_dot_normal < 0.0)
+		return 0.0;
+
+	float roughness_2 		 = roughness * roughness;
+	float flip_roughness_2 = 1.0 - roughness * roughness;
+
+	float length_M_inv_out_2 = roughness_2 + flip_roughness_2 * lambert_out * lambert_out;
+	float length_M_half_2    = 1.0 				 - flip_roughness_2 * half_dot_normal * half_dot_normal;
+
+	float D_vis_std = max(0.0, half_dot_out) 
+									* (1.0 / M_PI) 
+									/ (lambert_out + sqrt(length_M_inv_out_2));
+
+	return D_vis_std * roughness_2 / (length_M_half_2 * length_M_half_2);
+}
+
+
+// Microfacet brdf without fresnel; normal times shadowing times masking over 4 cos wo cos wi
+float eval_microfacet(in SurfaceInfo si, in vec3 wh, in vec3 wo, in float alpha) {
+  float alpha_2 = alpha * alpha;
+
+  // GGX normal distribution function
+  // float ggx = (alpha_2 * wh.z - wh.z) * wh.z + 1.f;
+  // ggx = alpha_2 / (ggx * ggx);
+  float ggx = alpha_2 / sdot((alpha_2 * cos_theta(wh) - cos_theta(wh)) * cos_theta(wh) + 1.f);
+
+  // G1/G2 shadowing-masking
+  float lambda_i = -.5f + .5f * sqrt(1.f + alpha_2 / (si.wi.z * si.wi.z) - alpha_2);
+  float lambda_o = -.5f + .5f * sqrt(1.f + alpha_2 / (wo.z * wo.z) - alpha_2);
+  float g1_i = 1.f / (1.f + lambda_i);
+  float g1_o = 1.f / (1.f + lambda_o);
+  float g2 = g1_i * g1_o;
+
+  // Combination, fresnel excluded and kept for the brdf
+  return ggx * g2 / (4.f * cos_theta(wo) * cos_theta(si.wi));
+  
+//   // GGX normal distribution function
+//   float alpha_2 = alpha * alpha;
+//   float ggx = (alpha_2 * wh.z - wh.z) * wh.z + 1.f;
+//   ggx = alpha_2 / (ggx * ggx);
+  
+// //  /*  float lambda_i = -.5f + .5f * sqrt(1.f + alpha_2 / (si.wi.z * si.wi.z) - alpha_2);
+// //   float lambda_o = -.5f + .5f * sqrt(1.f + alpha_2 / (wo.z * wo.z) - alpha_2);
+// //   float g1_i = 1.f / (1.f + lambda_i);
+// //   float g1_o = 1.f / (1.f + lambda_o);
+// //   float smith = g1_i * g1_o; */
+// //   // smith /= 4.f * cos_theta(wo) * cos_theta(si.wi);
+// //   // smith /= 4.f * cos_theta(wo) * dot(si.wi, wh);
+
+// 	// ... Smith masking-shadowing...
+// 	float masking   = cos_theta(wo)    * sqrt((cos_theta(si.wi) - alpha_2 * cos_theta(si.wi)) * cos_theta(si.wi) + alpha_2);
+// 	float shadowing = cos_theta(si.wi) * sqrt((cos_theta(wo)    - alpha_2 * cos_theta(wo))    * cos_theta(wo) + alpha_2);
+// 	float smith = 0.5 / (masking + shadowing);
+
+  // return ggx * smith;
+}
+
+// Sampling density for a given normal, drawn from a ggx microfacet distribution
+float pdf_microfacet(in SurfaceInfo si, in vec3 wh, in float alpha) {
+  float density = get_ggx_vndf_density(cos_theta(si.wi),
+                                       cos_theta(wh),
+                                       dot(si.wi, wh),
+                                       alpha);
+	density /= 4.0 * dot(si.wi, wh);
+  return density;
+
+  // return pdf_vndf_isotropic(si.wi, wh, reflect(-si.wi, wh), alpha);
+
+  /* if (cos_theta(wh) < 0.f)
     return 0.f;
 
-  vec2 sc = sincos_phi(w);
-  float alpha2 = sdot(sc.y * alpha + sdot(sc.x * alpha));
+  float alpha_2       = alpha * alpha;
+  float len_mwi_2_inv = alpha_2 + (1.f - alpha_2) * sdot(cos_theta(si.wi));
+  float len_mwh_2     = 1.f     - (1.f - alpha_2) * sdot(cos_theta(wh));
 
-  return (-1.f + sqrt(1.f + alpha2 * tan_2_theta)) / 2.f;
+  float D_vis_std = max(0.f, dot(wh, si.wi)) 
+                  * (2.f * M_PI_INV) 
+                  / (cos_theta(si.wi) + sqrt(len_mwi_2_inv));
+
+  float pdf = D_vis_std * alpha_2 / (len_mwh_2 * len_mwh_2);
+  pdf /= 4.f * dot(wh, si.wi);
+
+  return pdf; */
 }
 
-float _D(in vec3 n, in float alpha) {
-  float tan_2_theta = max(0.f, 1.f - sdot(n)) / sdot(n);
-  if (isinf(tan_2_theta))
-    return 0.f;
+// Sample a ggx microfacet distribution and obtain a normal with some probability
+MicrofacetSample sample_microfacet(in SurfaceInfo si,
+                                   in float       alpha,
+                                   in vec2        sample_2d) {
+  /* {
+    MicrofacetSample ms;
+    // vec3 wo = sample_ggx_in_dir(si.wi, alpha, sample_2d);
+    // ms.n   = normalize(si.wi + wo);
+    vec3 wo = reflect(-si.wi, sample_ggx_vndf(si.wi, vec2(alpha), sample_2d));
+    ms.n   = normalize(si.wi + wo);
+    ms.pdf = pdf_microfacet(si, ms.n, alpha);
+    return ms;
+  }      */           
 
-  float cos4theta = sdot(sdot(n));
-  if (cos4theta < 1e-16f)
-    return 0.f;
-  
-  vec2 sc = sincos_phi(n);
-  float e = tan_2_theta 
-          * (sdot(sc.y / alpha) + sdot(sc.x / alpha));
-  
-  return 1.f / (M_PI * alpha * alpha * cos4theta * sdot(1.f + e));
-}
-
-float _G1(in vec3 w, in float alpha) {
-  return 1.f / (1.f + _Lambda(w, alpha));
-}
-
-float _G(in vec3 wi, in vec3 wo, in float alpha) {
-  return 1.f / (1.f + _Lambda(wi, alpha) + _Lambda(wo, alpha));
-}
-
-// Mostly a carbon copy of the implementation in mitsuba 3
-vec2 sample_visible_11(in float cos_theta_i, in vec2 sample_2d) {
-  vec2 p  = square_to_unif_disk_concentric(sample_2d);
-  float s = 0.5f * (1.f + cos_theta_i);
-  p.y = mix(safe_sqrt(1.f - sdot(p.x)), p.y, s);
-
-  float x = p.x, y = p.y, z = safe_sqrt(1.f - sdot(p));
-  
-  float sin_theta_i = safe_sqrt(1.f - sdot(cos_theta_i));
-  float inv_norm    = 1.f / fma(sin_theta_i, y, cos_theta_i * z);
-
-  return vec2(cos_theta_i * y - (sin_theta_i * z), x) * inv_norm;
-}
-
-// Mostly a carbon copy of the implementation of ggx with visible normal sampling in mitsuba 3
-float eval_microfacet(in vec3 wi, in vec3 wh, in vec3 wo, in float alpha) {
-  float f = (_G(wi, wo, alpha) * _D(wh, alpha))
-          / (4.f * cos_theta(wi) * cos_theta(wo));
-  return f;
-}
-
-// Mostly a carbon copy of the implementation of ggx with visible normal sampling in mitsuba 3
-float pdf_microfacet(in vec3 wi, in vec3 n, in float alpha) {
-  float pdf = _D(n, alpha)
-            * _G1(wi, alpha)
-            * max(0.f, dot(n, wi))
-            / cos_theta(wi);
-  return pdf;
-}
-
-// Mostly a carbon copy of the implementation of ggx with visible normal sampling in mitsuba 3
-MicrofacetSample sample_microfacet(in vec3  wi,
-                                    in float alpha,
-                                    in vec2  sample_2d) {
-  // Step 1; stretch wi
-  vec3 wi_p = normalize(vec3(alpha * wi.xy, wi.z));
-  if (wi_p.z < 0.f)
+  // Step 1; warp wi to hemisphere as wi_p
+  vec3 wi_p = normalize(vec3(si.wi.xy * alpha, si.wi.z));
+  if (wi_p.z < 0)
     wi_p = -wi_p;
   
-  // Step 2; simulate P22_{wi}(slope.x, slope.y, 1, 1)
-  vec2 slope = sample_visible_11(cos_theta(wi_p), sample_2d);
+  // Step 2; sample visible hemisphere;  
+  // listing 3 of Dupuy et al.
+  float phi  = 2.f * M_PI * sample_2d.x;
+  float z    = fma(1.f - sample_2d.y, 1.f + wi_p.z, -wi_p.z);
+  float sth  = sqrt(clamp(1.f - z * z, 0.f, 1.f));
+  vec3  c    = { sth * cos(phi), sth * sin(phi), z };
+  vec3  wh_p = c + wi_p;
 
-  // Step 3; rotate & unstretch
-  vec2 sin_cos_phi = sincos_phi(wi_p);
-  slope = alpha * vec2(
-    fma(sin_cos_phi.y, slope.x, -(sin_cos_phi.x * slope.y)),
-    fma(sin_cos_phi.x, slope.x,  (sin_cos_phi.y * slope.y))
-  );
+  // Step 2; sample visible hemisphere
+  // christoph's rewrite
+  /* float azimuth = 2.f * M_PI * sample_2d.x - M_PI;
+  float z       = 1.f - sample_2d.y * (1.f + wi_p.z);
+  float sth     = sqrt(max(0.f, 1.f - z * z));
+  vec3  c       = { sth * cos(azimuth), sth * sin(azimuth), z };
+  vec3  wh_p    = c + wi_p;  */
 
-  // Step 4; assemble normal & PDF
+  // Step 3; warp wh_p back to ellipsoid as wh
+  vec3 wh = normalize(vec3(wh_p.xy * alpha, wh_p.z));
+  if (wh.z < 0)
+    wh = -wh;
+
+  // Step 4; assemble sample object
   MicrofacetSample ms;
-  ms.n   = normalize(vec3(-slope.xy, 1));
-  ms.pdf = _G1(wi, alpha);
+  ms.n   = normalize(reflect(-si.wi, wh) + si.wi);
+  ms.pdf = pdf_microfacet(si, ms.n, alpha);
   return ms;
 }
 
