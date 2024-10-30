@@ -8,9 +8,8 @@ void ray_intersect_object(inout Ray ray, uint object_i) {
   // Generate local ray
   Ray ray_local = ray_transform(ray, inverse(object_info.trf));
 
-  // Run intersection, continue on closest hit
-  ray_intersect_bvh(ray_local, object_info.mesh_i);
-  guard(ray_local.data != ray.data);
+  // Run intersection, return if not a closest hit
+  guard(ray_intersect_bvh(ray_local, object_info.mesh_i)); 
 
   // Recover world-space distance from local ray
   ray_transform_inplace(ray, ray_local, scene_object_info(object_i).trf);

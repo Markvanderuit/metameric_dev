@@ -9,8 +9,8 @@ struct AABB {
 };
 
 bool ray_intersect(inout Ray ray, in AABB aabb) {
-  /* if (aabb.minb == aabb.maxb)
-    return false; */
+  if (aabb.minb == aabb.maxb)
+    return false;
     
   bvec3 degenerate = equal(ray.d, vec3(0));
 
@@ -33,8 +33,8 @@ bool ray_intersect(inout Ray ray, in AABB aabb) {
 }
 
 bool ray_intersect_any(in Ray ray, in AABB aabb) {
-  /* if (aabb.minb == aabb.maxb)
-    return false; */
+  if (aabb.minb == aabb.maxb)
+    return false;
 
   vec3 d_rcp = 1.f / ray.d;
   vec3 t_max = (aabb.maxb - ray.o) * d_rcp;

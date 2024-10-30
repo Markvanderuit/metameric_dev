@@ -31,7 +31,10 @@ AABB unpack_child_aabb(in AABB parent_aabb, in BVHNode1Pack pack, in uint child_
               fma(vec3(unpack_0.zw, unpack_1.y), parent_aabb.maxb, parent_aabb.minb));
 }
 
-void ray_intersect_bvh(inout Ray ray, in uint mesh_i) {
+bool ray_intersect_bvh(inout Ray ray, in uint mesh_i) {
+  // Return value
+  bool hit = false;
+  
   // Initiate small stack for traversal from root node
   // Stack values use 8 bits to flag nodes of interest, 
   // and 24 bits to store the offset to these nodes;
@@ -43,18 +46,17 @@ void ray_intersect_bvh(inout Ray ray, in uint mesh_i) {
   // Continue traversal until stack is once again empty
   int stckc = 0; 
   while (stckc >= 0) {
-    // Read next flagged bit from stack and remove it
-    int  node_bit = findMSB(stck[stckc] >> bvh_stck_offset);
+    // Read next flagged bit and offset from stack, then remove flagged bit
+    int  node_bit  = findMSB(stck[stckc] >> bvh_stck_offset);
+    uint node_offs = stck[stckc] & 0x00FFFFFF;
     stck[stckc] &= (~(1u << (bvh_stck_offset + node_bit)));
-
-    // Compute next node id
-    uint node_i   = mesh_info.nodes_offs + (stck[stckc] & 0x00FFFFFF) + node_bit;
 
     // If this was the last flagged bit, decrease stack count
     if ((stck[stckc] & 0xFF000000) == 0)
       stckc--;
 
     // Obtain next node parent data
+    uint node_i       = mesh_info.nodes_offs + node_offs + node_bit;
     BVHNode0Pack node = scene_mesh_node0(node_i);
 
     if (bvh_size(node) == 0) {
@@ -70,6 +72,7 @@ void ray_intersect_bvh(inout Ray ray, in uint mesh_i) {
         if (ray_intersect(ray, prim)) {
           // Store primitive index on a hit
           record_set_object_primitive(ray.data, prim_i);
+          hit = true;
         }
       }
     } else {
@@ -96,6 +99,8 @@ void ray_intersect_bvh(inout Ray ray, in uint mesh_i) {
         stck[++stckc] = (mask << bvh_stck_offset) | bvh_offs(node);
     }
   } // while (stckc >= 0)
+
+  return hit;
 }
 
 bool ray_intersect_bvh_any(in Ray ray, in uint mesh_i) {
@@ -110,18 +115,17 @@ bool ray_intersect_bvh_any(in Ray ray, in uint mesh_i) {
   // Continue traversal until stack is once again empty
   int stckc = 0; 
   while (stckc >= 0) {
-    // Read next flagged bit from stack and remove it
-    int  node_bit = findMSB(stck[stckc] >> bvh_stck_offset);
+    // Read next flagged bit and offset from stack, then remove flagged bit
+    int  node_bit  = findMSB(stck[stckc] >> bvh_stck_offset);
+    uint node_offs = stck[stckc] & 0x00FFFFFF;
     stck[stckc] &= (~(1u << (bvh_stck_offset + node_bit)));
-
-    // Compute next node id
-    uint node_i   = mesh_info.nodes_offs + (stck[stckc] & 0x00FFFFFF) + node_bit;
 
     // If this was the last flagged bit, decrease stack count
     if ((stck[stckc] & 0xFF000000) == 0)
       stckc--;
 
     // Obtain next node parent data
+    uint node_i       = mesh_info.nodes_offs + node_offs + node_bit;
     BVHNode0Pack node = scene_mesh_node0(node_i);
 
     if (bvh_size(node) == 0) {

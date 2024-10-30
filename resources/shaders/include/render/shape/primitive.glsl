@@ -59,52 +59,6 @@ Triangle unpack_triangle(in MeshPrimPack pack) {
 bool ray_intersect(inout Ray ray, in Primitive prim) {
   vec3 ab = prim.v1.p - prim.v0.p;
   vec3 bc = prim.v2.p - prim.v1.p;
-  vec3 ca = prim.v0.p - prim.v2.p;
-  vec3 n  = normalize(cross(bc, ab));
-  
-  // Ray/plane distance test
-  float t = dot(((prim.v0.p + prim.v1.p + prim.v2.p) / 3.f - ray.o), n) / dot(n, ray.d);
-  if (t < 0.f || t > ray.t)
-    return false;
-  
-  // Point-in-triangle test
-  vec3 p = ray.o + t * ray.d;
-  if ((dot(n, cross(p - prim.v0.p, ab)) < 0.f) ||
-      (dot(n, cross(p - prim.v1.p, bc)) < 0.f) ||
-      (dot(n, cross(p - prim.v2.p, ca)) < 0.f))
-    return false;
-
-  // Update closest-hit distance before return
-  ray.t = t;
-  return true;
-}
-
-bool ray_intersect(inout Ray ray, in Triangle prim) {
-  vec3 ab = prim.p1 - prim.p0;
-  vec3 bc = prim.p2 - prim.p1;
-  vec3 ca = prim.p0 - prim.p2;
-  vec3 n  = normalize(cross(bc, ab));
-  
-  // Ray/plane distance test
-  float t = dot(((prim.p0 + prim.p1 + prim.p2) / 3.f - ray.o), n) / dot(n, ray.d);
-  if (t < 0.f || t > ray.t)
-    return false;
-  
-  // Point-in-triangle test
-  vec3 p = ray.o + t * ray.d;
-  if ((dot(n, cross(p - prim.p0, ab)) < 0.f) ||
-      (dot(n, cross(p - prim.p1, bc)) < 0.f) ||
-      (dot(n, cross(p - prim.p2, ca)) < 0.f))
-    return false;
-
-  // Update closest-hit distance before return
-  ray.t = t;
-  return true;
-}
-
-/* bool ray_intersect(inout Ray ray, in Primitive prim) {
-  vec3 ab = prim.v1.p - prim.v0.p;
-  vec3 bc = prim.v2.p - prim.v1.p;
   vec3 n_ = cross(bc, ab);
   
   // Ray/plane distance test
@@ -146,6 +100,6 @@ bool ray_intersect(inout Ray ray, in Triangle prim) {
   // Update closest-hit distance before return
   ray.t = t;
   return true;
-} */
+}
 
 #endif // SHAPE_PRIMITIVE_GLSL_GUARD
