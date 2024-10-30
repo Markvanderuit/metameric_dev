@@ -7,8 +7,8 @@
 
 void init_brdf_principled(inout BRDFInfo brdf, in SurfaceInfo si, vec4 wvls) {
   // Temporary until I can connect them to scene sparameters
-  float roughness = 0.1f;
-  float metallic  = 0.5f;
+  float roughness = 0.2f;
+  float metallic  = 0.f;
   float eta       = 1.46f;
   
   brdf.r        = scene_sample_reflectance(record_get_object(si.data), si.tx, wvls);

@@ -184,7 +184,7 @@ vec4 Li(in SensorSample ss, in SamplerState state, inout float alpha) {
       vec3 wo = to_local(si, es.ray.d);
       
       // Sample density of brdf for this sample
-      float brdf_pdf = pdf_brdf(brdf, si, wo);
+      float brdf_pdf = bs_pdf * pdf_brdf(brdf, si, wo);
 
       // If the sample position has potential throughput, 
       // evaluate a ray towards the position and add contribution to output
