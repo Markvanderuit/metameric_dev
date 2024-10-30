@@ -18,91 +18,28 @@ float fresnel_schlick(float f_0, float f_90, float lambert) {
 vec4 Li_debug(in SensorSample ss, in SamplerState state) {
   // Ray-trace first. If no surface is intersected by the ray, return early
   if (!scene_intersect(ss.ray))
-    return vec4(0);
+    return vec4(1);
 
   // Get info about the intersected surface; if an emitter was intersected, return early
   SurfaceInfo si = get_surface_info(ss.ray);
   if (!is_valid(si) || !is_object(si))
     return vec4(0);
 
-  // Output values
-  vec3  wo  = vec3(0);
-  float f   = 0.f;
-  float pdf = 0.f;
+  BRDFInfo   brdf = get_brdf(si, ss.wvls, next_2d(state));
+  BRDFSample bs   = sample_brdf(brdf, next_3d(state), si);
+  vec4 f = eval_brdf(brdf, si, bs.wo);
+  vec4 c = f * abs(cos_theta(si.wi)) / pdf_brdf_diffuse(brdf, si, bs.wo);
+  if (bs.pdf == 0.f)
+    c = vec4(0, 0, 0, 0);
 
-  // BRDF sampling and computation
-  /* while (pdf <= 0.f) */ 
-  { // To simplify debug, we forcibly loop a valid sample is found
-    // BRDF parameters
-    float f_0     = 0.02f;
-    float alpha   = 0.1f;
-    float alpha_2 = sdot(alpha);
-
-    // Visible normal samplings
-    MicrofacetSample ms = sample_microfacet(si, alpha, next_2d(state));
-    wo  = reflect(-si.wi, ms.n);
-    pdf = ms.pdf;
-
-    /* wo  = square_to_cos_hemisphere(next_2d(state));
-    pdf = square_to_cos_hemisphere_pdf(wo); */
-
-    /* wo  = reflect(-si.wi, vec3(0, 0, 1));
-    pdf = 1.f; */
-
-    // BRDF throughput 
-    vec3 wh = normalize(si.wi + wo);
-
-    if (record_get_object(si.data) == 1) { // Intersect with first sphere
-      // GGX normal distribution function
-      float ggx = (alpha_2 * cos_theta(wh) - cos_theta(wh)) * cos_theta(wh) + 1.f;
-      ggx = alpha_2 / (ggx * ggx);
-
-      float g1_masking = cos_theta(wo)    
-                       * sqrt((cos_theta(si.wi) - alpha_2 * cos_theta(si.wi)) * cos_theta(si.wi) + alpha_2);
-      float g1_shadow  = cos_theta(si.wi) 
-                       * sqrt((cos_theta(wo)    - alpha_2 * cos_theta(wo))    * cos_theta(wo)    + alpha_2);
-      float g2 = 0.5f / (g1_masking + g1_shadow);
-
-      float fresnel = fresnel_schlick(f_0, 1.f, dot(si.wi, wh));
-
-      // D(N) = 1 / (pi * (...))
-      f = ggx * g2 * fresnel;
-    } else if (record_get_object(si.data) == 2) { // Intersect with second sphere
-      // GGX normal distribution function
-      // Initial
-      // float ggx = sdot(wh.xy) / alpha_2 + sdot(wh.z);
-      // ggx = 1.f / (alpha_2 * (ggx * ggx));
-      // Rewrite confirmation; it really is the same as christoph's
-      /* float ggx = (alpha_2 * wh.z - wh.z) * wh.z + 1.f;
-      ggx = alpha_2 / (ggx * ggx);
-
-      float lambda_in
-        = -.5f + .5f * sqrt(
-          1.f + alpha_2 / (si.wi.z * si.wi.z) - alpha_2
-        );
-      float lambda_out
-        = -.5f + .5f * sqrt(
-          1.f + alpha_2 / (wo.z * wo.z) - alpha_2
-        );
-      float g1_in  = 1.f / (1.f + lambda_in);
-      float g1_out = 1.f / (1.f + lambda_out);
-      float g2_ = g1_in * g1_out;
-      float g2 = g2_ / (4.f * cos_theta(wo) * cos_theta(si.wi)); */
-      
-
-      // float fresnel = schlick_fresnel(vec4(f_0), vec4(1), cos_theta(si.wi)).x;
-      if (pdf != 0)
-        f = eval_microfacet(si, wh, wo, alpha)
-          * schlick_fresnel(vec4(f_0), vec4(1), dot(si.wi, wh)).x;;
-    } else { // Intersect with background plane, or other object
-      f = 0.f;
-      pdf = 1.f;
-    }
-  }
+  // Generate position sample on emitter, with ray towards sample
+  EmitterSample es = sample_emitters(si, ss.wvls, next_3d(state));
+  // Exitant direction in local frame
+  // vec3 wo = to_local(si, es.ray.d);
+  c = vec4(abs(es.ray.d), 1);
 
   // Adjust for spectral intergration by doing 4 / n
-  float L = M_PI_INV * cos_theta(wo) * f / pdf; // .1f  * f  / pdf;
-  return vec4(L * 4.f / float(wavelength_samples));
+  return c * 4.f / float(wavelength_samples);
 }
 
 vec4 Li(in SensorSample ss, in SamplerState state, inout float alpha) {
@@ -175,7 +112,7 @@ vec4 Li(in SensorSample ss, in SamplerState state, inout float alpha) {
     // Construct the underlying BRDF at the intersected surface
     BRDFInfo brdf = get_brdf(si, ss.wvls, next_2d(state));
     
-    // Direct illumination sampling
+    // Emitter sampling
     {
       // Generate position sample on emitter, with ray towards sample
       EmitterSample es = sample_emitters(si, ss.wvls, next_3d(state));
@@ -215,6 +152,8 @@ vec4 Li(in SensorSample ss, in SamplerState state, inout float alpha) {
     {
       // Importance sample brdf direction
       BRDFSample bs = sample_brdf(brdf, next_3d(state), si);
+
+      // Early exit on zero brdf density
       if (bs.pdf == 0.f)
         break;
       

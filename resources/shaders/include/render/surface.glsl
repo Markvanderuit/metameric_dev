@@ -48,7 +48,7 @@ SurfaceInfo get_surface_info(in Ray ray) {
 }
 
 vec3 surface_offset(in SurfaceInfo si, in vec3 d) {
-  return fma(vec3(M_RAY_EPS), si.n, si.p);
+  return si.p + si.n * M_RAY_EPS;
 }
 
 // Shorthands for frame transformation

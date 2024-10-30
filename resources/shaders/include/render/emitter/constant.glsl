@@ -3,7 +3,7 @@
 
 EmitterSample sample_emitter_constant(in EmitterInfo em, in SurfaceInfo si, in vec4 wvls, in vec2 sample_2d) {
   EmitterSample es;
-  es.ray      = init_ray(si.p, square_to_cos_hemisphere(sample_2d), 10000.f);
+  es.ray      = ray_towards_direction(si, square_to_cos_hemisphere(sample_2d));
   es.L        = scene_illuminant(em.illuminant_i, wvls) * em.illuminant_scale;
   es.pdf      = square_to_cos_hemisphere_pdf(es.ray.d);
   es.is_delta = false;

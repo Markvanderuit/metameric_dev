@@ -71,7 +71,7 @@ bool hit_emitter(in Ray ray) {
 }
 
 vec3 ray_get_position(in Ray ray) {
-  return ray.t == FLT_MAX ? vec3(FLT_MAX) : fma(ray.d, vec3(ray.t), ray.o);
+  return ray.t == FLT_MAX ? vec3(FLT_MAX) : ray.o + ray.d * ray.t;
 }
 
 Ray ray_transform(in Ray ray_world, in mat4 to_local) {  

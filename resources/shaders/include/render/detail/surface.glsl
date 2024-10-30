@@ -30,8 +30,8 @@ void detail_fill_surface_info_object(inout SurfaceInfo si, in Ray ray) {
   vec3 p = (inverse(object_info.trf) * vec4(ray_get_position(ray), 1)).xyz;
   vec3 b = detail_gen_barycentric_coords(p, prim);
   si.p  = b.x * prim.v0.p  + b.y * prim.v1.p  + b.z * prim.v2.p;
-  si.tx = b.x * prim.v0.tx + b.y * prim.v1.tx + b.z * prim.v2.tx;
   si.ns = b.x * prim.v0.n  + b.y * prim.v1.n  + b.z * prim.v2.n;
+  si.tx = b.x * prim.v0.tx + b.y * prim.v1.tx + b.z * prim.v2.tx;
   
   // Offset surface position as shading point, as per
   // "Hacking the Shadow Terminator, Hanika, 2021"
