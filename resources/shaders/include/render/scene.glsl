@@ -4,7 +4,6 @@
 #include <render/detail/scene_types.glsl> // Should be available by now
 #include <render/ray.glsl>
 #include <render/bvh.glsl>
-// #include <render/tlas.glsl>
 #include <render/emitter.glsl>
 #include <render/object.glsl>
 #include <render/brdf.glsl>

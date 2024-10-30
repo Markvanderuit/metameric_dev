@@ -1,7 +1,7 @@
 #include <preamble.glsl>
 #include <math.glsl>
 
-extension(GL_KHR_shader_subgroup_basic, require)
+#extension GL_KHR_shader_subgroup_basic : require
 
 layout(local_size_x = 1) in;
 layout(std430)           buffer;

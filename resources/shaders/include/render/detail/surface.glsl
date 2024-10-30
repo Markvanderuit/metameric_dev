@@ -1,7 +1,6 @@
 #ifndef GLSL_SURFACE_DETAIL_GUARD
 #define GLSL_SURFACE_DETAIL_GUARD
 
-#include <render/scene.glsl>
 #include <render/shape/primitive.glsl>
 
 vec3 detail_gen_barycentric_coords(in vec3 p, in Primitive prim) {
@@ -35,7 +34,7 @@ void detail_fill_surface_info_object(inout SurfaceInfo si, in Ray ray) {
   si.ns = b.x * prim.v0.n  + b.y * prim.v1.n  + b.z * prim.v2.n;
   
   // Offset surface position as shading point, as per
-  // "Hacking the Shadow Terminator, J. Hanika, 2021"
+  // "Hacking the Shadow Terminator, Hanika, 2021"
   /* {
     vec3  tmp_u = si.p - prim.v0.p, 
           tmp_v = si.p - prim.v1.p, 

@@ -31,19 +31,23 @@ vec4 Li_debug(in SensorSample ss, in SamplerState state) {
   float pdf = 0.f;
 
   // BRDF sampling and computation
-  while (pdf <= 0.f) { // To simplify debug, we forcibly loop a valid sample is found
-    // Sample cosine hemisphere for output
-    // wo  = square_to_cos_hemisphere(next_2d(state));
-    // pdf = square_to_cos_hemisphere_pdf(wo);
-
-    // Reflect specularly
-    wo  = vec3(-si.wi.xy, si.wi.z);
-    pdf = 1.f;
-
+  /* while (pdf <= 0.f) */ 
+  { // To simplify debug, we forcibly loop a valid sample is found
     // BRDF parameters
-    float f_0     = 0.3f;
+    float f_0     = 0.02f;
     float alpha   = 0.1f;
     float alpha_2 = sdot(alpha);
+
+    // Visible normal samplings
+    MicrofacetSample ms = sample_microfacet(si, alpha, next_2d(state));
+    wo  = reflect(-si.wi, ms.n);
+    pdf = ms.pdf;
+
+    /* wo  = square_to_cos_hemisphere(next_2d(state));
+    pdf = square_to_cos_hemisphere_pdf(wo); */
+
+    /* wo  = reflect(-si.wi, vec3(0, 0, 1));
+    pdf = 1.f; */
 
     // BRDF throughput 
     vec3 wh = normalize(si.wi + wo);
@@ -59,17 +63,17 @@ vec4 Li_debug(in SensorSample ss, in SamplerState state) {
                        * sqrt((cos_theta(wo)    - alpha_2 * cos_theta(wo))    * cos_theta(wo)    + alpha_2);
       float g2 = 0.5f / (g1_masking + g1_shadow);
 
-      float fresnel = fresnel_schlick(f_0, 1.f, cos_theta(si.wi));
+      float fresnel = fresnel_schlick(f_0, 1.f, dot(si.wi, wh));
 
       // D(N) = 1 / (pi * (...))
-      f = /* M_PI_INV * fresnel * ggx * */ g2;
+      f = ggx * g2 * fresnel;
     } else if (record_get_object(si.data) == 2) { // Intersect with second sphere
       // GGX normal distribution function
       // Initial
       // float ggx = sdot(wh.xy) / alpha_2 + sdot(wh.z);
       // ggx = 1.f / (alpha_2 * (ggx * ggx));
       // Rewrite confirmation; it really is the same as christoph's
-      float ggx = (alpha_2 * wh.z - wh.z) * wh.z + 1.f;
+      /* float ggx = (alpha_2 * wh.z - wh.z) * wh.z + 1.f;
       ggx = alpha_2 / (ggx * ggx);
 
       float lambda_in
@@ -83,12 +87,13 @@ vec4 Li_debug(in SensorSample ss, in SamplerState state) {
       float g1_in  = 1.f / (1.f + lambda_in);
       float g1_out = 1.f / (1.f + lambda_out);
       float g2_ = g1_in * g1_out;
-      float g2 = g2_ / (4.f * cos_theta(wo) * cos_theta(si.wi));
+      float g2 = g2_ / (4.f * cos_theta(wo) * cos_theta(si.wi)); */
+      
 
-      float fresnel = schlick_fresnel(vec4(f_0), vec4(1), cos_theta(si.wi)).x;
-
-      // D(N) = 1 / (pi * (...))
-      f = /* M_PI_INV * fresnel * ggx * */ g2;
+      // float fresnel = schlick_fresnel(vec4(f_0), vec4(1), cos_theta(si.wi)).x;
+      if (pdf != 0)
+        f = eval_microfacet(si, wh, wo, alpha)
+          * schlick_fresnel(vec4(f_0), vec4(1), dot(si.wi, wh)).x;;
     } else { // Intersect with background plane, or other object
       f = 0.f;
       pdf = 1.f;
@@ -96,20 +101,9 @@ vec4 Li_debug(in SensorSample ss, in SamplerState state) {
   }
 
   // Adjust for spectral intergration by doing 4 / n
-  float L = f * cos_theta(wo) / pdf;
+  float L = M_PI_INV * cos_theta(wo) * f / pdf; // .1f  * f  / pdf;
   return vec4(L * 4.f / float(wavelength_samples));
 }
-
-/* // Path throughput and other global variables are forced into shared memory
-shared vec4  s_spec[gl_WorkGroupSize.x * gl_WorkGroupSize.y * gl_WorkGroupSize.z];
-shared vec4  s_beta[gl_WorkGroupSize.x * gl_WorkGroupSize.y * gl_WorkGroupSize.z];
-shared float s_bs_pdf[gl_WorkGroupSize.x * gl_WorkGroupSize.y * gl_WorkGroupSize.z];
-shared bool  s_bs_is_delta[gl_WorkGroupSize.x * gl_WorkGroupSize.y * gl_WorkGroupSize.z];
-
-#define beta        s_beta[gl_LocalInvocationIndex]
-#define S           s_spec[gl_LocalInvocationIndex]
-#define bs_pdf      s_bs_pdf[gl_LocalInvocationIndex]
-#define bs_is_delta s_bs_is_delta[gl_LocalInvocationIndex] */
 
 vec4 Li(in SensorSample ss, in SamplerState state, inout float alpha) {
   // Initialize path store if requested for path queries
@@ -189,8 +183,8 @@ vec4 Li(in SensorSample ss, in SamplerState state, inout float alpha) {
       // Exitant direction in local frame
       vec3 wo = to_local(si, es.ray.d);
       
-      // Accumulated sample density of brdf sampling for this sample
-      float brdf_pdf = bs_pdf * pdf_brdf(brdf, si, wo);
+      // Sample density of brdf for this sample
+      float brdf_pdf = pdf_brdf(brdf, si, wo);
 
       // If the sample position has potential throughput, 
       // evaluate a ray towards the position and add contribution to output
@@ -198,16 +192,15 @@ vec4 Li(in SensorSample ss, in SamplerState state, inout float alpha) {
         // Test for any hit closer than sample position
         if (!scene_intersect_any(es.ray)) {
           // Avoid diracs when calculating mis weight
-          float mis_weight = es.is_delta 
-                           ? 1.f / es.pdf 
-                           : mis_power(es.pdf, brdf_pdf) / es.pdf;
+          float mis_weight = es.is_delta ? 1.f : mis_power(es.pdf, brdf_pdf);
 
           // Assemble path throughput
           vec4 s = beta                    // current path throughput
                  * es.L                    // emitter response
                  * eval_brdf(brdf, si, wo) // brdf response
                  * cos_theta(wo)           // cosine attenuation
-                 * mis_weight;             // mis weight
+                 * mis_weight              // mis weight
+                 / es.pdf;                 // sample density
 
           // Store current path query if requested
           path_query_finalize_emitter(pt, es, s, ss.wvls);
@@ -235,7 +228,7 @@ vec4 Li(in SensorSample ss, in SamplerState state, inout float alpha) {
       bs_is_delta = bs.is_delta;
       
       // Early exit on zero throughput
-      if (all(is_zero(beta)))
+      if (beta == vec4(0))
         break;
 
       // Generate the next ray to trace through the scene

@@ -1,6 +1,7 @@
 #include <metameric/core/distribution.hpp>
 #include <metameric/core/convex.hpp>
 #include <metameric/core/solver.hpp>
+#include <metameric/core/math.hpp>
 #include <metameric/core/metamer.hpp>
 #include <metameric/core/moments.hpp>
 #include <metameric/core/ranges.hpp>
@@ -334,7 +335,7 @@ namespace met {
       eig::MatrixXf S(wavelength_samples, 3 * info.linear_objectives.size());
       for (uint i = 0; i < info.linear_objectives.size(); ++i)
         S.block<wavelength_samples, 3>(0, 3 * i) = info.linear_objectives[i].finalize(false);
-      eig::JacobiSVD<decltype(S)> svd;
+      eig::JacobiSVD<eig::MatrixXf> svd;
       svd.compute(S, eig::ComputeFullV);
       auto U = (S * svd.matrixV() * svd.singularValues().asDiagonal().inverse()).eval();
 

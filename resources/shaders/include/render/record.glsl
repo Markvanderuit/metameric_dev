@@ -59,4 +59,4 @@ vec3  record_get_direct_value(in uvec2 rc)  { return vec3(unpackHalf2x16(rc.x),
                                                           unpackHalf2x16(rc.y).x); }
 float record_get_direct_value(in uint rc)   { return unpackHalf2x16(rc).x; }
 
-#endif RECORD_GLSL_GUARD
+#endif // RECORD_GLSL_GUARD

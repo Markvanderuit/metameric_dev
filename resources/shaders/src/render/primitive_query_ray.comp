@@ -7,7 +7,6 @@
 #include <render/detail/path_types.glsl>
 #include <render/detail/scene_types.glsl>
 #include <render/load/bvh.glsl>
-// #include <render/load/tlas.glsl>
 #include <render/load/emitter.glsl>
 #include <render/load/object.glsl>
 #include <render/load/defaults.glsl>

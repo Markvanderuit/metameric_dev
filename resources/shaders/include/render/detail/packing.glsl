@@ -134,7 +134,7 @@ float[wavelength_bases] unpack_basis_coeffs(in uvec4 p) {
   v = unpack_snorm_8(p);
 #else
   // ...
-#endif;
+#endif
   return v;
 }
 
@@ -148,7 +148,7 @@ float extract_basis_coeff(in uvec4 p, in uint i) {
   f = extract_snorm_8(p, i);
 #else
   // ...
-#endif;
+#endif
   return f;
 }
 
@@ -162,7 +162,7 @@ uvec4 pack_basis_coeffs(in float[wavelength_bases] v) {
   p = pack_snorm_8(v);
 #else
   // ...
-#endif;
+#endif
   return p;
 }
 

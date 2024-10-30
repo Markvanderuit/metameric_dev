@@ -3,11 +3,11 @@
 #include <moments.glsl>
 #include <spectrum.glsl>
 
-extension(GL_KHR_shader_subgroup_arithmetic,       require)
-extension(GL_KHR_shader_subgroup_ballot,           require)
-extension(GL_KHR_shader_subgroup_clustered,        require)
-extension(GL_KHR_shader_subgroup_shuffle,          require)
-extension(GL_KHR_shader_subgroup_shuffle_relative, require)
+#extension GL_KHR_shader_subgroup_arithmetic       : require
+#extension GL_KHR_shader_subgroup_ballot           : require
+#extension GL_KHR_shader_subgroup_clustered        : require
+#extension GL_KHR_shader_subgroup_shuffle          : require
+#extension GL_KHR_shader_subgroup_shuffle_relative : require
 
 // General layout rule declarations
 layout(local_size_x = 32) in;
@@ -47,7 +47,7 @@ double cos_121s(double x) {
 double cos_121(double x){
 	x = mod(x, 2.0 * M_PI);	            // Get rid of values > 2* pi
   x = abs(x);                         // cos(-x) = cos(x)
-	int quad = int(x * 2.0 * M_PI_INV);	// Get quadrant # (0 to 3) below
+	int quad = int(x * 2.0 * M_PI_INV);	// Get quadrant (0 to 3) below
 	switch (quad){
     case 0: return  cos_121s(x);
     case 1: return -cos_121s(M_PI - x);

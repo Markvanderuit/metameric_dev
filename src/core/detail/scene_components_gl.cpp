@@ -4,7 +4,9 @@
 #include <metameric/core/moments.hpp>
 #include <metameric/core/ranges.hpp>
 #include <metameric/core/utility.hpp>
+#include <algorithm>
 #include <bit>
+#include <execution>
 #include <numbers>
 #include <numeric>
 
