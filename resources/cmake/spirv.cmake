@@ -12,6 +12,11 @@ find_program(glslangValidator NAMES glslangValidator PATHS ${bin_tools_path} NO_
 find_program(spirv-opt        NAMES spirv-opt        PATHS ${bin_tools_path} NO_DEFAULT_PATH REQUIRED)
 find_program(spirv-cross      NAMES spirv-cross      PATHS ${bin_tools_path} NO_DEFAULT_PATH REQUIRED)
 
+# Ensure the target stb_include_app is available to handle glsl includes with less
+# finicking than GL_ARB_shading_language_include
+add_executable(stb_include_app                     ${CMAKE_SOURCE_DIR}/resources/cmake/stb_include/stb_include_app.cpp)
+target_include_directories(stb_include_app PRIVATE ${CMAKE_SOURCE_DIR}/resources/cmake/stb_include/include)
+
 function(compile_glsl_to_spirv glsl_src_fp spirv_dependencies)
   # Obtain path, stripped of lead and filename
   cmake_path(RELATIVE_PATH glsl_src_fp
@@ -26,78 +31,37 @@ function(compile_glsl_to_spirv glsl_src_fp spirv_dependencies)
   # Add preprocessor stage to handle #include as well as > c98 preprocessing
   # we reuse the local c++ compiler to avoid google_include extensions and
   # allow for varargs
-  # TODO; adapt dependent on compiler
   add_custom_command(
-    OUTPUT  ${spirv_parse_fp}
+    OUTPUT  ${spirv_bin_fp} ${spirv_refl_fp}
 
-    # First command; preprocessor stage
-    COMMAND ${CMAKE_CXX_COMPILER}
-            # Primary arguments
-            -Tp                                                  # treat this as a c++ source file
-            ${glsl_src_fp}                                       # source file
-            -EP                                                  # override line directive
-            -P                                                   # preprocess to file
-            -C                                                   # preserve comments
-            -I "${PROJECT_SOURCE_DIR}/resources/shaders/include" # include directory
-            -Zc:preprocessor                                     # make nice recent c++ macro expansions available
-            -std:c++20                                           # make nice recent c++ macro expansions available
-            -Fi${spirv_parse_fp}                                 # preprocess file output name
-
-            # Define arguments
-            ${preprocessor_defines}
+    # First command; parse includes; we avoid use of GL_ARB_shading_language_include as it
+    # and glslangvalidator seem to be... finicky?
+    COMMAND stb_include_app
+            ${glsl_src_fp}
+            "${PROJECT_SOURCE_DIR}/resources/shaders/include"
+            ${spirv_parse_fp}
     
-    # Second command; nuke shader cache if exists
+    # Second command; nuke shader cache if one currently exists
     COMMAND ${CMAKE_COMMAND} 
             -E remove 
             -f "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/resources/shaders/shaders.bin"
 
-    DEPENDS ${glsl_src_fp} ${glsl_includes}
-    VERBATIM
-  )
+    # Third command; generate spirv binary using glslangvalidator
+    COMMAND ${glslangValidator} 
+            ${spirv_parse_fp}       # input glsl
+            -o ${spirv_bin_fp}      # output binary
+            -Os                     # minimize size
+            --client opengl100      # create binary under OpenGL semantics
+            --target-env spirv1.5   # execution environment is spirv 1.5
+            ${preprocessor_defines} # forward -D... arguments
 
-  
-  # add_custom_target(${target_name}_erase
-  #   COMMAND ${CMAKE_COMMAND} -E remove -f "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/resources/shaders/${cache_name}")
-  
-  # Generate spir-v binary using glslangValidator, store in .temp file
-  add_custom_command(
-    OUTPUT  ${spirv_bin_fp}
-    COMMAND ${glslangValidator} ${spirv_parse_fp} 
-            # -o ${spirv_temp_fp} 
-            -o ${spirv_bin_fp}
-            --client opengl100 
-            --target-env spirv1.5 
-            --glsl-version 460
-    DEPENDS ${spirv_parse_fp}
-    VERBATIM
-  )
+    # Fourth command; generate reflection information in .json files using spirv-cross
+    COMMAND ${spirv-cross} 
+            ${spirv_bin_fp} 
+            --output ${spirv_refl_fp} 
+            --reflect
 
-  # # Generate optimized spir-v binary using spirv-opt from spirv-tools
-  # add_custom_command(
-  #   OUTPUT  ${spirv_bin_fp}
-  #   COMMAND ${spirv-opt} ${spirv_temp_fp} 
-  #           -o ${spirv_bin_fp} 
-  #           -O 
-  #           # -Os
-  #   DEPENDS ${spirv_temp_fp}
-  #   VERBATIM 
-  # )
-
-  # # Generate spir-v reflection information in .json files using spirv-cross
-  # add_custom_command(
-  #   OUTPUT  ${spirv_refl_fp}
-  #   COMMAND ${spirv-cross} ${spirv_temp_fp} 
-  #           --output ${spirv_refl_fp} --reflect
-  #   DEPENDS ${spirv_temp_fp}
-  #   VERBATIM
-  # )
-
-  # Generate spir-v reflection information in .json files using spirv-cross
-  add_custom_command(
-    OUTPUT  ${spirv_refl_fp}
-    COMMAND ${spirv-cross} ${spirv_bin_fp} 
-            --output ${spirv_refl_fp} --reflect
-    DEPENDS ${spirv_bin_fp}
+    DEPENDS ${glsl_src_fp} ${glsl_includes} stb_include_app
     VERBATIM
   )
 
