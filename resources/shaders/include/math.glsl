@@ -118,40 +118,6 @@ vec2  safe_sqrt(in vec2  v) { return SAFE_SQRT(v); }
 vec3  safe_sqrt(in vec3  v) { return SAFE_SQRT(v); }
 vec4  safe_sqrt(in vec4  v) { return SAFE_SQRT(v); }
 
-// is_all_equal(...) for short, fast, component equality check
-
-#define IS_ALL_EQUAL(type, n)                \
-  bool is_all_equal(in type##vec##n v) {     \
-    return all(equal(v, type##vec##n(v.x))); \
-  }
-
-#define IS_ALL_EQUAL_ALL_N(type) \
-  IS_ALL_EQUAL(type, 2)          \
-  IS_ALL_EQUAL(type, 3)          \
-  IS_ALL_EQUAL(type, 4)
-  
-IS_ALL_EQUAL_ALL_N( )
-IS_ALL_EQUAL_ALL_N(d)
-IS_ALL_EQUAL_ALL_N(i)
-IS_ALL_EQUAL_ALL_N(u)
-
-// is_zero(...) for short, fast zero check
-
-#define IS_ZERO(type, n)               \
-  bvec##n is_zero(in type##vec##n v) { \
-    return equal(v, type##vec##n(0));  \
-  }
-
-#define IS_ZERO_ALL_N(type) \
-  IS_ZERO(type, 2)          \
-  IS_ZERO(type, 3)          \
-  IS_ZERO(type, 4)
-
-IS_ZERO_ALL_N( )
-IS_ZERO_ALL_N(d)
-IS_ZERO_ALL_N(i)
-IS_ZERO_ALL_N(u)
-
 // Swapping of vector objects
 
 #define SWAP_T(Ty)                        \
@@ -190,7 +156,6 @@ vec4 schlick_fresnel(in vec4 f0, in float cos_theta) {
   return schlick_fresnel(f0, vec4(1), cos_theta);
 }
 
-// https://github.com/blender/blender/blob/97f9e100546256b1f7432f85057de523724644eb/source/blender/draw/engines/eevee_next/shaders/eevee_bxdf_lib.glsl#L63
 float fresnel_dielectric(float eta, float cos_theta) {
   float c = abs(cos_theta);
   float g = eta * eta - 1.0 + c * c;
@@ -203,7 +168,6 @@ float fresnel_dielectric(float eta, float cos_theta) {
   return 1.0;
 }
 
-// https://github.com/dillongoostudios/goo-engine/blob/8457395892beec33d4605ef9d894a1aff4a8d79f/source/blender/draw/engines/eevee/shaders/bsdf_common_lib.glsl#L65
 /* Fresnel color blend base on fresnel factor */
 // vec3 F_color_blend(float eta, float fresnel, vec4 F0_refl) { // F)_refl should be white
 //   float F0 = F0_from_ior(eta);
