@@ -3,8 +3,8 @@
 
 #include <render/record.glsl>
 
-void init_brdf_mirror(inout BRDFInfo brdf, in SurfaceInfo si, vec4 wvls) {
-  brdf.r = scene_sample_reflectance(record_get_object(si.data), si.tx, wvls);
+void init_brdf_mirror(inout BRDFInfo brdf, in SurfaceInfo si, vec4 wvls, in vec2 sample_2d) {
+  brdf.r = texture_reflectance(si, wvls, sample_2d);
 }
 
 BRDFSample sample_brdf_mirror(in BRDFInfo brdf, in vec3 sample_3d, in SurfaceInfo si) {

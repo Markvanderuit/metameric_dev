@@ -1,9 +1,9 @@
 #ifndef BRDF_GLSL_GUARD
 #define BRDF_GLSL_GUARD
 
-#include <render/reflectance.glsl>
 #include <render/sample.glsl>
 #include <render/surface.glsl>
+#include <render/texture.glsl>
 #include <render/brdf/null.glsl>
 #include <render/brdf/diffuse.glsl>
 #include <render/brdf/mirror.glsl>
@@ -24,9 +24,9 @@ BRDFInfo get_brdf(in SurfaceInfo si, vec4 wvls, in vec2 sample_2d) {
   } else if (brdf.type == BRDFTypeNull) {
     init_brdf_null(brdf, si, wvls);
   } else if (brdf.type == BRDFTypeMirror) {
-    init_brdf_mirror(brdf, si, wvls);
+    init_brdf_mirror(brdf, si, wvls, sample_2d);
   } else if (brdf.type == BRDFTypePrincipled) {
-    init_brdf_principled(brdf, si, wvls);
+    init_brdf_principled(brdf, si, wvls, sample_2d);
   } /* else if (...) {
     // ...
   } */

@@ -3,39 +3,35 @@
 #include <render/record.glsl>
 #include <render/detail/scene_types.glsl>
 
-// Wrapper data packing tetrahedron data [x, y, z, w]; 64 bytes under std430
-struct Elem {
-  mat3 inv; // Inverse of 3x3 matrix [x - w, y - w, z - w]
-  vec3 sub; // Subtractive component w
-};
-
 // General layout rule declarations
 layout(std430) buffer;
 layout(std140) uniform;
 
-// Specialization constant declarations
-layout(constant_id = 0) const bool sample_albedo = true;
+// Wrapper data representing tetrahedron data [x, y, z, w]
+struct UpliftPack {
+  mat3 inv; // Inverse of 3x3 matrix [x - w, y - w, z - w]
+  vec3 sub; // Subtractive component w
+};
 
 // Fragment stage declarations
-layout(location = 0) in  vec2  in_txuv;    // Per-fragment original texture UVs, adjusted to atlas
-layout(location = 0) out uvec4 out_coeffs; // Per fragment MESE representations of texel spectra
-
-// Storage buffer declarations
-layout(binding = 0) restrict readonly buffer b_buff_uplift_coef { 
-  float[met_max_constraints][4][wavelength_bases] data;
-} buff_uplift_coef;
+layout(location = 0) in  vec2  in_txuv;  // Per-fragment texture UVs, adjusted to atlas
+layout(location = 0) out uvec4 out_coef; // Per fragment coefficients
 
 // Uniform buffer declarations
 layout(binding = 0) uniform b_buff_unif {
   uint  object_i;
   float px_scale;
 } unif;
+/* layout(binding = 1) uniform b_buff_atlas {
+  uint n;
+  AtlasInfo data[met_max_textures];
+} buff_atlas; */
 layout(binding = 2) uniform b_buff_uplift_data {
   uint offs;
   uint size;
 } buff_uplift_data;
 layout(binding = 3) uniform b_buff_uplift_pack { 
-  Elem data[met_max_constraints]; 
+  UpliftPack data[met_max_constraints]; 
 } buff_uplift_pack;
 layout(binding = 4) uniform b_buff_objects {
   uint n;
@@ -46,24 +42,30 @@ layout(binding = 5) uniform b_buff_textures {
   TextureInfo data[met_max_textures];
 } buff_textures;
 
+// Storage buffer declarations
+layout(binding = 0) restrict readonly buffer b_buff_uplift_coef { 
+  float[met_max_constraints][4][wavelength_bases] data;
+} buff_uplift_coef;
+
 // Image/sampler declarations
 layout(binding = 0) uniform sampler2DArray b_txtr_3f;
+layout(binding = 1) uniform sampler2DArray b_txtr_1f;
 
 void main() {
   // Load relevant object data
-  ObjectInfo object = buff_objects.data[unif.object_i];
+  ObjectInfo object_info = buff_objects.data[unif.object_i];
 
-  // We compile-time select between single-color and texture
-  // origins to avoid excessive warnings  when there is an 
-  // unbound sampler object floating around
+  // Sample color value from object
   vec3 p;
-  if (sample_albedo) { 
+  if (record_is_sampled(object_info.albedo_data)) {
     // Color value is supplied by scene texture
-    TextureInfo txtr = buff_textures.data[record_get_sampler_index(object.albedo_data)];
-    p = texture(b_txtr_3f, vec3(txtr.uv0 + txtr.uv1 * in_txuv, txtr.layer)).xyz;
+    TextureInfo txtr = buff_textures.data[record_get_sampler_index(object_info.albedo_data)];
+    p = txtr.is_3f
+      ? texture(b_txtr_3f, vec3(txtr.uv0 + txtr.uv1 * in_txuv, txtr.layer)).xyz
+      : vec3(texture(b_txtr_1f, vec3(txtr.uv0 + txtr.uv1 * in_txuv, txtr.layer)).x);
   } else {
     // Color value is specified directly
-    p = record_get_direct_value(object.albedo_data);
+    p = record_get_direct_value(object_info.albedo_data);
   }
   
   // Next, brute-force search for the corresponding barycentric weights and tetrahedron's index
@@ -86,7 +88,7 @@ void main() {
     result_indx = j; // + buff_uplift_data.offs;
   } // for (uint j)
 
-  // Gather basis coefficients representing tetrahedron's spectra, mix them, and store packed result
+  // Then, gather basis coefficients representing tetrahedron's spectra and mix them
   float[wavelength_bases] coeffs;
   for (uint i = 0; i < wavelength_bases; ++i) {
     coeffs[i] = 0.f;
@@ -95,6 +97,6 @@ void main() {
                  * buff_uplift_coef.data[result_indx][j][i];
   } // for (uint i)
 
-  // Store result, outputting packed moment coefficients to 128 bytes
-  out_coeffs = pack_basis_coeffs(coeffs);
+  // Finally, store packed result
+  out_coef = pack_basis_coeffs(coeffs);
 }

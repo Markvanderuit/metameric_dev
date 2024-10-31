@@ -11,7 +11,7 @@
 #define M_PI      3.14159265358979323846
 #define M_PI_INV  0.31830988618379067154
 #define M_EPS     5.9604645e-8
-#define M_RAY_EPS 1e3 * M_EPS
+#define M_RAY_EPS 5e3 * M_EPS
 
 // Rounded-up division functions
 

@@ -29,18 +29,23 @@ namespace met {
           std::tie(o.is_active, o.transform, o.mesh_i, o.uplifting_i, o.brdf_type), 
           false);
 
-    /* guard(std::tie(roughness, metallic, opacity) == 
-          std::tie(o.roughness, o.metallic, o.opacity), false); */
-    guard(diffuse.index() == o.diffuse.index() /* && 
-          normals.index() == o.normals.index() */, false);
+    guard(diffuse.index() == o.diffuse.index(), false);
     switch (diffuse.index()) {
       case 0: guard(std::get<Colr>(diffuse).isApprox(std::get<Colr>(o.diffuse)), false); break;
       case 1: guard(std::get<uint>(diffuse) == std::get<uint>(o.diffuse), false); break;
     }
-    /* switch (normals.index()) {
-      case 0: guard(std::get<Colr>(normals).isApprox(std::get<Colr>(o.normals)), false); break;
-      case 1: guard(std::get<uint>(normals) == std::get<uint>(o.normals), false); break;
-    } */
+
+    guard(metallic.index() == o.metallic.index(), false);
+    switch (metallic.index()) {
+      case 0: guard(std::get<float>(metallic) == std::get<float>(o.metallic), false); break;
+      case 1: guard(std::get<uint>(metallic) == std::get<uint>(o.metallic), false); break;
+    }
+
+    guard(roughness.index() == o.roughness.index(), false);
+    switch (roughness.index()) {
+      case 0: guard(std::get<float>(roughness) == std::get<float>(o.roughness), false); break;
+      case 1: guard(std::get<uint>(roughness) == std::get<uint>(o.roughness), false); break;
+    }
    
     return true;
   }

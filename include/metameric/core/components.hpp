@@ -9,12 +9,9 @@ namespace met {
   struct Settings {
     // Selected viewport renderer; the rgb renderers are hacked in just for debugging
     enum class RendererType { 
-      ePath,        // Spectral render, up to fixed path length
-      ePathRGB,     // RGB fallback, up to fixed path length
-      eDirect,      // Spectral render, direct light only
-      eDirectRGB,   // RGB fallback, direct light only
-      eDebug,      // Spectral render, queries a value (eg albedo) and returns
-      eDebugRGB    // RGB fallback, queries a value (eg albedo) and returns
+      ePath,   // Spectral render, up to fixed path length
+      eDirect, // Spectral render, direct light only
+      eDebug,  // Spectral render, queries a value (eg albedo) and returns
     } renderer_type = RendererType::ePath;
 
     // Clamped texture sizes in atlas; input res, 2048x2048, 1024x1024, or 512x512
@@ -81,6 +78,8 @@ namespace met {
     // some values are variant of a specified value, or a texture index
     BRDFType                  brdf_type = BRDFType::eDiffuse;
     std::variant<Colr,  uint> diffuse   = Colr(.5f);
+    std::variant<float, uint> metallic  = 0.f;
+    std::variant<float, uint> roughness = 0.1f;
 
   public: // Boilerplate
     bool operator==(const Object &o) const;
@@ -219,12 +218,9 @@ namespace std {
     auto format(const met::Settings::RendererType& ty, std::format_context& ctx) const {
       std::string s;
       switch (ty) {
-        case met::Settings::RendererType::ePath      : s = "path";         break;
-        case met::Settings::RendererType::ePathRGB   : s = "path (rgb)";   break;
-        case met::Settings::RendererType::eDirect    : s = "direct";       break;
-        case met::Settings::RendererType::eDirectRGB : s = "direct (rgb)"; break;
-        case met::Settings::RendererType::eDebug     : s = "debug";        break;
-        case met::Settings::RendererType::eDebugRGB  : s = "debug (rgb)";  break;
+        case met::Settings::RendererType::ePath   : s = "path";    break;
+        case met::Settings::RendererType::eDirect : s = "direct";  break;
+        case met::Settings::RendererType::eDebug  : s = "debug";   break;
       };
       return std::formatter<std::string_view>::format(s, ctx);
     }

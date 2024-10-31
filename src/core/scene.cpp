@@ -135,12 +135,9 @@ namespace met {
           { "mesh_i",      object.mesh_i      },
           { "uplifting_i", object.uplifting_i },
           { "brdf_type",   object.brdf_type   }};
-    
     js["diffuse"]   = {{ "index", object.diffuse.index() },   { "variant", object.diffuse }};
-    /* js["roughness"] = {{ "index", object.roughness.index() }, { "variant", object.roughness }};
+    js["roughness"] = {{ "index", object.roughness.index() }, { "variant", object.roughness }};
     js["metallic"]  = {{ "index", object.metallic.index() },  { "variant", object.metallic }};
-    js["opacity"]   = {{ "index", object.opacity.index() },   { "variant", object.opacity }};
-    js["normals"]   = {{ "index", object.normals.index() },   { "variant", object.normals }}; */
   }
 
   void from_json(const json &js, Object &object) {
@@ -159,26 +156,20 @@ namespace met {
       case 1: object.diffuse = js.at("diffuse").at("variant").get<uint>(); break;
       default: debug::check_expr(false, "Error parsing json material data");
     }
-    /* switch (js.at("roughness").at("index").get<size_t>()) {
-      case 0: object.roughness = js.at("roughness").at("variant").get<float>(); break;
-      case 1: object.roughness = js.at("roughness").at("variant").get<uint>(); break;
-      default: debug::check_expr(false, "Error parsing json material data");
+    if (js.contains("metallic")) {
+      switch (js.at("metallic").at("index").get<size_t>()) {
+        case 0: object.metallic = js.at("metallic").at("variant").get<float>(); break;
+        case 1: object.metallic = js.at("metallic").at("variant").get<uint>(); break;
+        default: debug::check_expr(false, "Error parsing json material data");
+      }
     }
-    switch (js.at("metallic").at("index").get<size_t>()) {
-      case 0: object.metallic = js.at("metallic").at("variant").get<float>(); break;
-      case 1: object.metallic = js.at("metallic").at("variant").get<uint>(); break;
-      default: debug::check_expr(false, "Error parsing json material data");
+    if (js.contains("roughness")) {
+      switch (js.at("roughness").at("index").get<size_t>()) {
+        case 0: object.roughness = js.at("roughness").at("variant").get<float>(); break;
+        case 1: object.roughness = js.at("roughness").at("variant").get<uint>(); break;
+        default: debug::check_expr(false, "Error parsing json material data");
+      }
     }
-    switch (js.at("opacity").at("index").get<size_t>()) {
-      case 0: object.opacity = js.at("opacity").at("variant").get<float>(); break;
-      case 1: object.opacity = js.at("opacity").at("variant").get<uint>(); break;
-      default: debug::check_expr(false, "Error parsing json material data");
-    }
-    switch (js.at("normals").at("index").get<size_t>()) {
-      case 0: object.normals = js.at("normals").at("variant").get<Colr>(); break;
-      case 1: object.normals = js.at("normals").at("variant").get<uint>(); break;
-      default: debug::check_expr(false, "Error parsing json material data");
-    } */
   }
 
   void to_json(json &js, const Emitter &emitter) {

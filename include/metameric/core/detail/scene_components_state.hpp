@@ -13,6 +13,8 @@ namespace met::detail {
     SceneStateHandler<decltype(Object::uplifting_i)> uplifting_i;
     SceneStateHandler<decltype(Object::brdf_type)>   brdf_type;
     SceneStateHandler<decltype(Object::diffuse)>     diffuse;
+    SceneStateHandler<decltype(Object::metallic)>    metallic;
+    SceneStateHandler<decltype(Object::roughness)>   roughness;
 
   public:
     bool update(const Object &o) override {
@@ -24,6 +26,8 @@ namespace met::detail {
       | uplifting_i.update(o.uplifting_i)
       | brdf_type.update(o.brdf_type)
       | diffuse.update(o.diffuse)
+      | metallic.update(o.metallic)
+      | roughness.update(o.roughness)
       );
     }
   };

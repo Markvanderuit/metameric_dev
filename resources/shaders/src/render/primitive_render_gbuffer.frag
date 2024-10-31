@@ -32,7 +32,6 @@ void main() {
   record_set_object_primitive(rc, gl_PrimitiveID);
 
   // Output packed gbuffer data
-  // out_value_gb = vec4(in_value_n, 1);
   out_value_gb = uintBitsToFloat(pack_gbuffer(
     gl_FragCoord.z, // user can recover position from depth
     in_value_n,

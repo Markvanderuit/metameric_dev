@@ -16,18 +16,23 @@ namespace met {
       alignas(4) float px_scale;
     };
 
+    // Shared data
     uint             m_object_i;
-    uint             m_atlas_layer_i;
-    gl::Program      m_program_txtr; // Program for texture handling
-    gl::Program      m_program_colr; // Program for single-color handling
-    gl::Buffer       m_unif_buffer;
-    UnifLayout      *m_unif_map;
-    gl::Framebuffer  m_fbo;
     gl::Sampler      m_sampler;
 
-    // Keys for program caches
-    std::string m_cache_key_txtr; // Program for texture handling
-    std::string m_cache_key_colr; // Program for single-color handling
+    // Objects specifically for spectral coefficient bake
+    uint            m_coef_layer_i;
+    gl::Buffer      m_coef_unif;
+    UnifLayout     *m_coef_unif_map;
+    gl::Framebuffer m_coef_fbo;
+    std::string     m_coef_cache_key; // Program-cache key for texture handling
+
+    // Objects specifically for brdf data bake
+    uint            m_brdf_layer_i;
+    gl::Buffer      m_brdf_unif;
+    UnifLayout     *m_brdf_unif_map;
+    gl::Framebuffer m_brdf_fbo;
+    std::string     m_brdf_cache_key; // Program-cache key for texture handling
 
   public:
     GenObjectDataTask(uint object_i);

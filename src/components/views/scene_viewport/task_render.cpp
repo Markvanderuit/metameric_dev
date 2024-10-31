@@ -62,24 +62,6 @@ namespace met {
                                                     .enable_debug        = true,
                                                     .cache_handle        = info.global("cache") });
           break;
-        case Settings::RendererType::ePathRGB:
-          render_handle.init<RGBPathRenderPrimitive>({ .spp_per_iter        = render_spp_per_iter,
-                                                       .pixel_checkerboard  = true,
-                                                       .cache_handle        = info.global("cache") });
-          break;
-        case Settings::RendererType::eDirectRGB:
-          render_handle.init<RGBPathRenderPrimitive>({ .spp_per_iter        = render_spp_per_iter,
-                                                       .max_depth           = 2u,
-                                                       .pixel_checkerboard  = true,
-                                                       .cache_handle        = info.global("cache") });
-          break;
-        case Settings::RendererType::eDebugRGB:
-          render_handle.init<RGBPathRenderPrimitive>({ .spp_per_iter        = render_spp_per_iter,
-                                                       .max_depth           = 2u,
-                                                       .pixel_checkerboard  = true,
-                                                       .enable_debug        = true,
-                                                       .cache_handle        = info.global("cache") });
-          break;
       }
     }
 
@@ -111,35 +93,13 @@ namespace met {
       i_sensor.flush();
 
       // Forward to underlying type dependent on setting
-      switch (e_settings.renderer_type) {
-        case Settings::RendererType::ePath:
-        case Settings::RendererType::eDirect:
-        case Settings::RendererType::eDebug:
-          render_handle.getw<PathRenderPrimitive>().reset(i_sensor, e_scene);
-          break;
-        case Settings::RendererType::ePathRGB:
-        case Settings::RendererType::eDirectRGB:
-        case Settings::RendererType::eDebugRGB:
-          render_handle.getw<RGBPathRenderPrimitive>().reset(i_sensor, e_scene);
-          break;
-      }
+      render_handle.getw<PathRenderPrimitive>().reset(i_sensor, e_scene);
     }
 
     // ... then forward to renderer to update frame if sampler is not exhausted
     if (render_handle.getr<detail::IntegrationRenderPrimitive>().has_next_sample_state()) {
       // Forward to underlying type dependent on setting
-      switch (e_settings.renderer_type) {
-        case Settings::RendererType::ePath:
-        case Settings::RendererType::eDirect:
-        case Settings::RendererType::eDebug:
-          render_handle.getw<PathRenderPrimitive>().render(sensor_handle.getr<Sensor>(), e_scene);
-          break;
-        case Settings::RendererType::ePathRGB:
-        case Settings::RendererType::eDirectRGB:
-        case Settings::RendererType::eDebugRGB:
-          render_handle.getw<RGBPathRenderPrimitive>().render(sensor_handle.getr<Sensor>(), e_scene);
-          break;
-      }
+      render_handle.getw<PathRenderPrimitive>().render(sensor_handle.getr<Sensor>(), e_scene);
     }
   }
 } // namespace met

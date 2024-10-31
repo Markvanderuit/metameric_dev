@@ -227,13 +227,9 @@ namespace met::io {
 
       // 2 - Identify referred texture resource or specify a single diffuse value
       std::variant<Colr, uint> diffuse = Colr(0.5);
-      if (!load_materials || !has_matrs) {
-        // No material specified; set to neutral gray
-        diffuse = Colr(0.5);
-      } else {
+      if (load_materials && has_matrs) {
         // Access first material only; we ignore per-face materials; 
         const auto &obj_mat = result.materials[shape.mesh.material_ids.front()];
-
         if (obj_mat.diffuse_texname.empty()) {
           // Assign color value if there is no file path
           diffuse = Colr { obj_mat.diffuse[0], obj_mat.diffuse[1], obj_mat.diffuse[2] };
@@ -243,6 +239,18 @@ namespace met::io {
             obj_mat.diffuse_texname,                    // filename of texture as key
             static_cast<uint>(texture_load_list.size()) // New texture id at end of list
           }).first->second;
+        }
+
+        if (obj_mat.metallic_texname.empty()) {
+
+        } else {
+
+        }
+        
+        if (obj_mat.roughness_texname.empty()) {
+
+        } else {
+          
         }
       }
 

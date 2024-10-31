@@ -55,7 +55,7 @@ namespace met {
     bool                     m_is_invalitated;
     
     // Texture/construction information
-    BuildMethod              m_method  = BuildMethod::eLayered;
+    BuildMethod              m_method  = BuildMethod::eSpread;
     uint                     m_levels  = 1u;
     uint                     m_padding = 0u;
 

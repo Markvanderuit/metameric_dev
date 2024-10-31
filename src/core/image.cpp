@@ -205,20 +205,54 @@ namespace met {
       uint pixl_size = pixl_chan * type_size;
 
       // Attempt to scatter EXR data to image memory
-      std::unordered_map<std::string, uint> channel_indices = {
-        { "R", 0 }, { "G", 1 }, { "B", 2 }, { "A", 3 },
-      };
-      for (uint c = 0; c < pixl_chan; ++c) {
-        size_t         chan_offs = channel_indices[exr_header.channels[c].name];
-        unsigned char* chan_data = exr_image.images[c];
+      switch (pixl_chan) {
+      case 1: {
+          unsigned char* chan_data = exr_image.images[0];
+          #pragma omp parallel for
+          for (int i = 0; i < m_size.prod(); ++i) {
+            size_t src_offs = type_size * i;
+            size_t dst_offs = type_size * (i * pixl_chan);
+            std::memcpy(&m_data[dst_offs], &chan_data[src_offs], type_size);
+          } // for (uint i)
+        }
+        break;
+      case 3: {
+          std::unordered_map<std::string, uint> channel_indices = {
+            { "R", 0 }, { "G", 1 }, { "B", 2 },
+          };
+          for (uint c = 0; c < pixl_chan; ++c) {
+            size_t         chan_offs = channel_indices[exr_header.channels[c].name];
+            unsigned char* chan_data = exr_image.images[c];
 
-        #pragma omp parallel for
-        for (int i = 0; i < m_size.prod(); ++i) {
-          size_t src_offs = type_size * i;
-          size_t dst_offs = type_size * (i * pixl_chan + chan_offs);
-          std::memcpy(&m_data[dst_offs], &chan_data[src_offs], type_size);
-        } // for (uint i)
-      } // for (uint c)
+            #pragma omp parallel for
+            for (int i = 0; i < m_size.prod(); ++i) {
+              size_t src_offs = type_size * i;
+              size_t dst_offs = type_size * (i * pixl_chan + chan_offs);
+              std::memcpy(&m_data[dst_offs], &chan_data[src_offs], type_size);
+            } // for (uint i)
+          } // for (uint c)
+        }
+        break;
+      case 4: {
+          std::unordered_map<std::string, uint> channel_indices = {
+            { "R", 0 }, { "G", 1 }, { "B", 2 }, { "A", 3 }
+          };
+          for (uint c = 0; c < pixl_chan; ++c) {
+            size_t         chan_offs = channel_indices[exr_header.channels[c].name];
+            unsigned char* chan_data = exr_image.images[c];
+
+            #pragma omp parallel for
+            for (int i = 0; i < m_size.prod(); ++i) {
+              size_t src_offs = type_size * i;
+              size_t dst_offs = type_size * (i * pixl_chan + chan_offs);
+              std::memcpy(&m_data[dst_offs], &chan_data[src_offs], type_size);
+            } // for (uint i)
+          } // for (uint c)
+        }
+        break;
+      default:
+        debug::check_expr(false, "Could not load EXR image, unsupported channel layout");
+      }
 
       fmt::print("Attempted to read: channels = {}, width = {}, height = {}, tiles = {}\n",
         exr_image.num_channels, exr_image.width, exr_image.height, exr_image.num_tiles);

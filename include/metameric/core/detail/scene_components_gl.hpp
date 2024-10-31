@@ -24,6 +24,8 @@ namespace met::detail {
       alignas(4)  uint          uplifting_i;
       alignas(4)  uint          brdf_type;
       alignas(8)  eig::Array2u  albedo_data;
+      alignas(4)  uint          metallic_data;
+      alignas(4)  uint          roughness_data;
     };
     static_assert(sizeof(BlockLayout) == 64 + 16 + 16);
     
@@ -94,15 +96,16 @@ namespace met::detail {
   // data is filled in by the uplifting pipeline, which is part of the program pipeline 
   template <>
   class SceneGLHandler<met::Uplifting> : public SceneGLHandlerBase {
-    using atlas_type_u = TextureAtlas<uint, 4>;
-    using basis_type   = gl::Texture1d<float, 1, gl::TextureType::eImageArray>;
+    using basis_type = gl::Texture1d<float, 1, gl::TextureType::eImageArray>;
 
   public:
     // Atlas texture; each per-object patch stored in this atlas holds either
     // linear (ours) or moment (bounded MESE) coefficients
-    atlas_type_u texture_coefficients;
+    // Atlas textures; each scene object has a patch in the atlas with some material parameters
+    TextureAtlas<uint, 4> texture_coef; // Stores packed linear coefficients representing surface spectral reflectances
+    TextureAtlas<uint, 1> texture_brdf; // Stores packing of other brdf parameters (roughness, metallic at fp16)
 
-    // Basis functions; each layer holds a basis function
+    // Array texture; each layer holds an available set of basis functions
     basis_type texture_basis;
 
     // Warped phase data for bounded MESE method

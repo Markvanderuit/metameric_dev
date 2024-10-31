@@ -35,7 +35,7 @@ void detail_fill_surface_info_object(inout SurfaceInfo si, in Ray ray) {
   
   // Offset surface position as shading point, as per
   // "Hacking the Shadow Terminator, Hanika, 2021"
-  {
+  /* {
     vec3 tmp_u = si.p - prim.v0.p, 
          tmp_v = si.p - prim.v1.p, 
          tmp_w = si.p - prim.v2.p;
@@ -48,7 +48,7 @@ void detail_fill_surface_info_object(inout SurfaceInfo si, in Ray ray) {
     tmp_w -= dot_w * prim.v2.n;
 
     si.p += b.x * tmp_u + b.y * tmp_v + b.z * tmp_w;
-  }
+  } */
 
   // Transform relevant data to world-space
   si.p  =          (object_info.trf * vec4(si.p,  1)).xyz;

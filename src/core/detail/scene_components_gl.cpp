@@ -209,15 +209,16 @@ namespace met::detail {
       auto mesh_trf   = scene.resources.meshes.gl.unit_transforms[object.mesh_i];
       auto trf        = (object_trf * mesh_trf).eval();
 
-
       // Fill in object struct data
       m_object_info_map->data[i] = {
-        .trf         = trf,
-        .is_active   = object.is_active,
-        .mesh_i      = object.mesh_i,
-        .uplifting_i = object.uplifting_i,
-        .brdf_type   = static_cast<uint>(object.brdf_type),
-        .albedo_data = pack_material_3f(object.diffuse),
+        .trf            = trf,
+        .is_active      = object.is_active,
+        .mesh_i         = object.mesh_i,
+        .uplifting_i    = object.uplifting_i,
+        .brdf_type      = static_cast<uint>(object.brdf_type),
+        .albedo_data    = pack_material_3f(object.diffuse),
+        .metallic_data  = pack_material_1f(object.metallic),
+        .roughness_data = pack_material_1f(object.roughness),
       };
 
       // Flush change to buffer; most changes to objects are local,
@@ -231,8 +232,9 @@ namespace met::detail {
   SceneGLHandler<met::Uplifting>::SceneGLHandler() {
     met_trace_full();
 
-    // Initialize texture atlas to hold per-object coefficients
-    texture_coefficients = {{ .levels  = 1, .padding = 0 }};
+    // Initialize texture atlaess to hold per-object data
+    texture_coef = {{ .levels  = 1, .padding = 0 }};
+    texture_brdf = {{ .levels  = 1, .padding = 0 }};
 
     // Initialize basis function data
     texture_basis = {{ .size = { wavelength_samples, wavelength_bases } }};
@@ -252,59 +254,86 @@ namespace met::detail {
     const auto &e_images     = scene.resources.images;
     const auto &e_settings   = scene.components.settings;
     
-    // Barycentric texture has not been touched yet
-    e_upliftings.gl.texture_coefficients.set_invalitated(false);
-    
+    // Flag that the atlas' internal texture has **not** been invalidated by internal resize
+    e_upliftings.gl.texture_coef.set_invalitated(false);
+    e_upliftings.gl.texture_brdf.set_invalitated(false);
+
     // Only rebuild if there are upliftings and objects
     guard(!e_upliftings.empty() && !e_upliftings.empty());
-    guard(e_upliftings                                              || 
-          e_objects                                                 ||
-          e_settings.state.texture_size                             ||
-          !e_upliftings.gl.texture_coefficients.texture().is_init() ||
-          !e_upliftings.gl.texture_coefficients.buffer().is_init()  );
+    guard(e_upliftings                                        || 
+          e_objects                                           ||
+          e_settings.state.texture_size                       ||
+          !e_upliftings.gl.texture_coef.texture().is_init()   ||
+          !e_upliftings.gl.texture_coef.buffer().is_init()    );
     
-    // Gather necessary texture sizes for each object
-    std::vector<eig::Array2u> inputs(e_objects.size());
-    rng::transform(e_objects, inputs.begin(), [&](const auto &comp) -> eig::Array2u {
-      const auto &object = comp.value;
-      if (auto value_ptr = std::get_if<uint>(&object.diffuse)) {
-        // Texture index specified; insert texture size in the atlas inputs
-        const auto &image = e_images[*value_ptr].value();
-        return image.size();
-      } else {
-        // Color specified directly; a small patch suffices
-        // TODO make smaller and test
-        return { 256, 256 };
+    // Handle texture_coef
+    {
+      // Gather necessary texture sizes for each object
+      // If the texture index was specified, we insert the texture size as an input
+      // for the atlas. If a color was specified, we allocate a small patch
+      std::vector<eig::Array2u> inputs(e_objects.size());
+      rng::transform(e_objects, inputs.begin(), [&](const auto &object) -> eig::Array2u {
+        return object->diffuse | visit {
+          [&](uint i) { return e_images[i]->size(); },
+          [&](Colr f) { return eig::Array2u { 256, 256 }; },
+        };
+      });
+
+      // Scale atlas inputs to respect the maximum texture size set in Settings::texture_size
+      eig::Array2u maximal = rng::fold_left(inputs, eig::Array2u(0), [](auto a, auto b) { return a.cwiseMax(b).eval(); });
+      eig::Array2f scaled  = e_settings->apply_texture_size(maximal).cast<float>() / maximal.cast<float>();
+      for (auto &input : inputs)
+        input = (input.cast<float>() * scaled).max(2.f).cast<uint>().eval();
+
+      // Regenerate atlas if inputs don't match the atlas' current layout
+      // Note; barycentric weights will need a full rebuild, which is detected
+      //       by the nr. of objects changing or the texture setting changing. A bit spaghetti-y :S
+      texture_coef.resize(inputs);
+      if (texture_coef.is_invalitated()) {
+        // The barycentric texture was re-allocated, which means underlying memory was all invalidated.
+        // So in a case of really bad spaghetti-code, we force object-dependent parts to update
+        auto &e_scene = const_cast<Scene &>(scene);
+        e_scene.components.objects.set_mutated(true);
       }
-    });
+    }
 
-    // Determine maximum texture sizes, and scale atlas inputs w.r.t. to this value and
-    // specified texture settings
-    eig::Array2u maximal_4f = rng::fold_left(inputs, eig::Array2u(0), 
-      [](auto a, auto b) { return a.cwiseMax(b).eval(); });
-    eig::Array2u clamped_4f = e_settings->apply_texture_size(maximal_4f);
-    eig::Array2f scaled_4f  = clamped_4f.cast<float>() / maximal_4f.cast<float>();
-    for (auto &input : inputs)
-      input = (input.cast<float>() * scaled_4f).max(2.f).cast<uint>().eval();
+    // Handle texture_brdf
+    {
+      // Gather necessary texture sizes for each object
+      // If the texture index was specified, we insert the texture size as an input
+      // for the atlas. If a value was specified, we allocate a small patch
+      // As we'd like to cram multiple brdf values into a single lookup, we will
+      // take the larger size for each patch. Makes baking slightly more expensive
+      std::vector<eig::Array2u> inputs(e_objects.size());
+      rng::transform(e_objects, inputs.begin(), [&](const auto &object) -> eig::Array2u {
+        auto metallic_size = object->metallic | visit {
+          [&](uint  i) { return e_images[i]->size(); },
+          [&](float f) { return eig::Array2u { 256, 256 }; },
+        };
+        auto roughness_size = object->roughness | visit {
+          [&](uint  i) { return e_images[i]->size(); },
+          [&](float f) { return eig::Array2u { 256, 256 }; },
+        };
+        return metallic_size.cwiseMax(roughness_size).eval();
+      });
 
-    // Test if the necessitated inputs match exactly to the atlas' reserved patches
-    bool is_exact_fit = rng::equal(inputs, texture_coefficients.patches(),
-      eig::safe_approx_compare<eig::Array2u>, {}, &PatchLayout::size);
-
-    // Regenerate atlas if inputs don't match the atlas' current layout
-    // Note; barycentric weights will need a full rebuild, which is detected
-    //       by the nr. of objects changing or the texture setting changing. A bit spaghetti.
-    texture_coefficients.resize(inputs);
-    if (texture_coefficients.is_invalitated()) {
-      // The barycentric texture was re-allocated, which means underlying memory was all invalidated.
-      // So in a case of really bad spaghetti-code, we force object-dependent parts of the pipeline 
-      // to rerun here. But uhh, code smell much?
-      auto &e_scene = const_cast<Scene &>(scene);
-      e_scene.components.objects.set_mutated(true);
-
-      fmt::print("Rebuilt texture atlas\n");
-      for (const auto &patch : texture_coefficients.patches()) {
-        fmt::print("\toffs = {}, size = {}, uv0 = {}, uv1 = {}\n", patch.offs, patch.size, patch.uv0, patch.uv1);
+      fmt::print("brdf inputs: {}\n", inputs);
+      
+      // Scale atlas inputs to respect the maximum texture size set in Settings::texture_size
+      eig::Array2u maximal = rng::fold_left(inputs, eig::Array2u(0), [](auto a, auto b) { return a.cwiseMax(b).eval(); });
+      eig::Array2f scaled  = e_settings->apply_texture_size(maximal).cast<float>() / maximal.cast<float>();
+      for (auto &input : inputs)
+        input = (input.cast<float>() * scaled).max(2.f).cast<uint>().eval();
+      
+      // Regenerate atlas if inputs don't match the atlas' current layout
+      // Note; barycentric weights will need a full rebuild, which is detected
+      //       by the nr. of objects changing or the texture setting changing. A bit spaghetti-y :S
+      texture_brdf.resize(inputs);
+      if (texture_brdf.is_invalitated()) {
+        // The barycentric texture was re-allocated, which means underlying memory was all invalidated.
+        // So in a case of really bad spaghetti-code, we force object-dependent parts to update
+        auto &e_scene = const_cast<Scene &>(scene);
+        e_scene.components.objects.set_mutated(true);
       }
     }
 
@@ -559,7 +588,9 @@ namespace met::detail {
     std::vector<eig::Array2u> inputs_3f, inputs_1f;
     for (uint i = 0; i < images.size(); ++i) {
       const auto &[img, state] = images[i];
-      bool is_3f = img.pixel_frmt() == Image::PixelFormat::eRGB;
+      bool is_3f 
+         = img.pixel_frmt() == Image::PixelFormat::eRGB
+        || img.pixel_frmt() == Image::PixelFormat::eRGBA;
 
       indices[i] = is_3f ? inputs_3f.size() : inputs_1f.size();
       
@@ -591,9 +622,15 @@ namespace met::detail {
       const auto &[img, state] = images[i];
 
       // Load patch from appropriate atlas (3f or 1f)
-      bool is_3f = img.pixel_frmt() == Image::PixelFormat::eRGB;
-      auto size  = is_3f ? texture_atlas_3f.capacity() : texture_atlas_1f.capacity();
-      auto resrv = is_3f ? texture_atlas_3f.patch(indices[i]) : texture_atlas_1f.patch(indices[i]);
+      bool is_3f 
+         = img.pixel_frmt() == Image::PixelFormat::eRGB
+        || img.pixel_frmt() == Image::PixelFormat::eRGBA;
+      auto size  = is_3f 
+                 ? texture_atlas_3f.capacity() 
+                 : texture_atlas_1f.capacity();
+      auto resrv = is_3f 
+                 ? texture_atlas_3f.patch(indices[i]) 
+                 : texture_atlas_1f.patch(indices[i]);
 
       // Determine UV coordinates of the texture inside the full atlas
       eig::Array2f uv0 = resrv.offs.cast<float>() / size.head<2>().cast<float>(),
@@ -607,17 +644,20 @@ namespace met::detail {
       // so we flush specific regions instead of the whole
       texture_info.flush(sizeof(BlockLayout), sizeof(BlockLayout) * i + sizeof(uint));
 
-      // Get a resampled float representation of image data
-      auto imgf = img.convert({ .resize_to  = resrv.size,
-                                .pixel_type = Image::PixelType::eFloat,
-                                .color_frmt = Image::ColorFormat::eLRGB });
-      
-      // Put image in appropriate place
+      // Put properly resampled image in appropriate place (rg)
       if (is_3f) {
+        auto imgf = img.convert({ .resize_to  = resrv.size,
+                                  .pixel_frmt = Image::PixelFormat::eRGB,
+                                  .pixel_type = Image::PixelType::eFloat,
+                                  .color_frmt = Image::ColorFormat::eLRGB });
         texture_atlas_3f.texture().set(imgf.data<float>(), 0,
           { resrv.size.x(), resrv.size.y(), 1             },
           { resrv.offs.x(), resrv.offs.y(), resrv.layer_i });
       } else {
+        auto imgf = img.convert({ .resize_to  = resrv.size,
+                                  .pixel_frmt = Image::PixelFormat::eAlpha,
+                                  .pixel_type = Image::PixelType::eFloat,
+                                  .color_frmt = Image::ColorFormat::eNone });
         texture_atlas_1f.texture().set(imgf.data<float>(), 0,
           { resrv.size.x(), resrv.size.y(), 1             },
           { resrv.offs.x(), resrv.offs.y(), resrv.layer_i });
@@ -629,6 +669,11 @@ namespace met::detail {
       texture_atlas_3f.texture().generate_mipmaps();
     if (texture_atlas_1f.texture().is_init()) 
       texture_atlas_1f.texture().generate_mipmaps();
+    
+    if (texture_atlas_3f.texture().is_init()) 
+      fmt::print("3f {}\n", texture_atlas_3f.texture().size());
+    if (texture_atlas_1f.texture().is_init()) 
+      fmt::print("1f {}\n", texture_atlas_1f.texture().size());
   }
 
   SceneGLHandler<met::Spec>::SceneGLHandler() {

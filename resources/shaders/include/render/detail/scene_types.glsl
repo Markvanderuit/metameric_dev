@@ -26,8 +26,10 @@ struct ObjectInfo {
   uint uplifting_i;
 
   // Material data
-  uint brdf_type;
+  uint  brdf_type;   // Type of brdf; 0 = null, 1 = diffuse, 2 = mirror, 3 = ggx
   uvec2 albedo_data;
+  uint  metallic_data;
+  uint  roughness_data;
 };
 
 // Info object for referred mesh.bvh data
@@ -45,7 +47,7 @@ struct TextureInfo {
 };
 
 // Info object for referred texture atlas patch data
-struct TextureAtlasInfo {
+struct AtlasInfo {
   uint layer;  // layer in texture array in which a texture patch is located
   vec2 uv0;    // Minimum uv value, at region's offset
   vec2 uv1;    // Maximum uv value, at region's offset + size

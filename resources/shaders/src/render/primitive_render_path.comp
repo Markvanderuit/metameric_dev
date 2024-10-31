@@ -10,7 +10,7 @@
 #include <render/load/object.glsl>
 #include <render/load/cmfs.glsl>
 #include <render/load/illuminant.glsl>
-#include <render/load/reflectance.glsl>
+#include <render/load/texture.glsl>
 #include <render/load/defaults.glsl>
 
 // General layout rule declarations
@@ -62,10 +62,14 @@ layout(binding = 7) uniform b_buff_envmap_info {
   bool envm_is_present;
   uint envm_i;
 } buff_envmap_info;
-layout(binding = 8) uniform b_buff_coeffs {
+layout(binding = 8) uniform b_buff_coef {
   uint n;
-  TextureAtlasInfo data[met_max_textures];
-} buff_coeffs;
+  AtlasInfo data[met_max_textures];
+} buff_coef;
+layout(binding = 9) uniform b_buff_brdf {
+  uint n;
+  AtlasInfo data[met_max_textures];
+} buff_brdf;
 
 // Storage buffer declarations
 layout(binding = 0) restrict readonly buffer b_buff_bvhs_node0 { BVHNode0Pack data[]; } buff_bvhs_node0;
@@ -76,14 +80,15 @@ layout(binding = 2) restrict readonly buffer b_buff_bvhs_prim  { MeshPrimPack da
 layout(binding = 0)          uniform sampler1DArray   b_illm_1f; // Illuminant function data, 1 component
 layout(binding = 1)          uniform sampler1DArray   b_cmfs_3f; // Observer function data, 3 components
 layout(binding = 2)          uniform sampler1DArray   b_bsis_1f; // Basis function data, 1 component
-layout(binding = 3)          uniform usampler2DArray  b_coef_4f; // Coefficient data for spectral MESE
+layout(binding = 3)          uniform usampler2DArray  b_coef_4f; // Texture atlas storing packed coefficients for surface reflectance
+layout(binding = 4)          uniform usampler2DArray  b_brdf_2f; // Texture atlas storing packed secondary brdf data
 layout(binding = 0, rgba32f) uniform restrict image2D b_film;    // Target film, averaged over frames
 
 // Shared memory declarations
 // shared EmitterInfo      s_emtr_info[met_max_emitters];
 // shared ObjectInfo       s_objc_info[met_max_objects];
 // shared MeshInfo         s_mesh_info[met_max_meshes];
-// shared TextureAtlasInfo s_coef_info[met_max_textures];
+// shared AtlasInfo s_coef_info[met_max_textures];
 
 // sensor.glsl will know not to take wavelength samples; we 
 // pull these from the below buckets for now
@@ -98,30 +103,19 @@ shared vec4   s_bucket_basis[n_wvl_buckets][wavelength_bases]; // Bucket of basi
 shared vec4   s_bucket_illm[n_wvl_buckets][met_max_emitters];
 shared mat4x3 s_bucket_cmfs[n_wvl_buckets]; */
 
-// Object and emitter data comes from shared memory
-// Texture data comes from uniform buffers and samplers
-// Wavelength/emitter sampling distributions draw from uniform buffers
-// Color system spectra and illuminant spectra draw from sampler arrays
-// Part of mesh data comes from storage buffers
+// Declare scene data; creates functions to access and interact with
+// scene data without knowing the exact names of buffers, textures, etc
 declare_distr_sampler(wavelength, buff_wvls_distr, wavelength_samples)
 declare_distr_sampler(emitters, buff_emitters_distr, met_max_emitters)
 declare_scene_cmfs_data(b_cmfs_3f);
 declare_scene_illuminant_data(b_illm_1f);
 declare_scene_emitter_data(buff_emitters.data, buff_emitters.n, buff_envmap_info);
 declare_scene_object_data(buff_objects.data, buff_objects.n);
-declare_scene_reflectance_data(buff_coeffs.data, b_bsis_1f, b_coef_4f);
+declare_scene_texture_data(buff_coef.data, buff_brdf.data, b_coef_4f, b_brdf_2f, b_bsis_1f);
 declare_scene_bvh_data(buff_bvhs_prim.data, buff_bvhs_node0.data, buff_bvhs_node1.data, buff_meshes.data, buff_meshes.n);
 
-
-// declare_scene_cmfs_data(s_bucket_cmfs, bucket_i);
-// declare_scene_illuminant_data(s_bucket_illm, bucket_i);
-
-// declare_scene_emitter_data(s_emtr_info, buff_emitters.n, buff_envmap_info);
-// declare_scene_object_data(s_objc_info, buff_objects.n);
-// declare_scene_reflectance_data(s_coef_info, s_bucket_basis, b_coef_4f, bucket_i);
-// declare_scene_bvh_data(buff_bvhs_prim.data, buff_bvhs_node.data, s_mesh_info, buff_meshes.n);
-
-// All includes from and in here rely on buffers/samplers to be declared
+// All includes from here on out require scene data to be declared above;
+// scene data that was not declared is default-set in defaults.glsl
 #include <render/path.glsl>
 
 // Preload object/mesh/emitter/texture info objects into shared memory

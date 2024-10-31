@@ -36,9 +36,6 @@ layout(binding = 4) uniform b_buff_envmap_info {
   bool envm_is_present;
   uint envm_i;
 } buff_envmap_info;
-layout(binding = 5) uniform b_buff_scene {
-  SceneInfo data;
-} buff_scene;
 
 // Storage buffer declarations
 layout(binding = 0) restrict readonly buffer b_buff_bvhs_node0 { BVHNode0Pack data[]; } buff_bvhs_node0;
@@ -51,17 +48,9 @@ layout(binding = 4) restrict readonly buffer b_buff_tlas_prim {
   uint data[]; 
 } buff_tlas_prim;
 
-// Shared memory declarations
-shared ObjectInfo  s_objc_info[met_max_objects];
-shared EmitterInfo s_emtr_info[met_max_emitters];
-shared MeshInfo    s_mesh_info[met_max_meshes];
-
-// declare_scene_traversal_stack(6); 
-// declare_scene_tlas_stack(4); 
-declare_scene_emitter_data(s_emtr_info, buff_emitters.n, buff_envmap_info);
-declare_scene_object_data(s_objc_info, buff_objects.n);
+declare_scene_emitter_data(buff_emitters.data, buff_emitters.n, buff_envmap_info);
+declare_scene_object_data(buff_objects.data, buff_objects.n);
 declare_scene_bvh_data(buff_bvhs_prim.data, buff_bvhs_node0.data, buff_bvhs_node1.data, buff_meshes.data, buff_meshes.n);
-// declare_scene_tlas_data(buff_tlas_prim.data, buff_tlas_node.data, buff_scene.data);
 declare_distr_sampler_default(wavelength, buff_wvls_distr, wavelength_samples)
 declare_distr_sampler_default(emitters, buff_emitters_distr, met_max_emitters)
 
@@ -69,18 +58,7 @@ declare_distr_sampler_default(emitters, buff_emitters_distr, met_max_emitters)
 #include <render/scene.glsl>
 #include <render/sensor.glsl>
 
-void load_shared() {
-  const uint iter = hprod(gl_WorkGroupSize.xyz);
-  for (uint i = gl_LocalInvocationIndex; i < buff_objects.n; i += iter)  s_objc_info[i] = buff_objects.data[i];
-  for (uint i = gl_LocalInvocationIndex; i < buff_meshes.n; i += iter)   s_mesh_info[i] = buff_meshes.data[i];
-  for (uint i = gl_LocalInvocationIndex; i < buff_emitters.n; i += iter) s_emtr_info[i] = buff_emitters.data[i];
-  memoryBarrierShared();
-  barrier();
-}
-
 void main() {
-  load_shared();
-
   // Clamp invocations to requested size
   guard(gl_GlobalInvocationID.x == 0);
 

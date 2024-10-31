@@ -11,7 +11,7 @@ namespace met {
     // Helper function; given a title, access to a set of textures, and a modifiable variant
     // representing a color or a texture, spawn a combo box for texture/color selection
     constexpr
-    void push_texture_variant_selector(const std::string &title, const auto &resources, auto &variant) {
+    void push_texture_variant_selector_3f(const std::string &title, const auto &resources, auto &variant) {
       // First, spawn a editor for the variant's specific type; color editor, or texture selector
       ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x * 0.75);
       if (std::holds_alternative<Colr>(variant)) {
@@ -31,6 +31,33 @@ namespace met {
       if (ImGui::BeginCombo(std::format("##_{}_data", title).c_str(), title.c_str())) {
         if (ImGui::Selectable("Value", std::holds_alternative<Colr>(variant)))
           variant = Colr(1);
+        if (ImGui::Selectable("Texture", std::holds_alternative<uint>(variant)))
+          variant = uint(0u);
+        ImGui::EndCombo();
+      } // If (BeginCombo)
+    }
+
+    // Helper function; given a title, access to a set of textures, and a modifiable variant
+    // representing a color or a texture, spawn a combo box for texture/color selection
+    constexpr
+    void push_texture_variant_selector_1f(const std::string &title, const auto &resources, auto &variant) {
+      // First, spawn a editor for the variant's specific type; color editor, or texture selector
+      ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x * 0.75);
+      if (std::holds_alternative<float>(variant)) {
+        auto value = std::get<float>(variant);
+        ImGui::SliderFloat(std::format("##_{}_value", title).c_str(), &value, 0.f, 1.f);
+        ImGui::SameLine();
+        variant = value;
+      } else if (std::holds_alternative<uint>(variant)) {
+        push_resource_selector(std::format("##_{}_txtr", title), resources, std::get<uint>(variant));
+      }
+      
+      // Then, spawn a combobox to switch between the variant's types
+      ImGui::SameLine();
+      ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+      if (ImGui::BeginCombo(std::format("##_{}_data", title).c_str(), title.c_str())) {
+        if (ImGui::Selectable("Value", std::holds_alternative<float>(variant)))
+          variant = float(0.f);
         if (ImGui::Selectable("Texture", std::holds_alternative<uint>(variant)))
           variant = uint(0u);
         ImGui::EndCombo();
@@ -74,12 +101,12 @@ namespace met {
         
       // Texture selectors
       if (value.brdf_type != Object::BRDFType::eNull) {
-        push_texture_variant_selector("Albedo", scene.resources.images, value.diffuse);
+        push_texture_variant_selector_3f("Albedo", scene.resources.images, value.diffuse);
       }
-      // push_texture_variant_selector("Roughness", scene.resources.images, value.roughness);
-      // push_texture_variant_selector("Metallic", scene.resources.images, value.metallic);
-      // push_texture_variant_selector("Normals", scene.resources.images, value.normals);
-      // push_texture_variant_selector("Opacity", scene.resources.images, value.opacity);
+      if (value.brdf_type == Object::BRDFType::ePrincipled) {
+        push_texture_variant_selector_1f("Roughness", scene.resources.images, value.roughness);
+        push_texture_variant_selector_1f("Metallic",  scene.resources.images, value.metallic);
+      }
     };
 
     // Default implementation of editing visitor for Emitter components

@@ -5,19 +5,7 @@
 #include <render/warp.glsl>
 #include <render/microfacet.glsl>
 
-void init_brdf_principled(inout BRDFInfo brdf, in SurfaceInfo si, vec4 wvls) {
-  // Temporary until I can connect them to scene sparameters
-  float roughness = 0.2f;
-  float metallic  = 0.f;
-  float eta       = 1.46f;
-  
-  brdf.r        = scene_sample_reflectance(record_get_object(si.data), si.tx, wvls);
-  brdf.metallic = metallic;
-  brdf.alpha    = max(1e-3, sdot(roughness)); // clamped to 0.001 to prevent issuess
-  brdf.F0       = clamp(mix(vec4(eta_to_specular(eta)), brdf.r, brdf.metallic), 0.f, 1.f);
-}
-
-vec2 _get_principled_lobe_probs(in BRDFInfo brdf, in SurfaceInfo si) {  
+vec2 _principled_lobe_probs(in BRDFInfo brdf, in SurfaceInfo si) {  
   // Estimate fresnel for incident vector to establish probabilities
   vec4 F = schlick_fresnel(brdf.F0, cos_theta(si.wi));
   
@@ -34,6 +22,16 @@ vec2 _get_principled_lobe_probs(in BRDFInfo brdf, in SurfaceInfo si) {
 
   // We consistently return [spec, diffuse]
   return vec2(prob_spec, prob_diff);
+}
+
+void init_brdf_principled(inout BRDFInfo brdf, in SurfaceInfo si, vec4 wvls, in vec2 sample_2d) {
+  float eta = 1.28f;
+  
+  vec2 brdf_data = texture_brdf(si, sample_2d);
+  brdf.r        = texture_reflectance(si, wvls, sample_2d);
+  brdf.alpha    = max(1e-3, brdf_data.x);
+  brdf.metallic = brdf_data.y;
+  brdf.F0       = clamp(mix(vec4(eta_to_specular(eta)), brdf.r, brdf.metallic), 0.f, 1.f);
 }
 
 vec4 eval_brdf_principled(in BRDFInfo brdf, in SurfaceInfo si, in vec3 wo) {
@@ -62,7 +60,7 @@ float pdf_brdf_principled(in BRDFInfo brdf, in SurfaceInfo si, in vec3 wo) {
   if (cos_theta(si.wi) <= 0.f || cos_theta(wo) <= 0.f)
     return 0.f;
 
-  vec2 lobe_probs = _get_principled_lobe_probs(brdf, si);
+  vec2 lobe_probs = _principled_lobe_probs(brdf, si);
 
   // Output values
   float specular_pdf = lobe_probs[0] * .5f * pdf_microfacet(si, normalize(si.wi + wo), brdf.alpha);
@@ -81,7 +79,7 @@ BRDFSample sample_brdf_principled(in BRDFInfo brdf, in vec3 sample_3d, in Surfac
   bs.is_delta = false;
   
   // Select a lobe based on sample probabilities [spec, diffuse]
-  vec2 lobe_probs = _get_principled_lobe_probs(brdf, si);
+  vec2 lobe_probs = _principled_lobe_probs(brdf, si);
   if (sample_3d.x < lobe_probs[0]) { // Specular lobe  microfacet sampling
     // Sample a microfacet normal to reflect with
     MicrofacetSample ms = sample_microfacet(si, brdf.alpha, sample_3d.yz);

@@ -139,52 +139,12 @@ namespace met {
                                                       .enable_debug       = true,
                                                       .cache_handle       = info.global("cache") });
             break;
-          case Settings::RendererType::ePathRGB:
-            render_handle.init<RGBPathRenderPrimitive>({ .spp_per_iter       = export_spp_per_iter,
-                                                         .pixel_checkerboard = false,
-                                                         .cache_handle       = info.global("cache") });
-            break;
-          case Settings::RendererType::eDirectRGB:
-            render_handle.init<RGBPathRenderPrimitive>({ .spp_per_iter       = export_spp_per_iter,
-                                                         .max_depth          = 2u,
-                                                         .pixel_checkerboard = false,
-                                                         .cache_handle       = info.global("cache") });
-            break;
-          case Settings::RendererType::eDebugRGB:
-            render_handle.init<RGBPathRenderPrimitive>({ .spp_per_iter       = export_spp_per_iter,
-                                                         .max_depth          = 2u,
-                                                         .pixel_checkerboard = false,
-                                                         .enable_debug       = true,
-                                                         .cache_handle       = info.global("cache") });
-            break;
         }
-        switch (m_render_type) {
-          case Settings::RendererType::ePath:
-          case Settings::RendererType::eDirect:
-          case Settings::RendererType::eDebug:
-            render_handle.getw<PathRenderPrimitive>().reset(m_sensor, e_scene);
-            break;
-          case Settings::RendererType::ePathRGB:
-          case Settings::RendererType::eDirectRGB:
-          case Settings::RendererType::eDebugRGB:
-            render_handle.getw<RGBPathRenderPrimitive>().reset(m_sensor, e_scene);
-            break;
-        }
+        render_handle.getw<PathRenderPrimitive>().reset(m_sensor, e_scene);
       }
 
       // Render step; taken over several frames
-      switch (m_render_type) {
-        case Settings::RendererType::ePath:
-        case Settings::RendererType::eDirect:
-        case Settings::RendererType::eDebug:
-          render_handle.getw<PathRenderPrimitive>().render(m_sensor, e_scene);
-          break;
-        case Settings::RendererType::ePathRGB:
-        case Settings::RendererType::eDirectRGB:
-        case Settings::RendererType::eDebugRGB:
-          render_handle.getw<RGBPathRenderPrimitive>().render(m_sensor, e_scene);
-          break;
-      }
+      render_handle.getw<PathRenderPrimitive>().render(m_sensor, e_scene);
       m_spp_curr += export_spp_per_iter;
 
       // End render
