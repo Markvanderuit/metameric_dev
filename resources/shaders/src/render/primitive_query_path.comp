@@ -23,7 +23,7 @@ layout(constant_id = 1) const uint max_depth = 4;     // Maximum path depth
 layout(constant_id = 2) const bool use_debug = false; // Override and enable debug queries
 
 // Uniform buffer declarations
-layout(binding = 1) uniform b_buff_sensor {
+layout(binding = 0) uniform b_buff_sensor {
   mat4  full_trf;
   mat4  proj_trf;
   mat4  view_trf;
@@ -50,12 +50,12 @@ layout(binding = 5) uniform b_buff_wvls_distr {
   float func[wavelength_samples];
   float cdf[wavelength_samples + 1];
 } buff_wvls_distr;
-layout(binding = 7) uniform b_buff_emitters_distr {
+layout(binding = 6) uniform b_buff_emitters_distr {
   float func_sum;
   float func[met_max_emitters];
   float cdf[met_max_emitters + 1];
 } buff_emitters_distr;
-layout(binding = 8) uniform b_buff_envmap_info {
+layout(binding = 7) uniform b_buff_envmap_info {
   bool envm_is_present;
   uint envm_i;
 } buff_envmap_info;
