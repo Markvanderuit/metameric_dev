@@ -1,7 +1,6 @@
 #include <preamble.glsl>
 #include <math.glsl>
 #include <spectrum.glsl>
-#include <distribution.glsl>
 #include <sampler/uniform.glsl>
 #include <render/ray.glsl>
 #include <render/detail/path_types.glsl>
@@ -51,8 +50,8 @@ layout(binding = 4) restrict readonly buffer b_buff_tlas_prim {
 declare_scene_emitter_data(buff_emitters.data, buff_emitters.n, buff_envmap_info);
 declare_scene_object_data(buff_objects.data, buff_objects.n);
 declare_scene_bvh_data(buff_bvhs_prim.data, buff_bvhs_node0.data, buff_bvhs_node1.data, buff_meshes.data, buff_meshes.n);
-declare_distr_sampler_default(wavelength, buff_wvls_distr, wavelength_samples)
-declare_distr_sampler_default(emitters, buff_emitters_distr, met_max_emitters)
+declare_distr_sampler_default(emitters);
+declare_distr_sampler_default(wavelength);
 
 // All includes from and in here rely on buffers/samplers to be declared
 #include <render/scene.glsl>

@@ -155,8 +155,9 @@ namespace met {
     // Helper struct
     // Definition for a path vertex; reflectance equals r_weight x our constraint reflectance + remainder
     struct CompactTetrRecord {
-      float        r_weight;  // Barycentric weight of reflectance at one of four vertices
-      eig::Array4f remainder; // Remainder of reflectances, premultiplied and summed
+      Object::BRDFType brdf_type; // Ref. to brdf type; we treat principled diffenently than diffuse
+      float            r_weight;  // Barycentric weight of reflectance at one of four vertices
+      eig::Array4f     remainder; // Remainder of reflectances, premultiplied and summed
     };
 
     // Compact paths into R^P + aR', which likely means separating them instead

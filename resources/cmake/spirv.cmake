@@ -50,7 +50,7 @@ function(compile_glsl_to_spirv glsl_src_fp spirv_dependencies)
     COMMAND ${glslangValidator} 
             ${spirv_parse_fp}       # input glsl
             -o ${spirv_bin_fp}      # output binary
-            -Os                     # minimize size
+            # -Os                     # minimize size
             --client opengl100      # create binary under OpenGL semantics
             --target-env spirv1.5   # execution environment is spirv 1.5
             ${preprocessor_defines} # forward -D... arguments

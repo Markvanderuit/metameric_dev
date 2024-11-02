@@ -1,7 +1,6 @@
 #include <preamble.glsl>
 #include <math.glsl>
 #include <spectrum.glsl>
-#include <distribution.glsl>
 #include <render/detail/path_types.glsl>
 #include <render/load/cmfs.glsl>
 #include <render/load/defaults.glsl>

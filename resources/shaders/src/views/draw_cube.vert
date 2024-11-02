@@ -1,4 +1,5 @@
 #include <preamble.glsl>
+#include <distribution.glsl>
 #include <render/load/defaults.glsl>
 #include <render/sensor.glsl>
 

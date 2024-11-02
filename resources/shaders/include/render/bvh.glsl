@@ -38,7 +38,9 @@ bool ray_intersect_bvh(inout Ray ray, in uint mesh_i) {
   // Initiate small stack for traversal from root node
   // Stack values use 8 bits to flag nodes of interest, 
   // and 24 bits to store the offset to these nodes;
-  uvec4 stck = { bvh_stck_init_value, 0, 0, 0 };
+  // uvec4 stck = { bvh_stck_init_value, 0, 0, 0 };
+  uint[6] stck;
+  stck[0] = bvh_stck_init_value;
 
   // Obtain mesh information
   MeshInfo mesh_info = scene_mesh_info(mesh_i);
@@ -107,7 +109,9 @@ bool ray_intersect_bvh_any(in Ray ray, in uint mesh_i) {
   // Initiate small stack for traversal from root node
   // Stack values use 8 bits to flag nodes of interest, 
   // and 24 bits to store the offset to these nodes;
-  uvec4 stck = { bvh_stck_init_value, 0, 0, 0 };
+  // uvec4 stck = { bvh_stck_init_value, 0, 0, 0 };
+  uint[6] stck;
+  stck[0] = bvh_stck_init_value;
   
   // Obtain mesh information
   MeshInfo mesh_info = scene_mesh_info(mesh_i);

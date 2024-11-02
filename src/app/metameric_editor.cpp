@@ -22,8 +22,8 @@ namespace met {
     fs::path shader_path = "resources/shaders/shaders.bin";
 
     // Window settings
-    eig::Array2u app_size  = { 1680, 1024 };
-    std::string  app_title = "Metameric Toolkit";
+    eig::Array2u app_size  = { 2560, 1080 };
+    std::string  app_title = "Metameric Editor";
   };
 
   // Application create function

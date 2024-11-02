@@ -9,7 +9,7 @@ project(Metameric LANGUAGES CXX)
 
 # Build options
 option(MET_ENABLE_EXCEPTIONS "Enable exceptions on release" ON)
-option(MET_ENABLE_TRACY      "Enable Tracy support"         ON)
+option(MET_ENABLE_TRACY      "Enable Tracy support"        OFF)
 option(MET_ENABLE_TESTS      "Build tests"                  ON)
 
 # Spectral layout; inserted in code/shaders as preprocessor defines

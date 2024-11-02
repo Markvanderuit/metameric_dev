@@ -31,22 +31,6 @@ namespace met {
       .is_closeable = false
     };
 
-    // Spawn subtasks
-    info.child_task("viewport_begin").init<detail::_ViewportBeginTask>(viewport_info);
-    info.child_task("viewport_image").init<detail::_ViewportImageTask>(viewport_info);
-    info.child_task("viewport_input_camera").init<detail::ArcballInputTask>(info.child("viewport_image")("lrgb_target"),
-    detail::ArcballInfo {
-      .dist            = 1,
-      .e_eye           = { 0,   0,    1 },
-      .e_center        = { -0.5, 0.5, 0 },
-      .zoom_delta_mult = 0.1f
-    });
-    info.child_task("viewport_input_editor").init<MeshViewportEditorInputTask>();
-    info.child_task("viewport_input_query").init<MeshViewportQueryInputTask>();
-    info.child_task("viewport_render").init<MeshViewportRenderTask>();
-    info.child_task("viewport_draw_overlay").init<MeshViewportDrawOverlayTask>();
-    info.child_task("viewport_draw_combine").init<MeshViewportDrawCombineTask>();
-
     // Subtask to handle viewport scene settings
     info.child_task("viewport_data_connection").init<LambdaTask>([this](SchedulerHandle &info) {
       met_trace();
@@ -75,6 +59,20 @@ namespace met {
       }
     });
 
+    // Spawn subtasks
+    info.child_task("viewport_begin").init<detail::_ViewportBeginTask>(viewport_info);
+    info.child_task("viewport_image").init<detail::_ViewportImageTask>(viewport_info);
+    info.child_task("viewport_input_camera").init<detail::ArcballInputTask>(info.child("viewport_image")("lrgb_target"), detail::ArcballInfo {
+      .dist            = 1,
+      .e_eye           = { 0,   0,    1 },
+      .e_center        = { -0.5, 0.5, 0 },
+      .zoom_delta_mult = 0.1f
+    });
+    info.child_task("viewport_input_editor").init<MeshViewportEditorInputTask>();
+    info.child_task("viewport_input_query").init<MeshViewportQueryInputTask>();
+    info.child_task("viewport_render").init<MeshViewportRenderTask>();
+    info.child_task("viewport_draw_overlay").init<MeshViewportDrawOverlayTask>();
+    info.child_task("viewport_draw_combine").init<MeshViewportDrawCombineTask>();
     info.child_task("viewport_end").init<detail::_ViewportEndTask>(viewport_info);
   }
 

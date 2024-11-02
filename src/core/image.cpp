@@ -372,6 +372,35 @@ namespace met {
     return (1.f - lerp.y()) * (a + b) + lerp.y() * (c + d);
   }
 
+  
+  Image Image::flip(bool flip_x, bool flip_y) const {
+    met_trace();
+    
+    // Initialize output image in requested format
+    Image output = {{ 
+      .pixel_frmt = m_pixel_frmt,
+      .pixel_type = m_pixel_type,
+      .color_frmt = m_color_frmt,
+      .size       = m_size
+    }};
+
+    // Perform sample and flip where necessary
+    #pragma omp parallel for
+    for (int y = 0; y < output.size().y(); ++y) {
+      for (int x = 0; x < output.size().x(); ++x) {
+        eig::Array2u pixel  = { x, y };
+        eig::Array2f uv     = ((pixel.cast<float>() + 0.5f) / output.size().cast<float>());
+        if (flip_x)
+          uv.x() = 1.f - uv.x();
+        if (flip_y)
+          uv.y() = 1.f - uv.y();
+        output.set_pixel(pixel, sample(uv, output.m_color_frmt));
+      } // for (int x)
+    } // for (int y)
+
+    return output;
+  }
+
   Image Image::convert(ConvertInfo info) const {
     met_trace();
 

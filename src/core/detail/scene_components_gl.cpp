@@ -275,7 +275,7 @@ namespace met::detail {
       rng::transform(e_objects, inputs.begin(), [&](const auto &object) -> eig::Array2u {
         return object->diffuse | visit {
           [&](uint i) { return e_images[i]->size(); },
-          [&](Colr f) { return eig::Array2u { 256, 256 }; },
+          [&](Colr f) { return eig::Array2u { 16, 16 }; },
         };
       });
 
@@ -308,17 +308,15 @@ namespace met::detail {
       rng::transform(e_objects, inputs.begin(), [&](const auto &object) -> eig::Array2u {
         auto metallic_size = object->metallic | visit {
           [&](uint  i) { return e_images[i]->size(); },
-          [&](float f) { return eig::Array2u { 256, 256 }; },
+          [&](float f) { return eig::Array2u { 16, 16 }; },
         };
         auto roughness_size = object->roughness | visit {
           [&](uint  i) { return e_images[i]->size(); },
-          [&](float f) { return eig::Array2u { 256, 256 }; },
+          [&](float f) { return eig::Array2u { 16, 16 }; },
         };
         return metallic_size.cwiseMax(roughness_size).eval();
       });
 
-      fmt::print("brdf inputs: {}\n", inputs);
-      
       // Scale atlas inputs to respect the maximum texture size set in Settings::texture_size
       eig::Array2u maximal = rng::fold_left(inputs, eig::Array2u(0), [](auto a, auto b) { return a.cwiseMax(b).eval(); });
       eig::Array2f scaled  = e_settings->apply_texture_size(maximal).cast<float>() / maximal.cast<float>();
@@ -381,24 +379,75 @@ namespace met::detail {
       emitter_info.flush(sizeof(EmBlockLayout), sizeof(EmBlockLayout) * i + sizeof(uint));
     } // for (uint i)
 
-    // Build sampling distribution over emitter's powers
-    std::vector<float> emitter_distr(met_max_emitters, 0.f);
-    auto active_emitters = scene.components.emitters
-                         | vws::transform([](const auto &comp) { return comp.value; })
-                         | vws::filter(&Emitter::is_active)
-                         | rng::to<std::vector>();
-    
+    /* // Build per-wavelength sampling distributions over emitter's
+    // relative spectral output, weighted by approximate emitter surface area
+    eig::Matrix<float, met_max_emitters, wavelength_samples> spectral_distr = 0.f;
     #pragma omp parallel for
     for (int i = 0; i < emitters.size(); ++i) {
       const auto &[emitter, state] = emitters[i];
       guard_continue(emitter.is_active);
-      Spec s  = scene.resources.illuminants[emitter.illuminant_i].value();
-      emitter_distr[i] = 1.f / static_cast<float>(active_emitters.size());
+
+      // Get relative spectral output of emitter
+      Spec s = scene.resources.illuminants[emitter.illuminant_i].value() 
+             * emitter.illuminant_scale;
+      
+      // Multiply by either approx. surface area, or hemisphere
+      switch (emitter.type) {
+        case Emitter::Type::eSphere:
+          s *= 
+            .5f *
+            4.f * std::numbers::pi_v<float> * std::pow(emitter.transform.scaling.x(), 2.f);
+          break;
+        case Emitter::Type::eRect:
+          s *= 
+            emitter.transform.scaling.x() * emitter.transform.scaling.y();
+          break;
+        default:
+          s *= 2.f * std::numbers::pi_v<float>; // half a hemisphere
+          break;
+      } 
+
+      spectral_distr.row(i) = s;
     }
+    
+    auto array_distr = DistributionArray<wavelength_samples>(cnt_span<float>(spectral_distr));   
+    emitter_distr_buffer = array_distr.to_buffer_std140(); */
+
+    // Build sampling distribution over emitter's relative output
+    std::vector<float> emitter_distr(met_max_emitters, 0.f);
+    #pragma omp parallel for
+    for (int i = 0; i < emitters.size(); ++i) {
+      const auto &[emitter, state] = emitters[i];
+      guard_continue(emitter.is_active);
+
+      // Get corresponding observer luminance for output spd under xyz/d65
+      Spec  s = scene.resources.illuminants[emitter.illuminant_i].value() * emitter.illuminant_scale;
+      float w = luminance(ColrSystem { .cmfs = models::cmfs_cie_xyz, .illuminant = models::emitter_cie_d65 }(s));
+
+      // Multiply by either approx. surface area, or hemisphere
+      switch (emitter.type) {
+        case Emitter::Type::eSphere:
+          w *= 
+            .5f *
+            4.f * std::numbers::pi_v<float> * std::pow(emitter.transform.scaling.x(), 2.f);
+          break;
+        case Emitter::Type::eRect:
+          w *= 
+            emitter.transform.scaling.x() * emitter.transform.scaling.y();
+          break;
+        default:
+          w *= 2.f * std::numbers::pi_v<float>; // half a hemisphere
+          break;
+      }
+
+      emitter_distr[i] = w;
+    }
+
     auto distr = Distribution(cnt_span<float>(emitter_distr));   
     emitter_distr_buffer = distr.to_buffer_std140();
 
-    // Store information on first constant emitter, if one is present and active
+    // Store information on first co  nstant emitter, if one is present and active;
+    // we don't support multiple environment emitters
     m_envm_info_data->envm_is_present = false;
     for (uint i = 0; i < emitters.size(); ++i) {
       const auto &[emitter, state] = emitters[i];
@@ -444,7 +493,7 @@ namespace met::detail {
       // We simplify a copy of the mesh, reparameterize it so texture UVs are
       // unique and non-overlapping, fit it to a [0, 1] cube, and finally
       // build a bvh to represent this mess
-      m_meshes[i]        = simplified_mesh<met::Mesh>(value, 12288, 1e-3);
+      m_meshes[i]        = simplified_mesh<met::Mesh>(value, 16384, 1e-3);
       txuvs[i]           = parameterize_mesh<met::Mesh>(m_meshes[i]);
       unit_transforms[i] = unitize_mesh<met::Mesh>(m_meshes[i]);
       m_bvhs[i]          = {{ .mesh = m_meshes[i], .n_leaf_children = 4 }};
@@ -669,11 +718,6 @@ namespace met::detail {
       texture_atlas_3f.texture().generate_mipmaps();
     if (texture_atlas_1f.texture().is_init()) 
       texture_atlas_1f.texture().generate_mipmaps();
-    
-    if (texture_atlas_3f.texture().is_init()) 
-      fmt::print("3f {}\n", texture_atlas_3f.texture().size());
-    if (texture_atlas_1f.texture().is_init()) 
-      fmt::print("1f {}\n", texture_atlas_1f.texture().size());
   }
 
   SceneGLHandler<met::Spec>::SceneGLHandler() {

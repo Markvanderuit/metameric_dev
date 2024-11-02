@@ -26,13 +26,18 @@ vec3 si_to_coef_atlas_tx(in SurfaceInfo si) {
 // Same as above, different atlas
 vec3 si_to_brdf_atlas_tx(in SurfaceInfo si) {
   // Load info about texture atlas patch
-  AtlasInfo atlas_info = scene_texture_brdf_info(record_get_object(si.data));
+  ObjectInfo object_info = scene_object_info(record_get_object(si.data));
+  AtlasInfo  atlas_info  = scene_texture_brdf_info(record_get_object(si.data));
   
+  // Obtain uv coordinates, or set to 0.5 if the albedo value is specified
+  vec2 tx2 = record_is_sampled(object_info.albedo_data) ? si.tx : vec2(0.5f);
+
   // Translate to texture atlas patch
-  vec3 tx = vec3(atlas_info.uv0 + atlas_info.uv1 * si.tx, atlas_info.layer);
-  tx.xy *= scene_texture_brdf_size(); // Scale [0,1] to texture size
-  tx.xy -= 0.5f;                      // Offset by half a pixel
-  return tx;
+  vec3 tx3 = vec3(atlas_info.uv0 + atlas_info.uv1 * tx2, atlas_info.layer);
+  tx3.xy *= scene_texture_brdf_size(); // Scale [0,1] to texture size
+  tx3.xy -= 0.5f;                      // Offset by half a pixel
+
+  return tx3;
 }
 
 // Sample four-wavelength surface reflectances using stochastic sampling; we avoid

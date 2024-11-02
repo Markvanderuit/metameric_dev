@@ -85,9 +85,6 @@ namespace met {
       const auto &e_coef  = e_scene.components.upliftings.gl.texture_coef;
       const auto &e_patch = e_coef.patch(m_object_i);
 
-      fmt::print("coef patch {} : {} to {}\n", m_object_i,
-        e_patch.offs, e_patch.size);
-
       // Rebuild framebuffer if necessary
       if (is_first_eval() || e_coef.is_invalitated() || m_coef_layer_i != e_patch.layer_i) {
         m_coef_layer_i = e_patch.layer_i;
@@ -137,7 +134,7 @@ namespace met {
 
       // Prepare framebuffer, clear relevant patch (not actually necessary)
       m_coef_fbo.bind();
-      m_coef_fbo.clear(gl::FramebufferType::eColor, 0.f);
+      m_coef_fbo.clear(gl::FramebufferType::eColor, 0u);
 
       // Find relevant draw command to map UVs;
       // if no UVs are present, we fall back on a rectangle's UVs to simply fill the patch
@@ -186,9 +183,6 @@ namespace met {
       const auto &e_brdf  = e_scene.components.upliftings.gl.texture_brdf;
       const auto &e_patch = e_brdf.patch(m_object_i);
       
-      fmt::print("brdf patch {} : {} to {}\n", m_object_i,
-        e_patch.offs, e_patch.size);
-
       // Rebuild framebuffer if necessary
       if (is_first_eval() || e_brdf.is_invalitated() || m_brdf_layer_i != e_patch.layer_i) {
         m_brdf_layer_i = e_patch.layer_i;
@@ -202,7 +196,6 @@ namespace met {
                                 / static_cast<float>(e_brdf.texture().size().head<2>().prod());
       m_brdf_unif.flush();
 
-      
       // Get ref. to relevant program, then bind resources to corresponding targets
       auto &program = e_cache.at(m_brdf_cache_key);
       program.bind();
@@ -228,7 +221,7 @@ namespace met {
 
       // Prepare framebuffer, clear relevant patch (not actually necessary)
       m_brdf_fbo.bind();
-      m_brdf_fbo.clear(gl::FramebufferType::eColor, 0.f);
+      m_brdf_fbo.clear(gl::FramebufferType::eColor, 0u);
       
       // Find relevant draw command to map UVs;
       // if no UVs are present, we fall back on a rectangle's UVs to simply fill the patch

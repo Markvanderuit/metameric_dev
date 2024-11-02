@@ -24,8 +24,8 @@ EmitterInfo scene_emitter_info(uint i) { EmitterInfo d; return d; }
 uint scene_emitter_count()             { return 0;                } 
 bool scene_has_envm_emitter() { return false;                     }
 uint scene_envm_emitter_idx() { return 0;                         }
-declare_distr_sampler_default(wavelength, buff_wvls_distr, wavelength_samples)
-declare_distr_sampler_default(emitters, buff_emitters_distr, met_max_emitters)
+declare_distr_sampler_default(wavelength);
+declare_distr_sampler_default(emitters);
 #endif // !SCENE_DATA_EMITTER
 
 #ifndef SCENE_DATA_OBJECT

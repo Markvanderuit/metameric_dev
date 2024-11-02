@@ -6,21 +6,15 @@
 #include <small_gl/texture.hpp>
 
 namespace met {
-  // Extended version of AtlasBlockLayout below; we keep pixel locations
-  struct PatchLayout {
-    uint         layer_i;
-    eig::Array2u offs, size;
-    eig::Array2f uv0, uv1;
-  };
-
   // Object describing a single texture patch reserved inside an arbitrary
   // atlas, fit for std140/std430 buffer layout. Kept separate as it is
   // template-independent, and we use it between different-typed atlases.
   struct alignas(16) AtlasBlockLayout {
     alignas(4) uint         layer_i;
+    alignas(8) eig::Array2u offs, size;
     alignas(8) eig::Array2f uv0, uv1;
   };
-  static_assert(sizeof(AtlasBlockLayout) == 32);
+  static_assert(sizeof(AtlasBlockLayout) == 48);
   
   // Object describing an std140 buffer layout for atlas data
   struct AtlasBufferLayout {
@@ -51,7 +45,8 @@ namespace met {
 
   private:
     // Current reserved spaces and remainder spaces
-    std::vector<PatchLayout> m_patches, m_free;
+    std::vector<AtlasBlockLayout> 
+                             m_patches, m_free;
     bool                     m_is_invalitated;
     
     // Texture/construction information

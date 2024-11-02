@@ -48,9 +48,11 @@ struct TextureInfo {
 
 // Info object for referred texture atlas patch data
 struct AtlasInfo {
-  uint layer;  // layer in texture array in which a texture patch is located
-  vec2 uv0;    // Minimum uv value, at region's offset
-  vec2 uv1;    // Maximum uv value, at region's offset + size
+  uint  layer; // layer in texture array in which a texture patch is located
+  uvec2 offs; // Offset to patch pixel region
+  uvec2 size; // Size of patch pixel region
+  vec2  uv0;   // Minimum uv value, at region's offset
+  vec2  uv1;   // Maximum uv value, at region's offset + size
 };
 
 #define EmitterTypeConstant  0
@@ -76,8 +78,7 @@ struct EmitterInfo {
 
 #define BRDFTypeNull       0
 #define BRDFTypeDiffuse    1
-#define BRDFTypeMirror     2
-#define BRDFTypePrincipled 3
+#define BRDFTypePrincipled 2
 
 // Info object to gather brdf data locally
 struct BRDFInfo {

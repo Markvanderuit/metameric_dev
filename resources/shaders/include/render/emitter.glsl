@@ -46,7 +46,7 @@ vec4 eval_env_emitter(in vec4 wvls) {
   return eval_emitter_constant(em, wvls);
 }
 
-float pdf_env_emitter(vec3 d_local) {
+float pdf_env_emitter(vec3 d_local, in vec4 wvls) {
   if (!scene_has_envm_emitter())
     return 0.f;
   EmitterInfo em = scene_emitter_info(scene_envm_emitter_idx());
@@ -82,7 +82,7 @@ float pdf_emitter(in SurfaceInfo si) {
 EmitterSample sample_emitters(in SurfaceInfo si, in vec4 wvls, in vec3 sample_3d) {
   // Sample emitter from distribution
   DistributionSampleDiscrete ds = sample_emitters_discrete(sample_3d.z);
-
+  
   // Sample position on emitter surface
   EmitterSample ps = sample_emitter(scene_emitter_info(ds.i), si, wvls, sample_3d.xy);
   record_set_emitter(ps.ray.data, ds.i);
@@ -93,7 +93,7 @@ EmitterSample sample_emitters(in SurfaceInfo si, in vec4 wvls, in vec3 sample_3d
   return ps;
 }
 
-float pdf_emitters(in SurfaceInfo si) {
+float pdf_emitters(in SurfaceInfo si, in vec4 wvls) {
   return pdf_emitter(si) * pdf_emitters_discrete(record_get_emitter(si.data));
 }
 

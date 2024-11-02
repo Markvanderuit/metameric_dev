@@ -60,7 +60,7 @@ vec4 Li(in SensorSample ss, in SamplerState state, inout float alpha) {
     // add contribution of environment map, and terminate the current path
     if (!scene_intersect(ss.ray)) {
       if (scene_has_envm_emitter()) {
-        float em_pdf = bs_is_delta ? 0.f : pdf_env_emitter(ss.ray.d);
+        float em_pdf = bs_is_delta ? 0.f : pdf_env_emitter(ss.ray.d, ss.wvls);
         
         // No division by sample density, as this is incorporated in path throughput
         vec4 s = beta                       // throughput
@@ -89,7 +89,7 @@ vec4 Li(in SensorSample ss, in SamplerState state, inout float alpha) {
     // If an emissive object is hit, add its contribution to the 
     // current path, and then terminate said path
     if (is_emitter(si)) {
-      float em_pdf = bs_is_delta ? 0.f : pdf_emitters(si);
+      float em_pdf = bs_is_delta ? 0.f : pdf_emitters(si, ss.wvls);
 
       // No division by sample density, as this is incorporated in path throughput
       vec4 s = beta                       // throughput 

@@ -2,7 +2,6 @@
 #include <render/record.glsl>
 #include <render/detail/scene_types.glsl>
 #include <render/load/defaults.glsl>
-#include <render/scene.glsl>
 
 // General layout rule declarations
 layout(std140) uniform;
@@ -25,6 +24,8 @@ layout(binding = 1) uniform b_buff_objects {
   uint n;
   ObjectInfo data[met_max_objects];
 } buff_objects;
+
+#include <render/scene.glsl>
 
 void main() {
   /* // Extract packed vertex data to obtain local position

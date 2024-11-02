@@ -23,13 +23,13 @@ namespace met {
     fs::path shader_path = "resources/shaders/shaders.bin";
     
     // View settings
-    std::string view_name  = "FFW View";
+    std::string view_name  = "Default view";
     float       view_scale = 1.f;
 
     // General output settings
-    uint fps = 24;         // Framerate of video
-    uint spp = 4;          // Sample count per frame
-    uint spp_per_step = 4; // Samples taken per render call
+    uint fps          = 30; // Framerate of video
+    uint spp          = 4;  // Sample count per frame
+    uint spp_per_step = 1;  // Samples taken per render call
     
     // Start/end times of config; 0 means not enforced
     float start_time = 0.f, end_time = 0.f;
@@ -187,12 +187,12 @@ namespace met {
         // Perform render step
         m_scheduler.run();
           
-        // Convert and write to stream
+        // Convert, flip, and write to stream
         auto rgb8 = m_image.convert({ 
           .pixel_frmt = Image::PixelFormat::eRGB,
           .pixel_type = Image::PixelType::eUChar,
           .color_frmt = Image::ColorFormat::eSRGB
-        });
+        }).flip(true, false);
         os.write(rgb8);
 
         // Handle window events every full second

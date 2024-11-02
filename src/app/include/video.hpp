@@ -42,7 +42,7 @@ namespace met {
       m_octx.setFormat(m_ofmt);
 
       // Specify encoder and codec
-      m_codec = av::findEncodingCodec(m_ofmt);
+      m_codec   = av::findEncodingCodec(m_ofmt);
       m_encoder = av::VideoEncoderContext { m_codec };
 
       // Specify encoder settings

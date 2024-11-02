@@ -92,7 +92,7 @@ namespace met {
     m_is_invalitated = false;
 
     // Define cleared replacements for m_patches, m_free
-    std::vector<PatchLayout> new_patches, new_free(capacity().z());
+    std::vector<AtlasBlockLayout> new_patches, new_free(capacity().z());
     for (uint i = 0; i < new_free.size(); ++i)
       new_free[i] = { .layer_i = i, .offs = 0, .size = capacity().head<2>() };
 
@@ -190,7 +190,7 @@ namespace met {
     // Tightly pack capacity for the current required space
     auto view = new_patches | vws::transform([&](const auto &s) { return s.offs + s.size + m_padding; });
     auto maxm = rng::fold_left(view, eig::Array2u(0), [](auto a, auto b) { return a.cwiseMax(b).eval();  });
-    auto maxl = 1 + rng::max(new_patches, {}, &PatchLayout::layer_i).layer_i;
+    auto maxl = 1 + rng::max(new_patches, {}, &AtlasBlockLayout::layer_i).layer_i;
     new_capacity = { maxm.x(), maxm.y(), maxl };
 
     // Ensure the underlying storage is suitable for the current set of patches
@@ -201,8 +201,8 @@ namespace met {
     if (new_patches.size() >= m_patches.size()) {
       auto overlap_eq = rng::equal(std::span(new_patches).subspan(0, m_patches.size()), 
                                    std::span(m_patches).subspan(0,   m_patches.size()), 
-      [](const PatchLayout &a, const PatchLayout &b) {
-        return a.layer_i == b.layer_i  && a.offs.isApprox(b.offs) && a.size.isApprox(b.size);
+      [](const AtlasBlockLayout &a, const AtlasBlockLayout &b) {
+        return a.layer_i == b.layer_i && a.offs.isApprox(b.offs) && a.size.isApprox(b.size);
       });
       if (!overlap_eq) {
         m_is_invalitated = true;
@@ -222,8 +222,7 @@ namespace met {
 
     // Copy patch layouts to buffer storage
     m_buffer_map->size = new_patches.size();
-    rng::transform(new_patches, m_buffer_map->data.begin(), 
-      [](PatchLayout p) { return AtlasBlockLayout { p.layer_i, p.uv0, p.uv1 }; });
+    rng::copy(new_patches, m_buffer_map->data.begin());
     m_buffer.flush();
   }
 
@@ -235,7 +234,7 @@ namespace met {
     // Tightly pack capacity for the current required space
     auto view = m_patches | vws::transform([&](const auto &s) { return s.offs + s.size + m_padding; });
     auto maxm = rng::fold_left(view, eig::Array2u(0), [](auto a, auto b) { return a.cwiseMax(b).eval();  });
-    auto maxl = 1 + rng::max(m_patches, {}, &PatchLayout::layer_i).layer_i;
+    auto maxl = 1 + rng::max(m_patches, {}, &AtlasBlockLayout::layer_i).layer_i;
     eig::Array3u new_capacity = { maxm.x(), maxm.y(), maxl };
     
     dstr_views();
@@ -257,8 +256,7 @@ namespace met {
     
     // Copy updated patch layouts to buffer storage
     m_buffer_map->size = m_patches.size();
-    rng::transform(m_patches, m_buffer_map->data.begin(), 
-      [](PatchLayout p) { return AtlasBlockLayout { p.layer_i, p.uv0, p.uv1 }; });
+    rng::copy(m_patches, m_buffer_map->data.begin());
     m_buffer.flush();
   }
 

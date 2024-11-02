@@ -86,7 +86,7 @@ namespace met {
       const auto &e_camera = camera_handle.getr<detail::Arcball>();
 
       // Push new sensor data
-      auto &i_sensor       = sensor_handle.getw<Sensor>();
+      auto &i_sensor     = sensor_handle.getw<Sensor>();
       i_sensor.film_size = (e_target.size().cast<float>() * e_settings.view_scale).cast<uint>().eval();
       i_sensor.proj_trf  = e_camera.proj().matrix();
       i_sensor.view_trf  = e_camera.view().matrix();

@@ -14,7 +14,7 @@ namespace met {
       eDebug,  // Spectral render, queries a value (eg albedo) and returns
     } renderer_type = RendererType::ePath;
 
-    // Clamped texture sizes in atlas; input res, 2048x2048, 1024x1024, or 512x512
+    // Clamped texture sizes in atlas; input res, 2K, 1k, 512p
     enum class TextureSize { 
       eFull, eHigh, eMed, eLow 
     } texture_size = TextureSize::eHigh;
@@ -60,9 +60,8 @@ namespace met {
     // Emitter type; only very basic BRDFs are supported
     enum class BRDFType {
       eNull       = 0,  // null is empty; object does not interact with scene
-      eDiffuse    = 1,  // diffuse is lambertian
-      eMirror     = 2,  // mirror is perfect specular reflector
-      ePrincipled = 3,  // very very partial implementation of mprincipled brdf
+      eDiffuse    = 1,  // diffuse is simple lambertian
+      ePrincipled = 2,  // very incomplete implementation of principled brdf
     };
     
   public:
@@ -97,7 +96,7 @@ namespace met {
 
   public:
     // Specific emitter type
-    Type type = Type::eSphere;
+    Type type = Type::eRect;
     
     // Scene properties
     bool      is_active = true;
@@ -181,7 +180,6 @@ namespace std {
       switch (ty) {
         case met::Object::BRDFType::eNull       : s = "null";        break;
         case met::Object::BRDFType::eDiffuse    : s = "diffuse";     break;
-        case met::Object::BRDFType::eMirror     : s = "mirror";      break;
         case met::Object::BRDFType::ePrincipled : s = "principled";  break;
       };
       return std::formatter<std::string_view>::format(s, ctx);

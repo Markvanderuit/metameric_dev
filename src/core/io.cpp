@@ -225,11 +225,16 @@ namespace met::io {
         compact_mesh(mesh);
       }
 
-      // 2 - Identify referred texture resource or specify a single diffuse value
-      std::variant<Colr, uint> diffuse = Colr(0.5);
+      // 2 - Identify referred texture resource or specify a single value, and
+      //     generally identify the brdf.
+      std::variant<Colr, uint>  diffuse   = Colr(.5f);
+      std::variant<float, uint> metallic  = 0.f;
+      std::variant<float, uint> roughness = 1.f;
+      Object::BRDFType brdf_type = Object::BRDFType::eDiffuse;
       if (load_materials && has_matrs) {
         // Access first material only; we ignore per-face materials; 
         const auto &obj_mat = result.materials[shape.mesh.material_ids.front()];
+        
         if (obj_mat.diffuse_texname.empty()) {
           // Assign color value if there is no file path
           diffuse = Colr { obj_mat.diffuse[0], obj_mat.diffuse[1], obj_mat.diffuse[2] };
@@ -242,15 +247,29 @@ namespace met::io {
         }
 
         if (obj_mat.metallic_texname.empty()) {
-
+          metallic = obj_mat.metallic;
+          if (obj_mat.roughness != 1.f || obj_mat.metallic != 0.f)
+            brdf_type = Object::BRDFType::ePrincipled;
         } else {
-
+          // Assign an allocated texture id from texture_load_list or get a new one
+          metallic = texture_load_list.insert({ 
+            obj_mat.metallic_texname,                   // filename of texture as key
+            static_cast<uint>(texture_load_list.size()) // New texture id at end of list
+          }).first->second;
+          brdf_type = Object::BRDFType::ePrincipled;
         }
         
         if (obj_mat.roughness_texname.empty()) {
-
+          roughness = obj_mat.roughness;
+          if (obj_mat.roughness != 1.f || obj_mat.metallic != 0.f)
+            brdf_type = Object::BRDFType::ePrincipled;
         } else {
-          
+          // Assign an allocated texture id from texture_load_list or get a new one
+          roughness = texture_load_list.insert({ 
+            obj_mat.roughness_texname,                   // filename of texture as key
+            static_cast<uint>(texture_load_list.size()) // New texture id at end of list
+          }).first->second;
+          brdf_type = Object::BRDFType::ePrincipled;
         }
       }
 
@@ -258,7 +277,10 @@ namespace met::io {
       met::Object object = {
         .mesh_i      = static_cast<uint>(scene.resources.meshes.size()),
         .uplifting_i = 0,
-        .diffuse     = diffuse
+        .brdf_type   = brdf_type,
+        .diffuse     = diffuse,
+        .metallic    = metallic,
+        .roughness   = roughness
       };
 
       // 4 - store mesh and object in scene

@@ -3,7 +3,6 @@
 #include <render/gbuffer.glsl>
 #include <render/ray.glsl>
 #include <render/load/defaults.glsl>
-#include <render/scene.glsl>
 
 // Fragment early-Z declaration
 layout(early_fragment_tests) in;
@@ -25,6 +24,8 @@ layout(binding = 1) uniform b_buff_objects {
   uint n;
   ObjectInfo data[met_max_objects];
 } buff_objects;
+
+#include <render/scene.glsl>
 
 void main() {
   // Store primitive ID in object record

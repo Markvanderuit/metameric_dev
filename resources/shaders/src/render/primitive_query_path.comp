@@ -22,6 +22,18 @@ layout(std430) buffer;
 layout(constant_id = 1) const uint max_depth = 4;     // Maximum path depth
 layout(constant_id = 2) const bool use_debug = false; // Override and enable debug queries
 
+struct WavelengthDistribution {
+  float func_sum;
+  float func[wavelength_samples];
+  float cdf[wavelength_samples + 1];
+};
+
+struct EmitterDistribution {
+  float func_sum;
+  float func[met_max_emitters];
+  float cdf[met_max_emitters + 1];
+};
+
 // Uniform buffer declarations
 layout(binding = 0) uniform b_buff_sensor {
   mat4  full_trf;
@@ -46,14 +58,10 @@ layout(binding = 4) uniform b_buff_emitters {
   EmitterInfo data[met_max_emitters];
 } buff_emitters;
 layout(binding = 5) uniform b_buff_wvls_distr {
-  float func_sum;
-  float func[wavelength_samples];
-  float cdf[wavelength_samples + 1];
+  WavelengthDistribution data;
 } buff_wvls_distr;
 layout(binding = 6) uniform b_buff_emitters_distr {
-  float func_sum;
-  float func[met_max_emitters];
-  float cdf[met_max_emitters + 1];
+  EmitterDistribution data;
 } buff_emitters_distr;
 layout(binding = 7) uniform b_buff_envmap_info {
   bool envm_is_present;
@@ -87,8 +95,8 @@ layout(binding = 4) uniform usampler2DArray b_brdf_2f; // Texture atlas storing 
 
 // Declare scene data; creates functions to access and interact with
 // scene data without knowing the exact names of buffers, textures, etc
-declare_distr_sampler(wavelength, buff_wvls_distr, wavelength_samples)
-declare_distr_sampler(emitters, buff_emitters_distr, met_max_emitters)
+declare_distr_sampler(wavelength, buff_wvls_distr.data, wavelength_samples);
+declare_distr_sampler(emitters, buff_emitters_distr.data, met_max_emitters);
 declare_scene_cmfs_data(b_cmfs_3f);
 declare_scene_illuminant_data(b_illm_1f);
 declare_scene_emitter_data(buff_emitters.data, buff_emitters.n, buff_envmap_info);
