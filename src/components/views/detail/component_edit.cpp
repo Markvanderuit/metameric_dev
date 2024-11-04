@@ -89,7 +89,7 @@ namespace met {
 
       // Type selector
       if (ImGui::BeginCombo("BRDF Type", std::format("{}", value.brdf_type).c_str())) {
-        for (uint i = 0; i < 4; ++i) {
+        for (uint i = 0; i < 3; ++i) {
           auto type = static_cast<Object::BRDFType>(i);
           auto name = std::format("{}", type);
           if (ImGui::Selectable(name.c_str(), value.brdf_type == type)) {

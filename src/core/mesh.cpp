@@ -481,7 +481,34 @@ namespace met {
 
     return trf.inverse().eval();
   }
+  
+  // Adjust a mesh so there are no triangles with 0-size UVs
+  template <typename MeshTy>
+  void fix_degenerate_uvs(MeshTy &mesh) {
+    met_trace();
+    guard(mesh.has_txuvs());
 
+    // Parallel iterate all triangle uv data 
+    #pragma omp parallel for
+    for (int i = 0; i < mesh.elems.size(); ++i) {
+      const auto &el = mesh.elems[i];
+      eig::Array2f &a = mesh.txuvs[el[0]], 
+                   &b = mesh.txuvs[el[1]], 
+                   &c = mesh.txuvs[el[2]];
+
+      // If a triangle uv set is exactly identical, randomly shuffle vertex uv data
+      // a tiny bit
+      if (a.isApprox(b) || b.isApprox(c) || c.isApprox(a)) {
+        UniformSampler sampler = i;
+        #pragma omp critical
+        {
+          a += (sampler.next_1d() * 2.f - 1.f) * 1e-3;
+          b += (sampler.next_1d() * 2.f - 1.f) * 1e-3;
+          b += (sampler.next_1d() * 2.f - 1.f) * 1e-3;
+        }
+      }
+    }
+  }
 
   /* Explicit template instantiations */
   
@@ -508,6 +535,8 @@ namespace met {
     void optimize_mesh<OutputMesh>(OutputMesh &);                                                     \
     template                                                                                          \
     void renormalize_mesh<OutputMesh>(OutputMesh &);                                                  \
+    template                                                                                          \
+    void fix_degenerate_uvs<OutputMesh>(OutputMesh &);                                                \
     template                                                                                          \
     std::vector<typename OutputMesh::txuv_type> parameterize_mesh<OutputMesh>(OutputMesh &);          \
     template                                                                                          \

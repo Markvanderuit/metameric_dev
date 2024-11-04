@@ -77,6 +77,7 @@ namespace met {
     auto       &e_cache     = info.global("cache").getw<gl::detail::ProgramCache>();
     const auto &e_scene     = info.global("scene").getr<Scene>();
     const auto &e_object    = e_scene.components.objects[m_object_i].value;
+    const auto &e_mesh      = e_scene.resources.meshes[e_object.mesh_i].value();
     const auto &e_uplifting = e_scene.components.upliftings[e_object.uplifting_i];
 
     // Handle coefficient texture baking
@@ -130,7 +131,7 @@ namespace met {
       gl::state::set(gl::DrawCapability::eDither,     false);
       gl::state::set_scissor(e_patch.size, e_patch.offs);
       gl::state::set_viewport(e_coef.texture().size().head<2>());
-      gl::state::set_line_width(3.f);
+      gl::state::set_line_width(4.f);
 
       // Prepare framebuffer, clear relevant patch (not actually necessary)
       m_coef_fbo.bind();
@@ -139,7 +140,7 @@ namespace met {
       // Find relevant draw command to map UVs;
       // if no UVs are present, we fall back on a rectangle's UVs to simply fill the patch
       gl::MultiDrawInfo::DrawCommand command;
-      if (e_scene.resources.meshes[e_object.mesh_i]->has_txuvs()) {
+      if (e_mesh.has_txuvs() && e_object.diffuse.index() == 1) {
         command = e_scene.resources.meshes.gl.draw_commands[e_object.mesh_i];
       } else {
         command = e_scene.resources.meshes.gl.draw_commands[0]; // Rectangle
@@ -217,7 +218,7 @@ namespace met {
       gl::state::set(gl::DrawCapability::eDither,     false);
       gl::state::set_scissor(e_patch.size, e_patch.offs);
       gl::state::set_viewport(e_brdf.texture().size().head<2>());
-      gl::state::set_line_width(3.f);
+      gl::state::set_line_width(4.f);
 
       // Prepare framebuffer, clear relevant patch (not actually necessary)
       m_brdf_fbo.bind();
@@ -226,7 +227,7 @@ namespace met {
       // Find relevant draw command to map UVs;
       // if no UVs are present, we fall back on a rectangle's UVs to simply fill the patch
       gl::MultiDrawInfo::DrawCommand command;
-      if (e_scene.resources.meshes[e_object.mesh_i]->has_txuvs()) {
+      if (e_mesh.has_txuvs() && e_object.roughness.index() == 1 || e_object.metallic.index() == 1) {
         command = e_scene.resources.meshes.gl.draw_commands[e_object.mesh_i];
       } else {
         command = e_scene.resources.meshes.gl.draw_commands[0]; // Rectangle

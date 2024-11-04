@@ -52,7 +52,6 @@ namespace met {
     // Objects
     RenderTaskInfo  m_info;
     LinearScheduler m_scheduler;
-    Sensor          m_sensor;
     Image           m_image;
 
   private: // Private functions
@@ -97,24 +96,57 @@ namespace met {
 
       // We use the scheduler to ensure scene data and spectral constraints are all handled properly
       m_scheduler.task("scene_handler").init<LambdaTask>(
-        [](auto &info) { 
-          met_trace();
-          info.global("scene").getw<Scene>().update(); 
+      [view_name = m_info.view_name, view_scale = m_info.view_scale](auto &info) { 
+        met_trace();
+
+        // Update scene data
+        auto &scene = info.global("scene").getw<Scene>();
+        scene.update(); 
+
+        // Update sensor data
+        const auto &[view, state] = scene.components.views(view_name);
+        if (state) {
+          auto &sensor = info.global("sensor").getw<Sensor>();
+
+          eig::Affine3f trf_rot = eig::Affine3f::Identity();
+          trf_rot *= eig::AngleAxisf(view.camera_trf.rotation.x(), eig::Vector3f::UnitY());
+          trf_rot *= eig::AngleAxisf(view.camera_trf.rotation.y(), eig::Vector3f::UnitX());
+          trf_rot *= eig::AngleAxisf(view.camera_trf.rotation.z(), eig::Vector3f::UnitZ());
+
+          auto dir = (trf_rot * eig::Vector3f(0, 0, 1)).normalized().eval();
+          auto eye = -dir; 
+          auto cen = (view.camera_trf.position + dir).eval();
+
+          detail::Arcball arcball = {{
+            .fov_y    = view.camera_fov_y * std::numbers::pi_v<float> / 180.f,
+            .aspect   = static_cast<float>(view.film_size.x()) / static_cast<float>(view.film_size.y()),
+            .dist     = 1,
+            .e_eye    = eye,
+            .e_center = cen,
+            .e_up     = { 0, -1, 0 } // flip for video output
+          }};
+          
+          sensor.film_size = (view.film_size.cast<float>() * view_scale).cast<uint>().eval();
+          sensor.proj_trf  = arcball.proj().matrix();
+          sensor.view_trf  = arcball.view().matrix();
+          sensor.flush();
+        }
       });
       m_scheduler.task("gen_upliftings").init<GenUpliftingsTask>(256); // build many, not few
       m_scheduler.task("gen_objects").init<GenObjectsTask>();
       m_scheduler.task("render").init<LambdaTask>([&](auto &info) {
         met_trace();
 
-        const auto &scene = info.global("scene").getr<Scene>();
-        auto &renderer = info.global("renderer").getw<RenderType>();
+        const auto &scene  = info.global("scene").getr<Scene>();
+        const auto &sensor = info.global("sensor").getr<Sensor>();
+        auto &renderer     = info.global("renderer").getw<RenderType>();
 
         // Reset renderer internal film
-        renderer.reset(m_sensor, scene);
+        renderer.reset(sensor, scene);
 
         // Render frame over several iterations
         for (uint i = 0; i < m_info.spp; i += m_info.spp_per_step)
-          renderer.render(m_sensor, scene);
+          renderer.render(sensor, scene);
         
         // Get frame data
         renderer.film().get(cast_span<float>(m_image.data()));
@@ -126,6 +158,7 @@ namespace met {
       });
 
       // Initialize sensor from scene view
+      auto &sensor = m_scheduler.global("sensor").set<Sensor>({}).getw<Sensor>();
       {
         auto &view = scene.components.views(m_info.view_name).value;
       
@@ -147,10 +180,10 @@ namespace met {
           .e_up     = { 0, -1, 0 } // flip for video output
         }};
         
-        m_sensor.film_size =( view.film_size.cast<float>() * m_info.view_scale).cast<uint>().eval();
-        m_sensor.proj_trf  = arcball.proj().matrix();
-        m_sensor.view_trf  = arcball.view().matrix();
-        m_sensor.flush();
+        sensor.film_size =( view.film_size.cast<float>() * m_info.view_scale).cast<uint>().eval();
+        sensor.proj_trf  = arcball.proj().matrix();
+        sensor.view_trf  = arcball.view().matrix();
+        sensor.flush();
       }
 
       // Initialize renderer and output buffer
@@ -162,7 +195,7 @@ namespace met {
         .pixel_frmt = Image::PixelFormat::eRGBA,
         .pixel_type = Image::PixelType::eFloat,
         .color_frmt = Image::ColorFormat::eLRGB,
-        .size       = m_sensor.film_size
+        .size       = sensor.film_size
       }};
 
       // Instantiate motions for scene animation
@@ -176,7 +209,7 @@ namespace met {
       auto &window = m_window_handle.getw<gl::Window>();
 
       // Begin video output
-      VideoOutputStream os(m_info.out_path.string(), m_sensor.film_size, m_info.fps);
+      VideoOutputStream os(m_info.out_path.string(), m_image.size(), m_info.fps);
       
       for (uint frame = anim::time_to_frame(m_info.start_time, m_info.fps); ; ++frame) {
         fmt::print("\tGenerating ({}): s={}, f={}\n", m_info.scene_path.filename().string(), frame / m_info.fps, frame);

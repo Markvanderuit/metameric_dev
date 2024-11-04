@@ -493,8 +493,9 @@ namespace met::detail {
       // We simplify a copy of the mesh, reparameterize it so texture UVs are
       // unique and non-overlapping, fit it to a [0, 1] cube, and finally
       // build a bvh to represent this mess
-      m_meshes[i]        = simplified_mesh<met::Mesh>(value, 16384, 1e-3);
-      txuvs[i]           = parameterize_mesh<met::Mesh>(m_meshes[i]);
+      m_meshes[i]        = simplified_mesh<met::Mesh>(value, 524288, 1e-3);
+      m_meshes[i]        = fixed_degenerate_uvs<met::Mesh>(m_meshes[i]);
+      txuvs[i]           = m_meshes[i].txuvs; // parameterize_mesh<met::Mesh>(m_meshes[i]);
       unit_transforms[i] = unitize_mesh<met::Mesh>(m_meshes[i]);
       m_bvhs[i]          = {{ .mesh = m_meshes[i], .n_leaf_children = 4 }};
     }
@@ -547,8 +548,9 @@ namespace met::detail {
 
         // Force UV to [0, 1]
         txuv = txuv.unaryExpr([](float f) {
-          int i = static_cast<int>(f);
-          return (i % 2) ? 1.f - (f - i) : f - i;
+          int   i = static_cast<int>(f);
+          float a = f - static_cast<float>(i);
+          return (i % 2) ? 1.f - a : a;
         });
 
         // Vertices are compressed as well as packed

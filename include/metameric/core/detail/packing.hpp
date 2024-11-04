@@ -502,10 +502,11 @@ namespace met::detail {
 
   inline
   VertexPack Vertex::pack() const {
-    auto tx_ = tx.unaryExpr([](float f) {
-      int i = static_cast<int>(f);
-      return (i % 2) ? 1.f - (f - i) : f - i;
-    }).eval();
+    auto tx_ = tx/* .unaryExpr([](float f) {
+      int   i = static_cast<int>(f);
+      float a = f - static_cast<float>(i);
+      return (i % 2) ? 1.f - a : a;
+    }).eval() */;
     return VertexPack {
       .p0 = pack_unorm_2x16({ p.x(), p.y() }),
       .p1 = pack_snorm_2x16({ p.z(), n.x() }),

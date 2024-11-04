@@ -24,7 +24,7 @@ namespace met {
         
         // Renderer type
         if (ImGui::BeginCombo("Renderer", std::format("{}", settings.renderer_type).c_str())) {
-          for (uint i = 0; i < 6; ++i) {
+          for (uint i = 0; i < 3; ++i) {
             auto type = static_cast<Settings::RendererType>(i);
             auto name = std::format("{}", type);
             if (ImGui::Selectable(name.c_str(), settings.renderer_type == type)) {
