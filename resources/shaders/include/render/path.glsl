@@ -47,7 +47,7 @@ vec4 Li_debug(in SensorSample ss, in SamplerState state) {
   return c; */
 }
 
-vec4 Li(in SensorSample ss, in SamplerState state, inout float alpha) {
+vec4 Li(in SensorSample ss, in SamplerState state, out float alpha) {
   // Initialize path store if requested for path queries
   path_query_initialize(pt);
   
@@ -58,7 +58,7 @@ vec4 Li(in SensorSample ss, in SamplerState state, inout float alpha) {
   // Prior brdf sample data, default-initialized, kept for multiple importance sampling
   float bs_pdf      = 1.f;
   bool  bs_is_delta = true;
-  
+
   // Iterate up to maximum depth
   for (uint depth = 0; depth < max_depth; ++depth) {
     // Ray-trace first. Then, if no surface is intersected by the ray, 
@@ -81,8 +81,9 @@ vec4 Li(in SensorSample ss, in SamplerState state, inout float alpha) {
       
       // Output 0 alpha on initial ray miss
       alpha = depth > 0 ? 1.f : 0.f;
-      
       break;
+    } else {
+      alpha = 1.f;
     }
 
     // Get info about the intersected surface
@@ -106,7 +107,6 @@ vec4 Li(in SensorSample ss, in SamplerState state, inout float alpha) {
 
       // Add to output radiance and terminate path
       S += s;
-      
       break;
     }
 
