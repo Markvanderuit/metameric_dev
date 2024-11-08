@@ -114,7 +114,7 @@ namespace met {
       program.bind("b_buff_uplift_data", e_tesselation_data);
       program.bind("b_buff_uplift_pack", e_tesselation_pack);
       program.bind("b_buff_uplift_coef", e_tesselation_coef);
-      program.bind("b_buff_objects",     e_scene.components.objects.gl.object_info);
+      program.bind("b_buff_object_info",     e_scene.components.objects.gl.object_info);
       program.bind("b_buff_atlas",       e_coef.buffer());
       if (!e_scene.resources.images.empty()) {
         program.bind("b_txtr_3f",        e_scene.resources.images.gl.texture_atlas_3f.texture());
@@ -201,7 +201,7 @@ namespace met {
       auto &program = e_cache.at(m_brdf_cache_key);
       program.bind();
       program.bind("b_buff_unif",        m_brdf_unif);
-      program.bind("b_buff_objects",     e_scene.components.objects.gl.object_info);
+      program.bind("b_buff_object_info",     e_scene.components.objects.gl.object_info);
       program.bind("b_buff_atlas",       e_brdf.buffer());
       if (!e_scene.resources.images.empty()) {
         program.bind("b_txtr_3f",        e_scene.resources.images.gl.texture_atlas_3f.texture());
@@ -210,7 +210,7 @@ namespace met {
         program.bind("b_txtr_1f",        m_sampler);  
         program.bind("b_buff_textures",  e_scene.resources.images.gl.texture_info);
       }
-
+      
       // Coordinates address the full atlas texture, while we enable a scissor 
       // test to restrict all operations in this scope to the relevant texture patch
       gl::state::ScopedSet scope(gl::DrawCapability::eScissorTest, true);

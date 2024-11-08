@@ -72,7 +72,7 @@ namespace met {
     // Bind relevant buffers
     // m_program.bind("b_buff_bvhs_info", m_bvh_data.info_gl);
     // m_program.bind("b_buff_bvhs_node", m_bvh_data.nodes);
-    // m_program.bind("b_buff_bvhs_prim", m_bvh_data.prims);
+    // m_program.bind("b_buff_blas_prim", m_bvh_data.prims);
     // m_program.bind("b_buff_objc_info", m_object_data.info_gl);
     m_program.bind("b_buff_input_head",  count);
     m_program.bind("b_buff_input_data",  input);
@@ -121,7 +121,7 @@ namespace met {
     // Bind relevant buffers
     // m_program.bind("b_buff_bvhs_info",   m_bvh_data.info_gl);
     // m_program.bind("b_buff_bvhs_node",   m_bvh_data.nodes);
-    // m_program.bind("b_buff_bvhs_prim",   m_bvh_data.prims);
+    // m_program.bind("b_buff_blas_prim",   m_bvh_data.prims);
     // m_program.bind("b_buff_objc_info",   m_object_data.info_gl);
     m_program.bind("b_buff_input_head",  count);
     m_program.bind("b_buff_input_data",  input);

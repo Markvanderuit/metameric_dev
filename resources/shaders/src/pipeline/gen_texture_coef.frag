@@ -1,7 +1,7 @@
 #include <preamble.glsl>
 #include <math.glsl>
 #include <render/record.glsl>
-#include <render/detail/scene_types.glsl>
+#include <render/load/defaults.glsl>
 
 // General layout rule declarations
 layout(std430) buffer;
@@ -33,7 +33,7 @@ layout(binding = 2) uniform b_buff_uplift_data {
 layout(binding = 3) uniform b_buff_uplift_pack { 
   UpliftPack data[met_max_constraints]; 
 } buff_uplift_pack;
-layout(binding = 4) uniform b_buff_objects {
+layout(binding = 4) uniform b_buff_object_info {
   uint n;
   ObjectInfo data[met_max_objects];
 } buff_objects;

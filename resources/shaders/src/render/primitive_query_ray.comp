@@ -1,11 +1,6 @@
 #include <preamble.glsl>
-#include <math.glsl>
-#include <spectrum.glsl>
-#include <sampler/uniform.glsl>
 #include <render/ray.glsl>
-#include <render/detail/path_types.glsl>
-#include <render/detail/scene_types.glsl>
-#include <render/load/bvh.glsl>
+#include <render/load/blas.glsl>
 #include <render/load/emitter.glsl>
 #include <render/load/object.glsl>
 #include <render/load/defaults.glsl>
@@ -15,31 +10,31 @@ layout(local_size_x_id = 0) in;
 layout(std140) uniform;
 layout(std430) buffer;
 
-layout(binding = 0) uniform b_buff_sensor {
+layout(binding = 0) uniform b_buff_sensor_info {
   vec3 origin;    /* padd to 16 bytes */ uint p0;
   vec3 direction; /* padd to 16 bytes */ uint p1;
-} buff_sensor;
-layout(binding = 1) uniform b_buff_objects {
+} buff_sensor_info;
+layout(binding = 1) uniform b_buff_object_info {
   uint n;
   ObjectInfo data[met_max_objects];
 } buff_objects;
-layout(binding = 2) uniform b_buff_meshes {
+layout(binding = 2) uniform b_buff_blas_info {
   uint n;
-  MeshInfo data[met_max_meshes];
-} buff_meshes;
-layout(binding = 3) uniform b_buff_emitters {
+  BLASInfo data[met_max_meshes];
+} buff_blas_info;
+layout(binding = 3) uniform b_buff_emitter_info {
   uint n;
   EmitterInfo data[met_max_emitters];
-} buff_emitters;
+} buff_emitter_info;
 layout(binding = 4) uniform b_buff_envmap_info {
   bool envm_is_present;
   uint envm_i;
 } buff_envmap_info;
 
 // Storage buffer declarations
-layout(binding = 0) restrict readonly buffer b_buff_bvhs_node0 { BVHNode0Pack data[]; } buff_bvhs_node0;
-layout(binding = 1) restrict readonly buffer b_buff_bvhs_node1 { BVHNode1Pack data[]; } buff_bvhs_node1;
-layout(binding = 2) restrict readonly buffer b_buff_bvhs_prim  { MeshPrimPack data[]; } buff_bvhs_prim;
+layout(binding = 0) restrict readonly buffer b_buff_blas_node0 { BVHNode0Pack data[]; } buff_blas_node0;
+layout(binding = 1) restrict readonly buffer b_buff_blas_node1 { BVHNode1Pack data[]; } buff_blas_node1;
+layout(binding = 2) restrict readonly buffer b_buff_blas_prim  { PrimitivePack data[]; } buff_blas_prim;
 layout(binding = 3) restrict coherent buffer b_buff_output { 
   Ray data;
 } buff_output;
@@ -47,9 +42,9 @@ layout(binding = 4) restrict readonly buffer b_buff_tlas_prim {
   uint data[]; 
 } buff_tlas_prim;
 
-declare_scene_emitter_data(buff_emitters.data, buff_emitters.n, buff_envmap_info);
+declare_scene_emitter_data(buff_emitter_info.data, buff_emitter_info.n, buff_envmap_info);
 declare_scene_object_data(buff_objects.data, buff_objects.n);
-declare_scene_bvh_data(buff_bvhs_prim.data, buff_bvhs_node0.data, buff_bvhs_node1.data, buff_meshes.data, buff_meshes.n);
+declare_scene_blas_data(buff_blas_prim.data, buff_blas_node0.data, buff_blas_node1.data, buff_blas_info.data);
 declare_distr_sampler_default(emitters);
 declare_distr_sampler_default(wavelength);
 
@@ -62,7 +57,7 @@ void main() {
   guard(gl_GlobalInvocationID.x == 0);
 
   // Load sensor data as ray
-  Ray ray = init_ray(buff_sensor.origin, buff_sensor.direction);
+  Ray ray = init_ray(buff_sensor_info.origin, buff_sensor_info.direction);
 
   // Intersect ray with scene
   scene_intersect(ray);

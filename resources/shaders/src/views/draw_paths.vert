@@ -1,7 +1,4 @@
 #include <preamble.glsl>
-#include <math.glsl>
-#include <spectrum.glsl>
-#include <render/detail/path_types.glsl>
 #include <render/load/cmfs.glsl>
 #include <render/load/defaults.glsl>
 
@@ -10,12 +7,12 @@ layout(std140) uniform;
 layout(std430) buffer;
 
 // Uniform buffer declarations
-layout(binding = 0) uniform b_buff_sensor {
+layout(binding = 0) uniform b_buff_sensor_info {
   mat4  full_trf;
   mat4  proj_trf;
   mat4  view_trf;
   uvec2 film_size; 
-} buff_sensor;
+} buff_sensor_info;
 
 // Storage buffer declarations
 layout(binding = 0) restrict readonly buffer b_buff_paths { 
@@ -47,5 +44,5 @@ void main() {
                              buff_paths.data[path_i].L);
 
   // Generate output vertex position
-  gl_Position = buff_sensor.full_trf * vec4(buff_paths.data[path_i].data[vert_i].p, 1);
+  gl_Position = buff_sensor_info.full_trf * vec4(buff_paths.data[path_i].data[vert_i].p, 1);
 }

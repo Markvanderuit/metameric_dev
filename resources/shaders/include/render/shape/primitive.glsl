@@ -2,35 +2,26 @@
 #define SHAPE_PRIMITIVE_GLSL_GUARD
 
 #include <render/ray.glsl>
-#include <render/detail/mesh_packing.glsl>
 
-// Unpacked vertex data
+// Scene vertex; position, normal, and texture coordinate
 struct Vertex {
   vec3 p;
   vec3 n;
   vec2 tx;
 };
 
-// Unpacked primitive data, typically queried during bvh travesal
+// Scene primitive; a triangle of vertices
 struct Primitive {
   Vertex v0, v1, v2;
 };
 
-// Unpacked primitive data, positions only
+// Scene primitive; vertex positions only
 struct Triangle {
   vec3 p0, p1, p2;
 };
 
-MeshVertPack to_mesh_vert_pack(in uvec4 v) {
-  MeshVertPack p;
-  p.p0 = v.x;
-  p.p1 = v.y;
-  p.n  = v.z;
-  p.tx = v.w;
-  return p;
-}
-
-Vertex unpack(in MeshVertPack p) {
+// Unpack Vertex data from a packed representation
+Vertex unpack(in VertexPack p) {
   Vertex o;
   o.p  = vec3(unpackUnorm2x16(p.p0),   unpackSnorm2x16(p.p1).x);
   o.n  = normalize(vec3(unpackSnorm2x16(p.p1).y, unpackSnorm2x16(p.n)));
@@ -38,7 +29,8 @@ Vertex unpack(in MeshVertPack p) {
   return o;
 }
 
-Primitive unpack(in MeshPrimPack p) {
+// Unpack Primitive data from a packed representation
+Primitive unpack(in PrimitivePack p) {
   Primitive prim = { 
     unpack(p.v0),
     unpack(p.v1),
@@ -47,7 +39,8 @@ Primitive unpack(in MeshPrimPack p) {
   return prim;
 }
 
-Triangle unpack_triangle(in MeshPrimPack pack) {
+// Unpack only Primitive position data from a packed representation
+Triangle unpack_triangle(in PrimitivePack pack) {
   Triangle prim = {
     vec3(unpackUnorm2x16(pack.v0.p0), unpackSnorm2x16(pack.v0.p1).x),
     vec3(unpackUnorm2x16(pack.v1.p0), unpackSnorm2x16(pack.v1.p1).x),

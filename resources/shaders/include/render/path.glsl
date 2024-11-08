@@ -2,18 +2,11 @@
 #define RENDER_PATH_GLSL_GUARD
 
 #include <sampler/uniform.glsl>
-#include <render/ray.glsl>
 #include <render/scene.glsl>
 #include <render/surface.glsl>
 #include <render/sensor.glsl>
+#include <render/brdf.glsl>
 #include <render/detail/path_query.glsl>
-
-float fresnel_schlick(float f_0, float f_90, float lambert) {
-	float flip_1 = 1.0 - lambert;
-	float flip_2 = flip_1 * flip_1;
-	float flip_5 = flip_2 * flip_1 * flip_2;
-	return flip_5 * (f_90 - f_0) + f_0;
-}
 
 vec4 Li_debug(in SensorSample ss, in SamplerState state) {
   // Ray-trace first. If no surface is intersected by the ray, return early
@@ -24,27 +17,8 @@ vec4 Li_debug(in SensorSample ss, in SamplerState state) {
   SurfaceInfo si = get_surface_info(ss.ray);
   if (!is_valid(si) || !is_object(si))
     return vec4(0);
-  
-  if (si.tx == vec2(0))
-    return vec4(1, 0, 0, 1);
-  else
-    return vec4(si.tx * 0.05, 0, 1);
-
-  /* BRDFInfo   brdf = get_brdf(si, ss.wvls, next_2d(state));
-  BRDFSample bs   = sample_brdf(brdf, next_3d(state), si);
-  vec4 f = eval_brdf(brdf, si, bs.wo);
-  vec4 c = f * abs(cos_theta(si.wi)) / pdf_brdf_diffuse(brdf, si, bs.wo);
-  if (bs.pdf == 0.f)
-    c = vec4(0, 0, 0, 0);
-
-  // Generate position sample on emitter, with ray towards sample
-  EmitterSample es = sample_emitters(si, ss.wvls, next_3d(state));
-  // Exitant direction in local frame
-  // vec3 wo = to_local(si, es.ray.d);
-  c = vec4(abs(es.ray.d), 1);
-
-  // Adjust for spectral integration by doing 4 / n
-  return c; */
+    
+  return vec4(si.tx, 0, 1);
 }
 
 vec4 Li(in SensorSample ss, in SamplerState state, out float alpha) {

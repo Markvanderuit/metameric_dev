@@ -120,46 +120,40 @@ namespace met::detail {
   };
 
   // Template specialization of SceneGLHandler.
-  // Handles packed mesh buffers, bvh buffers, and info to unpack said buffers shader-side
+  // Handles packed mesh buffers, blas bvh buffers, and info to unpack said buffers shader-side
   template <>
   class SceneGLHandler<met::Mesh> : public SceneGLHandlerBase {
-    // Per-mesh block layout for std140 uniform buffer
-    struct alignas(16) MeshBlockLayout {
-      alignas(4) uint prims_offs; // Offset/extent into mesh_elems buffer
-      alignas(4) uint nodes_offs; // Offset/extent into bvh_nodes buffer
+    // Block layout for std140 uniform buffer
+    struct alignas(16) BLASInfoBlockLayout {
+      alignas(4) uint prims_offs; // Offset/extent into blas_prims buffer
+      alignas(4) uint nodes_offs; // Offset/extent into blas_nodes buffer
     };
-    static_assert(sizeof(MeshBlockLayout) == 16);
+    static_assert(sizeof(BLASInfoBlockLayout) == 16);
     
-    // All-mesh block layout for std140 uniform buffer, mapped for write
-    struct MeshBufferLayout {
+    // Buffer layout for std140 uniform buffer, mapped for write
+    struct BLASInfoBufferLayout {
       alignas(4) uint size;
-      std::array<MeshBlockLayout, met_max_meshes> data;
-    } *m_mesh_info_map;
+      std::array<BLASInfoBlockLayout, met_max_meshes> data;
+    } *m_blas_info_map;
 
-    // Caches of simplified meshes and generated acceleration data
+    // Caches of simplified meshes and generated acceleration structure data
     std::vector<met::Mesh>   m_meshes;
-    std::vector<met::BVH<8>> m_bvhs;
+    std::vector<met::BVH<8>> m_blas;
 
   public:
-    // This buffer contains offsets/sizes, ergo layout info necessary to
-    // sample relevant parts of the other buffers
-    gl::Buffer mesh_info;
-
-    // Packed mesh data, used in gen_object_data and miscellaneous operations
+    // Packed mesh data, used in gen_object_data to bake surface textures
     gl::Buffer mesh_verts; // Mesh vertices; packed position, normal, and reparameterized texture uvs
-    gl::Buffer mesh_elems; // Mesh elements
-    gl::Buffer mesh_txuvs; // Original (unreparameterized) texture coordinates, kept for baking
+    gl::Buffer mesh_elems; // Mesh elements data
 
-    // Packed BVH data, used during render/query operations
-    gl::Buffer bvh_nodes;
-    gl::Buffer bvh_nodes_0;
-    gl::Buffer bvh_nodes_1;
-    gl::Buffer bvh_prims;
+    // Packed BLAS BVH data, used in render/query primitives
+    gl::Buffer blas_info;    // Per-mesh offsets into blas_nodes_* and blas_prims 
+    gl::Buffer blas_nodes_0; // Parent AABB and traversal data (is_leaf, size, offs)
+    gl::Buffer blas_nodes_1; // Child AABBs at 8 bits per child; requires parent AABB to unpack
+    gl::Buffer blas_prims;   // Packed mesh primitive data in bvh construction order
 
-    // CPU-side packed bvh data and original texture coordinates
-    // Useful for ray interaction recovery that mirrors the gpu-side precision issues
-    std::vector<PrimitivePack> bvh_prims_cpu;
-    std::vector<eig::Array3u>  bvh_txuvs_cpu; // unparameterized texture coordinates per bvh prim
+    // CPU-side packed primitive data
+    // Useful for ray interaction recovery that mirrors the gpu's packed version exactly
+    std::vector<PrimitivePack> blas_prims_cpu;
 
     // Draw array referencing packed, indexed mesh data
     // and a set of draw commands for assembling multidraw operations over this array;
@@ -262,20 +256,20 @@ namespace met::detail {
     void update(const Scene &) override;
   };
 
-  /* template <>
+  template <>
   class SceneGLHandler<met::Scene> : public SceneGLHandlerBase {
     // Block layout for std140 uniform buffer
-    struct alignas(16) BufferLayout {
+    struct alignas(16) TLASInfoBufferLayout {
       alignas(16) eig::Matrix4f trf;
-      alignas(16) eig::Matrix4f trf_inv;
-    } *m_scene_info_map;
+      alignas(16) eig::Matrix4f inv;
+    } *m_tlas_info_map;
     
   public:
-    // Buffer storing one instance of BufferLayout
-    gl::Buffer scene_info;
-
-    // Set of buffers storing scene top-level acceleration structure data
-    gl::Buffer tlas_nodes, tlas_prims;
+    // Packed TLAS BVH data, used in render/ray query primitives
+    gl::Buffer tlas_info;    // Info object containing ray transforms
+    gl::Buffer tlas_nodes_0; // Parent AABB and traversal data (is_leaf, size, offs)
+    gl::Buffer tlas_nodes_1; // Child AABBs at 8 bits per child; requires parent AABB to unpack
+    gl::Buffer tlas_prims;   // Indices referring to underlying revelant BLAS structure
 
   public:
     // Class constructor
@@ -283,5 +277,5 @@ namespace met::detail {
 
     // Update GL-side data for objects indicated as changed
     void update(const Scene &) override;
-  }; */
+  };
 } // namespace met::detail

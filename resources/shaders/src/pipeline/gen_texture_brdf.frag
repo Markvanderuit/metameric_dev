@@ -1,7 +1,7 @@
 #include <preamble.glsl>
 #include <math.glsl>
 #include <render/record.glsl>
-#include <render/detail/scene_types.glsl>
+#include <render/load/defaults.glsl>
 
 // General layout rule declarations
 layout(std430) buffer;
@@ -20,7 +20,7 @@ layout(binding = 0) uniform b_buff_unif {
   uint n;
   AtlasInfo data[met_max_textures];
 } buff_atlas; */
-layout(binding = 2) uniform b_buff_objects {
+layout(binding = 2) uniform b_buff_object_info {
   uint n;
   ObjectInfo data[met_max_objects];
 } buff_objects;

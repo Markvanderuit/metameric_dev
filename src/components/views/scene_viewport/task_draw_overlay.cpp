@@ -286,7 +286,7 @@ namespace met {
     m_fbo.bind();
     m_vao.bind();
     m_program.bind();
-    m_program.bind("b_buff_sensor", e_sensor.buffer());
+    m_program.bind("b_buff_sensor_info", e_sensor.buffer());
     m_program.bind("b_buff_paths",  e_query.output());
     m_program.bind("b_cmfs_3f",     e_scene.resources.observers.gl.cmfs_texture);
 

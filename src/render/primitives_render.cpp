@@ -182,8 +182,8 @@ namespace met {
 
     // Prepare program state
     program.bind();
-    program.bind("b_buff_sensor",  sensor.buffer());
-    program.bind("b_buff_objects", scene.components.objects.gl.object_info);
+    program.bind("b_buff_sensor_info",  sensor.buffer());
+    program.bind("b_buff_object_info", scene.components.objects.gl.object_info);
 
     // Dispatch draw call with appropriate barriers
     gl::sync::memory_barrier(gl::BarrierFlags::eFramebuffer        | gl::BarrierFlags::eTextureFetch  |
@@ -247,8 +247,8 @@ namespace met {
     program.bind();
     program.bind("b_gbuffer",       gbuffer);
     program.bind("b_film",          m_film);
-    program.bind("b_buff_sensor",   sensor.buffer());
-    program.bind("b_buff_objects",  scene.components.objects.gl.object_info);
+    program.bind("b_buff_sensor_info",   sensor.buffer());
+    program.bind("b_buff_object_info",  scene.components.objects.gl.object_info);
 
     // Let primary handle rest
     return render(sensor, scene);
@@ -328,13 +328,13 @@ namespace met {
     // Bind required resources to their corresponding targets
     program.bind();
     program.bind("b_film",                m_film);
-    program.bind("b_buff_sensor",         sensor.buffer());
+    program.bind("b_buff_sensor_info",         sensor.buffer());
     program.bind("b_buff_sampler_state",  get_sampler_state());
-    program.bind("b_buff_objects",        scene.components.objects.gl.object_info);
-    program.bind("b_buff_emitters",       scene.components.emitters.gl.emitter_info);
+    program.bind("b_buff_object_info",        scene.components.objects.gl.object_info);
+    program.bind("b_buff_emitter_info",       scene.components.emitters.gl.emitter_info);
     program.bind("b_buff_envmap_info",    scene.components.emitters.gl.emitter_envm_info);
-    program.bind("b_buff_coef",           scene.components.upliftings.gl.texture_coef.buffer());
-    program.bind("b_buff_brdf",           scene.components.upliftings.gl.texture_brdf.buffer());
+    program.bind("b_buff_coef_info",           scene.components.upliftings.gl.texture_coef.buffer());
+    program.bind("b_buff_brdf_info",           scene.components.upliftings.gl.texture_brdf.buffer());
     program.bind("b_buff_wvls_distr",     get_wavelength_distr());
     program.bind("b_buff_emitters_distr", scene.components.emitters.gl.emitter_distr_buffer);
     program.bind("b_illm_1f",             scene.resources.illuminants.gl.spec_texture);
@@ -349,10 +349,10 @@ namespace met {
     program.bind("b_cmfs_3f",             m_sampler);
     
     if (!scene.resources.meshes.empty()) {
-      program.bind("b_buff_meshes",     scene.resources.meshes.gl.mesh_info);
-      program.bind("b_buff_bvhs_node0", scene.resources.meshes.gl.bvh_nodes_0);
-      program.bind("b_buff_bvhs_node1", scene.resources.meshes.gl.bvh_nodes_1);
-      program.bind("b_buff_bvhs_prim",  scene.resources.meshes.gl.bvh_prims);
+      program.bind("b_buff_blas_info",     scene.resources.meshes.gl.blas_info);
+      program.bind("b_buff_blas_node0", scene.resources.meshes.gl.blas_nodes_0);
+      program.bind("b_buff_blas_node1", scene.resources.meshes.gl.blas_nodes_1);
+      program.bind("b_buff_blas_prim",  scene.resources.meshes.gl.blas_prims);
     }
 
     // Dispatch compute shader

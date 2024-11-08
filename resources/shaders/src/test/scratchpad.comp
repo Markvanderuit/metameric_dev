@@ -10,7 +10,7 @@ struct Object {
   mat4 trf;
 };
 
-layout(binding = 0) uniform b_buff_objects {
+layout(binding = 0) uniform b_buff_object_info {
   uint n;
   Object data[256];
 } buff_objects;

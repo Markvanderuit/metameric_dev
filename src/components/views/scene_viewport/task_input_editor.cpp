@@ -8,7 +8,7 @@
 
 namespace met {
   static constexpr float selector_near_distance = 12.f;
-  static constexpr uint  indirect_query_spp     = 65536;
+  static constexpr uint  indirect_query_spp     = 8192; // 65536;
 
   namespace detail {
     // From a trio of vertex positions forming a triangle, and a center position,
@@ -47,13 +47,8 @@ namespace met {
       SurfaceInfo si = { .object = object, .uplifting = uplifting  };
       si.record = rc;
 
-      // Unpack relevant primitive data, and restore old, non-reparameterized UV coordinates
-      // so we can sample image data cpu-side
-      auto prim = scene.resources.meshes.gl.bvh_prims_cpu[rc.primitive_i()].unpack();
-      auto txuv = scene.resources.meshes.gl.bvh_txuvs_cpu[rc.primitive_i()];
-      prim.v0.tx = detail::unpack_unorm_2x16(txuv[0]);
-      prim.v1.tx = detail::unpack_unorm_2x16(txuv[1]);
-      prim.v2.tx = detail::unpack_unorm_2x16(txuv[2]);
+      // Unpack relevant primitive data
+      auto prim = scene.resources.meshes.gl.blas_prims_cpu[rc.primitive_i()].unpack();
 
       // Generate barycentric coordinates
       eig::Vector3f pinv = (trf.inverse() * eig::Vector4f(p.x(), p.y(), p.z(), 1.f)).head<3>();

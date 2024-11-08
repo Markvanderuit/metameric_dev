@@ -62,7 +62,7 @@ namespace met {
 
     // Bind relevant resources
     m_program.bind();
-    m_program.bind("b_buff_sensor", m_sensor.buffer());
+    m_program.bind("b_buff_sensor_info", m_sensor.buffer());
 
     // Dispatch draw object
     gl::dispatch_draw(gl::DrawInfo {

@@ -1,12 +1,9 @@
 #ifndef SCENE_GLSL_GUARD
 #define SCENE_GLSL_GUARD
 
-#include <render/detail/scene_types.glsl> // Should be available by now
-#include <render/ray.glsl>
-#include <render/bvh.glsl>
+#include <render/blas.glsl>
 #include <render/emitter.glsl>
 #include <render/object.glsl>
-#include <render/brdf.glsl>
 
 bool scene_intersect(inout Ray ray) {
   // Generate ray local to TLAS, then forward original ray and local ray to intersection test

@@ -3,7 +3,6 @@
 
 #include <math.glsl>
 #include <render/record.glsl>
-#include <render/detail/mesh_packing.glsl>
 #include <sampler/uniform.glsl>
 
 // An object defining a 3-dimensional ray.

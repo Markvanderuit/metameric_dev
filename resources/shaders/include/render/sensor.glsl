@@ -2,7 +2,6 @@
 #define RENDER_SENSOR_GLSL_GUARD
 
 #include <render/ray.glsl>
-#include <spectrum.glsl>
 
 // Simple sensor definition based on matrices
 struct FilmSensor {

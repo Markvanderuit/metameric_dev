@@ -14,13 +14,13 @@ layout(location = 2) in flat uint in_value_rc;
 layout(location = 0) out vec4     out_value_gb;
 
 // Buffer declarations
-layout(binding = 0) uniform b_buff_sensor {
+layout(binding = 0) uniform b_buff_sensor_info {
   mat4  full_trf; 
   mat4  proj_trf;
   mat4  view_trf;
   uvec2 film_size; 
-} buff_sensor;
-layout(binding = 1) uniform b_buff_objects {
+} buff_sensor_info;
+layout(binding = 1) uniform b_buff_object_info {
   uint n;
   ObjectInfo data[met_max_objects];
 } buff_objects;

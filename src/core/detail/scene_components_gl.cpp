@@ -464,7 +464,7 @@ namespace met::detail {
     met_trace_full();
 
     // Preallocate up to a number of meshes and obtain writeable/flushable mapping
-    std::tie(mesh_info, m_mesh_info_map) = gl::Buffer::make_flusheable_object<MeshBufferLayout>();
+    std::tie(blas_info, m_blas_info_map) = gl::Buffer::make_flusheable_object<BLASInfoBufferLayout>();
   }
 
   void SceneGLHandler<met::Mesh>::update(const Scene &scene) {
@@ -475,14 +475,11 @@ namespace met::detail {
 
     // Resize cache vectors, which keep cleaned, simplified mesh data around 
     m_meshes.resize(meshes.size());
-    m_bvhs.resize(meshes.size());
+    m_blas.resize(meshes.size());
     unit_transforms.resize(meshes.size());
 
-    // Keep around old, unparameterized texture coordinates for now
-    std::vector<std::vector<eig::Array2f>> txuvs(meshes.size());
-
     // Set appropriate mesh count in buffer
-    m_mesh_info_map->size = static_cast<uint>(meshes.size());
+    m_blas_info_map->size = static_cast<uint>(meshes.size());
 
     // Generate cleaned, simplified mesh data
     #pragma omp parallel for
@@ -490,14 +487,11 @@ namespace met::detail {
       const auto &[value, state] = meshes[i];
       guard_continue(state);
 
-      // We simplify a copy of the mesh, reparameterize it so texture UVs are
-      // unique and non-overlapping, fit it to a [0, 1] cube, and finally
+      // We simplify a copy of the mesh, fit it to a [0, 1] cube, and finally
       // build a bvh to represent this mess
-      m_meshes[i]        = simplified_mesh<met::Mesh>(value, 524288, 1e-3);
-      m_meshes[i]        = fixed_degenerate_uvs<met::Mesh>(m_meshes[i]);
-      txuvs[i]           = m_meshes[i].txuvs; // parameterize_mesh<met::Mesh>(m_meshes[i]);
+      m_meshes[i]        = fixed_degenerate_uvs<met::Mesh>(simplified_mesh<met::Mesh>(value, 524288, 1e-3));
       unit_transforms[i] = unitize_mesh<met::Mesh>(m_meshes[i]);
-      m_bvhs[i]          = {{ .mesh = m_meshes[i], .n_leaf_children = 4 }};
+      m_blas[i]          = {{ .mesh = m_meshes[i], .n_leaf_children = 4 }};
     }
 
     // Pack mesh/BVH data tightly and fill in corresponding mesh layout info
@@ -511,7 +505,7 @@ namespace met::detail {
     
     // Fill in vert/node/elem sizes and scans
     rng::transform(m_meshes, verts_size.begin(), [](const auto &m) -> uint { return m.verts.size(); });
-    rng::transform(m_bvhs,   nodes_size.begin(), [](const auto &m) -> uint { return m.nodes.size(); });
+    rng::transform(m_blas,   nodes_size.begin(), [](const auto &m) -> uint { return m.nodes.size(); });
     rng::transform(m_meshes, elems_size.begin(), [](const auto &m) -> uint { return m.elems.size(); });
     std::exclusive_scan(range_iter(verts_size), verts_offs.begin(), 0u);
     std::exclusive_scan(range_iter(nodes_size), nodes_offs.begin(), 0u);
@@ -519,25 +513,22 @@ namespace met::detail {
     
     // Fill in gl-side mesh layout info
     for (int i = 0; i < meshes.size(); ++i) {
-      auto &layout = m_mesh_info_map->data[i];
+      auto &layout = m_blas_info_map->data[i];
       layout.nodes_offs = nodes_offs[i];
       layout.prims_offs = elems_offs[i];
     }
 
     // Mostly temporary data packing vectors; will be copied to gpu-side buffers after
     std::vector<VertexPack>   verts_packed(verts_size.back() + verts_offs.back());   // Compressed and packed
-    std::vector<NodePack>     nodes_packed(nodes_size.back() + nodes_offs.back());   // Partially compressed 8-way
-    std::vector<NodePack0>    nodes_0_packed(nodes_size.back() + nodes_offs.back()); // Partially compressed 8-way
-    std::vector<NodePack1>    nodes_1_packed(nodes_size.back() + nodes_offs.back()); // Partially compressed 8-way
-    std::vector<uint>         txuvs_packed(verts_size.back() + verts_offs.back());   // Compressed and packed
+    std::vector<NodePack0>    nodes_0_packed(nodes_size.back() + nodes_offs.back()); // Partially compressed 8-way blas
+    std::vector<NodePack1>    nodes_1_packed(nodes_size.back() + nodes_offs.back()); // Partially compressed 8-way blas
     std::vector<eig::Array3u> elems_packed(elems_size.back() + elems_offs.back());   // Not compressed, just packed
-    bvh_prims_cpu.resize(elems_size.back() + elems_offs.back());                     // Compressed and packed
-    bvh_txuvs_cpu.resize(elems_size.back() + elems_offs.back());                     // Compressed and packed
+    blas_prims_cpu.resize(elems_size.back() + elems_offs.back());                     // Compressed and packed
 
     // Pack data tightly into pack data vectors
     #pragma omp parallel for
     for (int i = 0; i < meshes.size(); ++i) {
-      const auto &bvh  = m_bvhs[i];
+      const auto &blas = m_blas[i];
       const auto &mesh = m_meshes[i];
 
       // Pack vertex data tightly and copy to the correctly offset range
@@ -556,35 +547,26 @@ namespace met::detail {
         // Vertices are compressed as well as packed
         Vertex v = { .p = mesh.verts[j], .n = norm, .tx = txuv };
         verts_packed[verts_offs[i] + j] = v.pack();
-
-        // We keep the unparameterized texture UVs around; set to 0.5 if not present
-        txuvs_packed[verts_offs[i] + j] = pack_unorm_2x16(!txuvs[i].empty() ? txuvs[i][j] : txuv);
       }
 
       // Pack primitive data tightly and copy to the correctly offset range
       // while scattering data into leaf node order for the BVH
       #pragma omp parallel for
-      for (int j = 0; j < bvh.prims.size(); ++j) {
+      for (int j = 0; j < blas.prims.size(); ++j) {
         // BVH primitives are packed in bvh order
-        auto el = mesh.elems[bvh.prims[j]];
-        bvh_prims_cpu[elems_offs[i] + j] = PrimitivePack {
+        auto el = mesh.elems[blas.prims[j]];
+        blas_prims_cpu[elems_offs[i] + j] = PrimitivePack {
           .v0 = verts_packed[verts_offs[i] + el[0]],
           .v1 = verts_packed[verts_offs[i] + el[1]],
           .v2 = verts_packed[verts_offs[i] + el[2]]
-        };
-        bvh_txuvs_cpu[elems_offs[i] + j] = eig::Array3u {
-          txuvs_packed[verts_offs[i] + el[0]],
-          txuvs_packed[verts_offs[i] + el[1]],
-          txuvs_packed[verts_offs[i] + el[2]]
         };
       }
 
       // Pack node data tightly and copy to the correctly offset range
       #pragma omp parallel for
-      for (int j = 0; j < bvh.nodes.size(); ++j) {
-        nodes_packed[nodes_offs[i] + j] = pack(bvh.nodes[j]);
+      for (int j = 0; j < blas.nodes.size(); ++j) {
         std::tie(nodes_0_packed[nodes_offs[i] + j], 
-                 nodes_1_packed[nodes_offs[i] + j]) = pack_pair(bvh.nodes[j]);
+                 nodes_1_packed[nodes_offs[i] + j]) = pack_pair(blas.nodes[j]);
       }
       
       // Copy element indices and adjust to refer to the correctly offset range
@@ -593,20 +575,16 @@ namespace met::detail {
     }
 
     // Copy data to buffers
-    mesh_verts  = {{ .data = cnt_span<const std::byte>(verts_packed)   }};
-    mesh_elems  = {{ .data = cnt_span<const std::byte>(elems_packed)   }};
-    mesh_txuvs  = {{ .data = cnt_span<const std::byte>(txuvs_packed)   }};
-    bvh_nodes   = {{ .data = cnt_span<const std::byte>(nodes_packed)   }};
-    bvh_nodes_0 = {{ .data = cnt_span<const std::byte>(nodes_0_packed) }};
-    bvh_nodes_1 = {{ .data = cnt_span<const std::byte>(nodes_1_packed) }};
-    bvh_prims   = {{ .data = cnt_span<const std::byte>(bvh_prims_cpu)  }};
+    mesh_verts   = {{ .data = cnt_span<const std::byte>(verts_packed)   }};
+    mesh_elems   = {{ .data = cnt_span<const std::byte>(elems_packed)   }};
+    blas_nodes_0 = {{ .data = cnt_span<const std::byte>(nodes_0_packed) }};
+    blas_nodes_1 = {{ .data = cnt_span<const std::byte>(nodes_1_packed) }};
+    blas_prims   = {{ .data = cnt_span<const std::byte>(blas_prims_cpu)  }};
 
     // Define corresponding vertex array object and generate multidraw command info
     array = {{
-      .buffers = {{ .buffer = &mesh_verts, .index = 0, .stride = sizeof(eig::Array4u)      },
-                  { .buffer = &mesh_txuvs, .index = 1, .stride = sizeof(uint)              }},
-      .attribs = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e4 },
-                  { .attrib_index = 1, .buffer_index = 1, .size = gl::VertexAttribSize::e1 }},
+      .buffers = {{ .buffer = &mesh_verts, .index = 0, .stride = sizeof(eig::Array4u)      }},
+      .attribs = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e4 }},
       .elements = &mesh_elems
     }};
     draw_commands.resize(meshes.size());
@@ -615,7 +593,7 @@ namespace met::detail {
     }
 
     // Flush changes to layout data
-    mesh_info.flush();
+    blas_info.flush();
   }
 
   SceneGLHandler<met::Image>::SceneGLHandler() {
@@ -724,6 +702,7 @@ namespace met::detail {
 
   SceneGLHandler<met::Spec>::SceneGLHandler() {
     met_trace_full();
+
     auto n_layers   = std::min<uint>(gl::state::get_variable_int(gl::VariableName::eMaxArrayTextureLayers), met_max_constraints);
     spec_texture    = {{ .size = { wavelength_samples, n_layers } }};
     std::tie(spec_buffer, spec_buffer_map) = gl::Buffer::make_flusheable_span<Spec>(n_layers);
@@ -772,11 +751,11 @@ namespace met::detail {
     cmfs_texture.set(cmfs_buffer);
   }
 
-  /* SceneGLHandler<met::Scene>::SceneGLHandler() {
+  SceneGLHandler<met::Scene>::SceneGLHandler() {
     met_trace_full();
 
     // Obtain writeable/flushable mapping for scene layout
-    std::tie(scene_info, m_scene_info_map) = gl::Buffer::make_flusheable_object<BufferLayout>();
+    std::tie(tlas_info, m_tlas_info_map) = gl::Buffer::make_flusheable_object<TLASInfoBufferLayout>();
   }
 
   void SceneGLHandler<met::Scene>::update(const Scene &scene) {
@@ -787,12 +766,12 @@ namespace met::detail {
     guard(objects || emitters);
 
     // Collect bounding boxes for active scene emitters and objects as one shared type
-    struct PrimData {
+    struct PrimitiveData {
       bool is_object;
       uint i;
       AABB aabb;
     };
-    std::vector<PrimData> prims;
+    std::vector<PrimitiveData> prims;
 
     // Collect object data
     for (uint i = 0; i < objects.size(); ++i) {
@@ -800,14 +779,13 @@ namespace met::detail {
       guard_continue(object.is_active);
 
       const auto &mesh = scene.resources.meshes[object.mesh_i].value();
-      
-      // Get object transform
-      auto object_trf = object.transform.affine().matrix().eval();
-      auto mesh_trf   = scene.resources.meshes.gl.transforms[object.mesh_i];
-      auto full_trf   = (object_trf * mesh_trf).eval();
 
-      prims.push_back({ .is_object = true, .i = i, .aabb = generate_rotated_aabb(full_trf) });
-      // prims.push_back({ .is_object = true, .i = i, .aabb = generate_fitting_aabb(mesh, full_trf) });
+      // Get mesh transform, incorporate into object transform
+      auto object_trf = object.transform.affine().matrix().eval();
+      auto mesh_trf   = scene.resources.meshes.gl.unit_transforms[object.mesh_i];
+      auto trf        = (object_trf * mesh_trf).eval();
+
+      prims.push_back({ .is_object = true, .i = i, .aabb = generate_rotated_aabb(trf) });
     }
 
     // Collect emitter data
@@ -833,7 +811,7 @@ namespace met::detail {
     }
 
     // Get vector of AABBs only
-    auto prim_aabbs = vws::transform(prims, &PrimData::aabb) | rng::to<std::vector>();
+    auto prim_aabbs = vws::transform(prims, &PrimitiveData::aabb) | rng::to<std::vector>();
 
     // Generate scene-enclosing bounding box
     AABB scene_aabb = std::reduce(
@@ -859,29 +837,47 @@ namespace met::detail {
       });
 
     // Push transformations to buffer
-    m_scene_info_map->trf     = trf.inverse().eval();
-    m_scene_info_map->trf_inv = trf;
-    scene_info.flush();
+    m_tlas_info_map->trf = trf.inverse().eval();
+    m_tlas_info_map->inv = trf;
+    tlas_info.flush();
     
     // Create top-level BVH over AABBS
     BVH<8> bvh = {{ .aabb = prim_aabbs, .n_leaf_children = 1 }};
 
     // Small helper to pack primitive data in a single integer
-    constexpr auto pack_prim = [](bool is_object, uint object_i) -> uint {
-      return (is_object ? 0x00000000 : 0x80000000) | (object_i & 0x00FFFFFF);
+    constexpr auto pack_prim = [](const PrimitiveData &prim) -> uint {
+      return (prim.is_object ? 0x00000000 : 0x80000000) | (prim.i & 0x00FFFFFF);
     };
 
     // Pack BVH node/prim data tightly
-    std::vector<NodePack> nodes_packed(bvh.nodes.size());
-    std::vector<uint>     prims_packed(bvh.prims.size());
-    std::transform(std::execution::par_unseq, range_iter(bvh.nodes), nodes_packed.begin(), pack);
-    std::transform(std::execution::par_unseq, range_iter(bvh.prims), prims_packed.begin(), [&](uint j) {
-      const auto &prim = prims[j];
-      return pack_prim(prim.is_object, prim.i);
-    });
+    std::vector<uint>      prims_packed(bvh.prims.size());
+    std::vector<NodePack0> nodes_0_packed(bvh.nodes.size()); // Partially compressed 8-way tlas
+    std::vector<NodePack1> nodes_1_packed(bvh.nodes.size()); // Partially compressed 8-way tlas
+  
+    // Pack primitive data tightly
+    #pragma omp parallel for
+    for (int j = 0; j < bvh.prims.size(); ++j)
+      prims_packed[j] = pack_prim(prims[j]);
+
+    // Pack node data tightly
+    #pragma omp parallel for
+    for (int j = 0; j < bvh.nodes.size(); ++j)
+      std::tie(nodes_0_packed[j], 
+               nodes_1_packed[j]) = pack_pair(bvh.nodes[j]);
+
+    fmt::print("TLAS\n");
+    for (const auto &node : bvh.nodes) {
+      fmt::print("{} : {} -> {}\n", node.is_leaf(), node.offs(), node.offs() + node.size());
+      guard_continue(node.is_leaf());
+      std::vector<uint> idx;
+      for (uint i = node.offs(); i < node.offs() + node.size(); ++i)
+        idx.push_back(prims[i].i);
+      fmt::print("\tidx: {}\n", idx);
+    }
 
     // Push BVH data to buffer
-    tlas_nodes = {{ .data = cnt_span<const std::byte>(nodes_packed) }};
-    tlas_prims = {{ .data = cnt_span<const std::byte>(prims_packed) }};
-  } */
+    tlas_nodes_0 = {{ .data = cnt_span<const std::byte>(nodes_0_packed) }};
+    tlas_nodes_1 = {{ .data = cnt_span<const std::byte>(nodes_1_packed) }};
+    tlas_prims   = {{ .data = cnt_span<const std::byte>(prims_packed) }};
+  }
 } // namespace met::detail

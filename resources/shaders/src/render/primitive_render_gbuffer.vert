@@ -1,6 +1,5 @@
 #include <preamble.glsl>
 #include <render/record.glsl>
-#include <render/detail/scene_types.glsl>
 #include <render/load/defaults.glsl>
 
 // General layout rule declarations
@@ -14,13 +13,13 @@ layout(location = 1) out vec2      out_value_tx;
 layout(location = 2) out flat uint out_value_rc;
 
 // Buffer declarations
-layout(binding = 0) uniform b_buff_sensor {
+layout(binding = 0) uniform b_buff_sensor_info {
   mat4  full_trf; 
   mat4  proj_trf;
   mat4  view_trf;
   uvec2 film_size; 
-} buff_sensor;
-layout(binding = 1) uniform b_buff_objects {
+} buff_sensor_info;
+layout(binding = 1) uniform b_buff_object_info {
   uint n;
   ObjectInfo data[met_max_objects];
 } buff_objects;
@@ -41,7 +40,7 @@ void main() {
   out_value_rc = rc;
 
   // Apply camera transformation for vertex position output
-  gl_Position = buff_sensor.full_trf 
+  gl_Position = buff_sensor_info.full_trf 
               * buff_objects.data[gl_DrawID].trf_mesh
               * vec4(vt.p, 1); */
 }

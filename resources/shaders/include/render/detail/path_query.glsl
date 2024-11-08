@@ -2,8 +2,8 @@
 #define RENDER_DETAIL_PATH_QUERY_GLSL_GUARD
 
 // Macros for enabling/disabling path querying; 
-// helper code optionally inserted into path.glsl to capture
-// path vertices and path throughput
+// helper code optionally inserted into render/path.glsl 
+// to capture path vertices and path throughput
 #ifdef ENABLE_PATH_QUERY
   // Instantiate a path object
   #define path_query_initialize(pt) Path pt; { pt.path_depth = 0; }
@@ -20,7 +20,6 @@
     pt.L    = L;
     set_path(pt, get_next_path_id());
   }
-
 
   // Finalize the path object, as if an emitter was hit by illuminant sampling,
   // and store to buffer

@@ -37,7 +37,7 @@ layout(binding = 1) uniform b_buff_uplift_data {
   uint offs;
   uint size;
 } buff_uplift_data;
-layout(binding = 2) uniform b_buff_objects {
+layout(binding = 2) uniform b_buff_object_info {
   uint n;
   ObjectInfo data[32];
 } buff_objects;
