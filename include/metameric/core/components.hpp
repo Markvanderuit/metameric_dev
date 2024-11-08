@@ -23,7 +23,7 @@ namespace met {
     uint view_i = 0;
 
     // Render scaling used for scene viewport
-    float view_scale   = .5f;  
+    float view_scale   = .5f;
 
   public: // Boilerplate  
     auto operator<=>(const Settings &) const = default;

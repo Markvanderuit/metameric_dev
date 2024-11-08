@@ -41,6 +41,10 @@ namespace met {
     // Render pixels each other frame, alternating between checkerboards
     bool pixel_checkerboard = false;
 
+    // Render output to image with an alpha component,
+    // allowing images without a background
+    bool enable_alpha = false;
+
     // Query a value (e.g. albedo), integrate it, and return
     bool enable_debug = false;
 

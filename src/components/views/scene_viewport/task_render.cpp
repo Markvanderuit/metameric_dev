@@ -47,6 +47,7 @@ namespace met {
         case Settings::RendererType::ePath:
           render_handle.init<PathRenderPrimitive>({ .spp_per_iter        = render_spp_per_iter,
                                                     .pixel_checkerboard  = true,
+                                                    .enable_alpha        = true,
                                                     .cache_handle        = info.global("cache") });
           break;
         case Settings::RendererType::eDirect:

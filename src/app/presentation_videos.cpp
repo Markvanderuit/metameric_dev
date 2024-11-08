@@ -388,7 +388,7 @@ std::queue<RenderTaskInfo> generate_task_queue() {
   
   // VIDEO 10a/b/c
   // Do some weird stuff
-  queue.push(RenderTaskInfo {
+  /* queue.push(RenderTaskInfo {
     .scene_path   = scene_path  / "path.json",
     .out_path     = render_path / "10.mp4",
     .view_name    = "mug",
@@ -412,6 +412,40 @@ std::queue<RenderTaskInfo> generate_task_queue() {
       d65r.is_active = false;
       fl2.is_active  = true;
       led.is_active  = true;
+    }
+  }); */
+
+  queue.push(RenderTaskInfo {
+    .scene_path   = scene_path  / "fold.json",
+    .out_path     = render_path / "fold_testmp4",
+    .view_name    = "Default view",
+    .view_scale   = 1.f,
+    .fps          = 60u,
+    .spp          = 1u,
+    .spp_per_step = 1u,
+    .start_time   = 0.f,
+    .end_time     = 5.f,
+    .init_events  = [](auto &info, Scene &scene) {
+      met_trace();
+
+      auto &vert = scene.components.upliftings[0]->verts[0];
+
+      std::array<Colr, 5> values = {
+        vert.get_mismatch_position(), // 0 -> 1 
+        Colr { 0.461, 0.430, 0.330 }, // 1 -> 2 
+        Colr { 0.409, 0.444, 0.444 }, // 2 -> 3 
+        Colr { 0.444, 0.388, 0.468 }, // 3 -> 4 
+        Colr { 0.317, 0.381, 0.447 }  // 4 -> 0
+      };
+
+      for (uint i = 0; i < values.size(); ++i) {
+        anim::add_twokey<Uplifting::Vertex>(info.events, {
+          .handle = vert,
+          .values = { values[i], values[(i + 1) % values.size()] },
+          .times  = { static_cast<float>(i), static_cast<float>(i + 1) },
+          .fps    = info.fps
+        });
+      }
     }
   });
 
