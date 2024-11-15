@@ -10,7 +10,7 @@ bool ray_intersect_object(inout Ray ray, uint object_i) {
   Ray ray_local = ray_transform(ray, inverse(object_info.trf));
 
   // Run intersection, return if not a closest hit
-  if (!ray_intersect_bvh(ray_local, object_info.mesh_i))
+  if (!ray_intersect_blas(ray_local, object_info.mesh_i))
     return false;
 
   // Recover world-space distance from local ray
@@ -31,7 +31,7 @@ bool ray_intersect_object_any(in Ray ray, uint object_i) {
   Ray ray_local = ray_transform(ray, inverse(object_info.trf));
   
   // Run intersection and return result
-  return ray_intersect_bvh_any(ray_local, object_info.mesh_i);
+  return ray_intersect_blas_any(ray_local, object_info.mesh_i);
 }
 
 #endif // RENDER_OBJECT_GLSL_GUARD

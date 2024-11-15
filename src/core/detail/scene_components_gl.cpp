@@ -6,6 +6,7 @@
 #include <metameric/core/utility.hpp>
 #include <algorithm>
 #include <bit>
+#include <bitset>
 #include <execution>
 #include <numbers>
 #include <numeric>
@@ -36,107 +37,65 @@ namespace met::detail {
     return u;
   }
 
-  struct NodePack0 {
-    uint aabb_pack_0; // lo.x, lo.y
-    uint aabb_pack_1; // hi.x, hi.y
-    uint aabb_pack_2; // lo.z, hi.z
-    uint data_pack;   // leaf | size | offs
-  };
-  static_assert(sizeof(NodePack0) == 16);
-  struct NodePack1 {
-    std::array<uint, 8> child_pack_0; // per child: lo.x | lo.y | hi.x | hi.y
-    std::array<uint, 4> child_pack_1; // per child: lo.z | hi.z
-  };
-  static_assert(sizeof(NodePack1) == 48);
-
   struct NodePack {
-    uint aabb_pack_0;                 // lo.x, lo.y
-    uint aabb_pack_1;                 // hi.x, hi.y
-    uint aabb_pack_2;                 // lo.z, hi.z
-    uint data_pack;                   // leaf | size | offs
-    std::array<uint, 8> child_pack_0; // per child: lo.x | lo.y | hi.x | hi.y
-    std::array<uint, 4> child_pack_1; // per child: lo.z | hi.z
+    uint data;                        // type 1b | child mask 8b | size 4b | offs 19b
+    std::array<uint, 3> aabb;         // [lo.x, lo.y], [hi.x, hi.y], [lo.z, hi.z]
+    std::array<uint, 8> child_aabb_0; // per child: lo.x | lo.y | hi.x | hi.y
+    std::array<uint, 4> child_aabb_1; // per child: lo.z | hi.z
   };
   static_assert(sizeof(NodePack) == 64);
 
-  // Helper method to pack BVH node data tightly
-  std::pair<NodePack0, NodePack1> pack_pair(const BVH<8>::Node &node) {
-    met_trace();
-
-    // Output node pack
-    NodePack0 p0;
-    NodePack1 p1;
-
-    // Generate a AABB over child AABBs
-    auto aabb = *rng::fold_left_first(std::span(node.child_aabb.begin(), node.size()), 
-    [](const AABB &a, const AABB &b) -> AABB {
-      return { .minb = a.minb.cwiseMin(b.minb), .maxb = a.maxb.cwiseMax(b.maxb) };
-    });
-    
-    // 3xu32 packs AABB lo, ex
-    auto b_lo_in = aabb.minb;
-    auto b_ex_in = (aabb.maxb - aabb.minb).eval();
-    p0.aabb_pack_0 = detail::pack_unorm_2x16_floor({ b_lo_in.x(), b_lo_in.y() });
-    p0.aabb_pack_1 = detail::pack_unorm_2x16_ceil ({ b_ex_in.x(), b_ex_in.y() });
-    p0.aabb_pack_2 = detail::pack_unorm_2x16_floor({ b_lo_in.z(), 0 }) 
-                   | detail::pack_unorm_2x16_ceil ({ 0, b_ex_in.z() });
-
-    // 1xu32 packs node type, child offset, child count
-    p0.data_pack = node.offs_data | (node.size_data << 27);
-
-    // Child AABBs are packed in 6 bytes per child
-    p1.child_pack_0.fill(0);
-    p1.child_pack_1.fill(0);
-    for (uint i = 0; i < node.size(); ++i) {
-      auto b_lo_safe = ((node.child_aabb[i].minb - b_lo_in) / b_ex_in).eval();
-      auto b_hi_safe = ((node.child_aabb[i].maxb - b_lo_in) / b_ex_in).eval();
-      auto pack_0 = detail::pack_unorm_4x8_floor((eig::Array4f() << b_lo_safe.head<2>(), 0, 0).finished())
-                  | detail::pack_unorm_4x8_ceil ((eig::Array4f() << 0, 0, b_hi_safe.head<2>()).finished());
-      auto pack_1 = detail::pack_unorm_4x8_floor((eig::Array4f() << b_lo_safe.z(), 0, 0, 0).finished())
-                  | detail::pack_unorm_4x8_ceil ((eig::Array4f() << 0, b_hi_safe.z(), 0, 0).finished());
-      p1.child_pack_0[i    ] |= pack_0;
-      p1.child_pack_1[i / 2] |= (pack_1 << ((i % 2) ? 16 : 0));
-    }
-
-    return { p0, p1 };
-  }
-
-  // Helper method to pack BVH node data tightly
+  // Helper method to pack BVH node data to NodePack type
   NodePack pack(const BVH<8>::Node &node) {
     met_trace();
 
     // Output node pack
     NodePack p;
 
-    // Generate a AABB over child AABBs
-    auto aabb = *rng::fold_left_first(std::span(node.child_aabb.begin(), node.size()), 
-    [](const AABB &a, const AABB &b) -> AABB {
-      return { .minb = a.minb.cwiseMin(b.minb), .maxb = a.maxb.cwiseMax(b.maxb) };
-    });
-    
-    // 3xu32 packs AABB lo, ex
-    auto b_lo_in = aabb.minb;
-    auto b_ex_in = (aabb.maxb - aabb.minb).eval();
-    p.aabb_pack_0 = detail::pack_unorm_2x16_floor({ b_lo_in.x(), b_lo_in.y() });
-    p.aabb_pack_1 = detail::pack_unorm_2x16_ceil ({ b_ex_in.x(), b_ex_in.y() });
-    p.aabb_pack_2 = detail::pack_unorm_2x16_floor({ b_lo_in.z(), 0 }) 
-                  | detail::pack_unorm_2x16_ceil ({ 0, b_ex_in.z() });
+    // Generate enclosing AABB over children
+    auto child_aabbs = std::span<const AABB>(node.child_aabb.begin(), node.size);
+    auto parent_aabb =*rng::fold_left_first(child_aabbs, std::plus {});
 
-    // 1xu32 packs node type, child offset, child count
-    p.data_pack = node.offs_data | (node.size_data << 27);
+    // 3xu32 packs AABB lo, ex
+    auto b_lo_in = parent_aabb.minb;
+    auto b_ex_in = (parent_aabb.maxb - parent_aabb.minb).eval();
+    p.aabb[0] = detail::pack_unorm_2x16_floor({ b_lo_in.x(), b_lo_in.y() });
+    p.aabb[1] = detail::pack_unorm_2x16_ceil ({ b_ex_in.x(), b_ex_in.y() });
+    p.aabb[2] = detail::pack_unorm_2x16_floor({ b_lo_in.z(), 0 }) 
+              | detail::pack_unorm_2x16_ceil ({ 0, b_ex_in.z() });
+
+    // Convert child leaf/node mask to bit field
+    uint child_mask = 0;
+    for (uint i = 0; i < node.child_mask.size(); ++i)
+      child_mask |= node.child_mask[i] << i;
+
+    // type 1b | child mask 8b | size 4b | offs 19b
+    p.data =  (0x007FFFFu & node.offset)        // 19 bits, child range offset
+           | ((0x000000Fu & node.size)   << 19) // 4 bits,  child range size
+           | ((0x00000FFu & child_mask)  << 23) // 8 bits,  child leaf/node mask
+           | ((0x0000001u & node.type)   << 31) // 1 bit,   current leaf/node type
+           ;
+    
+    // uint copy_mask = (p.data >> 23) & 0x00000FFu;
+    // if (!node.type)
+    //   fmt::print("{} -> {} -> {}\n", node.child_mask, child_mask, copy_mask);
+    // if (copy_mask != child_mask) {
+    //   // for (auto [i, b] : enumerate_view(node.child_mask))
+    //   //   fmt::print("\t{} -> {}\n", i, (uint(b) << i));
+    // }
 
     // Child AABBs are packed in 6 bytes per child
-    p.child_pack_0.fill(0);
-    p.child_pack_1.fill(0);
-    for (uint i = 0; i < node.size(); ++i) {
-      auto b_lo_safe = ((node.child_aabb[i].minb - b_lo_in) / b_ex_in).eval();
-      auto b_hi_safe = ((node.child_aabb[i].maxb - b_lo_in) / b_ex_in).eval();
+    p.child_aabb_0.fill(0);
+    p.child_aabb_1.fill(0);
+    for (uint i = 0; i < child_aabbs.size(); ++i) {
+      auto b_lo_safe = ((child_aabbs[i].minb - b_lo_in) / b_ex_in).eval();
+      auto b_hi_safe = ((child_aabbs[i].maxb - b_lo_in) / b_ex_in).eval();
       auto pack_0 = detail::pack_unorm_4x8_floor((eig::Array4f() << b_lo_safe.head<2>(), 0, 0).finished())
                   | detail::pack_unorm_4x8_ceil ((eig::Array4f() << 0, 0, b_hi_safe.head<2>()).finished());
       auto pack_1 = detail::pack_unorm_4x8_floor((eig::Array4f() << b_lo_safe.z(), 0, 0, 0).finished())
                   | detail::pack_unorm_4x8_ceil ((eig::Array4f() << 0, b_hi_safe.z(), 0, 0).finished());
-      p.child_pack_0[i    ] |= pack_0;
-      p.child_pack_1[i / 2] |= (pack_1 << ((i % 2) ? 16 : 0));
+      p.child_aabb_0[i    ] |= pack_0;
+      p.child_aabb_1[i / 2] |= (pack_1 << ((i % 2) ? 16 : 0));
     }
 
     return p;
@@ -488,9 +447,9 @@ namespace met::detail {
 
       // We simplify a copy of the mesh, fit it to a [0, 1] cube, and finally
       // build a bvh to represent this mess
-      m_meshes[i]        = fixed_degenerate_uvs<met::Mesh>(simplified_mesh<met::Mesh>(value, 524288, 1e-3));
+      m_meshes[i]        = fixed_degenerate_uvs<met::Mesh>(simplified_mesh<met::Mesh>(value, 262144, 5e-3));
       unit_transforms[i] = unitize_mesh<met::Mesh>(m_meshes[i]);
-      m_blas[i]          = {{ .mesh = m_meshes[i], .n_leaf_children = 4 }};
+      m_blas[i]          = {{ .mesh = m_meshes[i], .n_leaf_children = 1 }};
     }
 
     // Pack mesh/BVH data tightly and fill in corresponding mesh layout info
@@ -518,11 +477,10 @@ namespace met::detail {
     }
 
     // Mostly temporary data packing vectors; will be copied to gpu-side buffers after
-    std::vector<VertexPack>   verts_packed(verts_size.back() + verts_offs.back());   // Compressed and packed
-    std::vector<NodePack0>    nodes_0_packed(nodes_size.back() + nodes_offs.back()); // Partially compressed 8-way blas
-    std::vector<NodePack1>    nodes_1_packed(nodes_size.back() + nodes_offs.back()); // Partially compressed 8-way blas
-    std::vector<eig::Array3u> elems_packed(elems_size.back() + elems_offs.back());   // Not compressed, just packed
-    blas_prims_cpu.resize(elems_size.back() + elems_offs.back());                     // Compressed and packed
+    std::vector<VertexPack>   verts_packed(verts_size.back() + verts_offs.back()); // Compressed and packed
+    std::vector<NodePack>     nodes_packed(nodes_size.back() + nodes_offs.back()); // Partially compressed 8-way blas
+    std::vector<eig::Array3u> elems_packed(elems_size.back() + elems_offs.back()); // Not compressed, just packed
+    blas_prims_cpu.resize(elems_size.back() + elems_offs.back());                  // Compressed and packed
 
     // Pack data tightly into pack data vectors
     #pragma omp parallel for
@@ -564,8 +522,7 @@ namespace met::detail {
       // Pack node data tightly and copy to the correctly offset range
       #pragma omp parallel for
       for (int j = 0; j < blas.nodes.size(); ++j) {
-        std::tie(nodes_0_packed[nodes_offs[i] + j], 
-                 nodes_1_packed[nodes_offs[i] + j]) = pack_pair(blas.nodes[j]);
+        nodes_packed[nodes_offs[i] + j] = pack(blas.nodes[j]);
       }
       
       // Copy element indices and adjust to refer to the correctly offset range
@@ -574,11 +531,10 @@ namespace met::detail {
     }
 
     // Copy data to buffers
-    mesh_verts   = {{ .data = cnt_span<const std::byte>(verts_packed)   }};
-    mesh_elems   = {{ .data = cnt_span<const std::byte>(elems_packed)   }};
-    blas_nodes_0 = {{ .data = cnt_span<const std::byte>(nodes_0_packed) }};
-    blas_nodes_1 = {{ .data = cnt_span<const std::byte>(nodes_1_packed) }};
-    blas_prims   = {{ .data = cnt_span<const std::byte>(blas_prims_cpu)  }};
+    mesh_verts = {{ .data = cnt_span<const std::byte>(verts_packed)   }};
+    mesh_elems = {{ .data = cnt_span<const std::byte>(elems_packed)   }};
+    blas_nodes = {{ .data = cnt_span<const std::byte>(nodes_packed) }};
+    blas_prims = {{ .data = cnt_span<const std::byte>(blas_prims_cpu)  }};
 
     // Define corresponding vertex array object and generate multidraw command info
     array = {{
@@ -847,9 +803,8 @@ namespace met::detail {
     BVH<8> bvh = {{ .aabb = prim_aabbs, .n_leaf_children = 1 }};
 
     // Pack BVH node/prim data tightly
-    std::vector<uint>      prims_packed(bvh.prims.size());
-    std::vector<NodePack0> nodes_0_packed(bvh.nodes.size()); // Partially compressed 8-way tlas
-    std::vector<NodePack1> nodes_1_packed(bvh.nodes.size()); // Partially compressed 8-way tlas
+    std::vector<uint>     prims_packed(bvh.prims.size());
+    std::vector<NodePack> nodes_packed(bvh.nodes.size()); // Compressed 8-way tlas nodes
   
     // Pack primitive data tightly
     #pragma omp parallel for
@@ -864,12 +819,11 @@ namespace met::detail {
     // Pack node data tightly
     #pragma omp parallel for
     for (int j = 0; j < bvh.nodes.size(); ++j) {
-      std::tie(nodes_0_packed[j], nodes_1_packed[j]) = pack_pair(bvh.nodes[j]);
+      nodes_packed[j] = pack(bvh.nodes[j]);
     }
 
     // Push BVH data to buffer
-    tlas_nodes_0 = {{ .data = cnt_span<const std::byte>(nodes_0_packed) }};
-    tlas_nodes_1 = {{ .data = cnt_span<const std::byte>(nodes_1_packed) }};
-    tlas_prims   = {{ .data = cnt_span<const std::byte>(prims_packed) }};
+    tlas_nodes = {{ .data = cnt_span<const std::byte>(nodes_packed) }};
+    tlas_prims = {{ .data = cnt_span<const std::byte>(prims_packed) }};
   }
 } // namespace met::detail

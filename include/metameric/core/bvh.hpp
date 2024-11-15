@@ -9,14 +9,35 @@ namespace met {
   // AABB representation used in cpu-side BVH
   struct AABB {
     eig::AlArray3f minb, maxb;
+
+  public:
+    // Abuse operator+ for reduce/fold
+    AABB operator+(const AABB &o) {
+      return { .minb = minb.cwiseMin(o.minb), .maxb = maxb.cwiseMax(o.maxb) };
+    }
   };
 
   template <uint K>
   struct BVH {
-    // BVH node representation; not for gpu-side packing
+    // BVH node representation; not for gpu-side packing, but
+    // preparing for this step either way
+    struct Node {
+      // Underlying type; true == leaf, false  == node
+      bool type;
+
+      // Range of <= K underlying child nodes or primitives
+      uint offset, size;
+
+      // Child data, only set if type is leaf
+      std::array<AABB, K> child_aabb; // AABB of <= K child node
+      std::array<bool, K> child_mask; // Mask of <= K is_leaf/!is_leaf
+    };
+    
+    /* // BVH node representation; not for gpu-side packing
     struct Node {
       // AABBs of children; is not set for leaves
       std::array<AABB, K> child_aabb;
+      std::array<bool, K> child_mask; // Mask of <= K is_leaf/!is_leaf
 
       // Offset into child nodes or primitives, overlapped with flag bit
       // to indicate leaves
@@ -26,7 +47,7 @@ namespace met {
       inline constexpr bool is_leaf() const { return offs_data & 0x80000000u;    }
       inline constexpr uint    offs() const { return offs_data & (~0x80000000u); }
       inline constexpr uint    size() const { return size_data;                  }
-    };
+    }; */
 
   public: // Internal BVH data
     std::vector<Node> nodes; // Tree structure of inner nodes and leaves

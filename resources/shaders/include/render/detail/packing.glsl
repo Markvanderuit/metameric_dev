@@ -19,17 +19,12 @@ struct PrimitivePack {
   uint padding[4]; // Aligned to 64 bytes
 };
 
-// Packed BVH node data, comprising child AABBs and traversal data
-// First part, node AABB at half precision, and traversal data
-struct BVHNode0Pack {
-  uint aabb_pack[3]; // lo.x, lo.y | hi.x, hi.y | lo.z, hi.z
-  uint data_pack;    // is_leaf | size | offs
-};
-
-// Second part, child AABBs, 8 bit precision
-struct BVHNode1Pack {
-  uint child_aabb0[8]; // 8 child aabbs: lo.x | lo.y | hi.x | hi.y
-  uint child_aabb1[4]; // 8 child aabbs: lo.z | hi.z
+// Packed BVH node data, comprising child AABBs and traversal data; 64 bytes
+struct BVHNodePack {
+  uint data;            // type 1b | child mask 8b | size 4b | offs 19b
+  uint aabb[3];         // lo.x, lo.y | hi.x, hi.y | lo.z, hi.z
+  uint child_aabb_0[8]; // 8 child aabbs: lo.x | lo.y | hi.x | hi.y
+  uint child_aabb_1[4]; // 8 child aabbs: lo.z | hi.z
 };
 
 float[8] unpack_snorm_8(in uvec4 p) {

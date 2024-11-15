@@ -72,9 +72,8 @@ layout(binding = 9) uniform b_buff_brdf_info {
 } buff_brdf_info;
 
 // Storage buffer declarations
-layout(binding = 0) restrict readonly buffer b_buff_blas_node0 { BVHNode0Pack data[];  } buff_blas_node0;
-layout(binding = 1) restrict readonly buffer b_buff_blas_node1 { BVHNode1Pack data[];  } buff_blas_node1;
-layout(binding = 2) restrict readonly buffer b_buff_blas_prim  { PrimitivePack data[]; } buff_blas_prim;
+layout(binding = 0) restrict readonly buffer b_buff_blas_node { BVHNodePack data[];   } buff_blas_node;
+layout(binding = 2) restrict readonly buffer b_buff_blas_prim { PrimitivePack data[]; } buff_blas_prim;
 layout(binding = 3) restrict coherent buffer b_buff_output { 
   uint head;
   uint padd[3]; /* align head to 16 bytes */ 
@@ -97,7 +96,7 @@ declare_scene_illuminant_data(b_illm_1f);
 declare_scene_emitter_data(buff_emitter_info.data, buff_emitter_info.n, buff_envmap_info);
 declare_scene_object_data(buff_objects.data, buff_objects.n);
 declare_scene_texture_data(buff_coef_info.data, buff_brdf_info.data, b_coef_4f, b_brdf_2f, b_bsis_1f);
-declare_scene_blas_data(buff_blas_prim.data, buff_blas_node0.data, buff_blas_node1.data, buff_blas_info.data);
+declare_scene_blas_data(buff_blas_prim.data, buff_blas_node.data, buff_blas_info.data);
 declare_path_data(buff_output.head, buff_output.data);
 
 // All includes from here on rely on the necessary buffers/samplers to be declared

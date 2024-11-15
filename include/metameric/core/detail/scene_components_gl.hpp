@@ -146,10 +146,9 @@ namespace met::detail {
     gl::Buffer mesh_elems; // Mesh elements data
 
     // Packed BLAS BVH data, used in render/query primitives
-    gl::Buffer blas_info;    // Per-mesh offsets into blas_nodes_* and blas_prims 
-    gl::Buffer blas_nodes_0; // Parent AABB and traversal data (is_leaf, size, offs)
-    gl::Buffer blas_nodes_1; // Child AABBs at 8 bits per child; requires parent AABB to unpack
-    gl::Buffer blas_prims;   // Packed mesh primitive data in bvh construction order
+    gl::Buffer blas_info;  // Per-mesh offsets into blas_nodes_* and blas_prims 
+    gl::Buffer blas_nodes; // Traversal data, parent AABB, and compressed child AABBS
+    gl::Buffer blas_prims; // Packed mesh primitive data in bvh construction order
 
     // CPU-side packed primitive data
     // Useful for ray interaction recovery that mirrors the gpu's packed version exactly
@@ -266,10 +265,9 @@ namespace met::detail {
     
   public:
     // Packed TLAS BVH data, used in render/ray query primitives
-    gl::Buffer tlas_info;    // Info object containing ray transforms
-    gl::Buffer tlas_nodes_0; // Parent AABB and traversal data (is_leaf, size, offs)
-    gl::Buffer tlas_nodes_1; // Child AABBs at 8 bits per child; requires parent AABB to unpack
-    gl::Buffer tlas_prims;   // Indices referring to underlying revelant BLAS structure
+    gl::Buffer tlas_info;  // Info object containing ray transforms
+    gl::Buffer tlas_nodes; // Traversal data, parent AABB, and compressed child AABBS
+    gl::Buffer tlas_prims; // Indices referring to underlying revelant BLAS structure
 
   public:
     // Class constructor

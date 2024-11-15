@@ -9,186 +9,190 @@
 #define blas_stck_init_value 0x01000000
 #define blas_stck_offset     24
 
+// BVH node data queries; operate on BVHNode::data
+uint node_get_offs(in uint node) { return bitfieldExtract(node, 0, 19);       }
+uint node_get_size(in uint node) { return bitfieldExtract(node, 19, 4);       }
+uint node_get_mask(in uint node) { return bitfieldExtract(node, 23, 8);       }
+bool node_is_leaf(in uint node)  { return bool(bitfieldExtract(node, 31, 1)); }
 
-// Unpack a compressed AABB for the node parent
-AABB unpack_parent_aabb(in BVHNode0Pack pack) {
-  return AABB(vec3(unpackUnorm2x16(pack.aabb_pack[0]), unpackUnorm2x16(pack.aabb_pack[2]).x),
-              vec3(unpackUnorm2x16(pack.aabb_pack[1]), unpackUnorm2x16(pack.aabb_pack[2]).y));
-}
-
-// Unpack a compressed AABB for the node parent
-AABB unpack_parent_aabb(in uint[3] pack) {
-  return AABB(vec3(unpackUnorm2x16(pack[0]), unpackUnorm2x16(pack[2]).x),
-              vec3(unpackUnorm2x16(pack[1]), unpackUnorm2x16(pack[2]).y));
-}
-
-// Query only the AABB of a specific node
-AABB get_blas_node_aabb(in uint i) {
-  return unpack_parent_aabb(scene_blas_node0(i).aabb_pack);
-}
-
-// Query only the data layout of a specific node
-uint get_blas_node_data(uint i) {
-  return scene_blas_node0(i).data_pack;
-}
-
-// BVH node data queries; operate on BVHNode0Pack
-bool node_is_leaf(in uint pack)  { return bool(pack & (1u << 31)); } // Is leaf or inner node
-uint node_get_offs(in uint pack) { return (pack & (~(0xF << 27))); } // Child node/primitive offset
-uint node_get_size(in uint pack) { return (pack >> 27) & 0xF;      } // Child node/primitive count
-bool node_is_leaf(in BVHNode0Pack node)  { return bool(node.data_pack & (1u << 31)); } // Is leaf or inner node
-uint node_get_offs(in BVHNode0Pack node) { return (node.data_pack & (~(0xF << 27))); } // Child node/primitive offset
-uint node_get_size(in BVHNode0Pack node) { return (node.data_pack >> 27) & 0xF;      } // Child node/primitive count
-
-// Unpack a compressed AABB for one of the 8 children of a given parent
-AABB unpack_child_aabb(in AABB parent_aabb, in BVHNode1Pack pack, in uint child_i) {
-  uint pack_0   = pack.child_aabb0[child_i];
-  uint pack_1   = pack.child_aabb1[child_i / 2] >> (bool(child_i % 2) ? 16 : 0);
-  vec4 unpack_0 = unpackUnorm4x8(pack_0);
-  vec4 unpack_1 = unpackUnorm4x8(pack_1);
-  return AABB(fma(vec3(unpack_0.xy, unpack_1.x), parent_aabb.maxb, parent_aabb.minb),
-              fma(vec3(unpack_0.zw, unpack_1.y), parent_aabb.maxb, parent_aabb.minb));
-}
-
-bool ray_intersect_bvh(inout Ray ray, in uint mesh_i) {
-  // Return value
-  bool hit = false;
+// Unpack and intersect <= 8 child node AABBs
+uint ray_intersect_aabb_mask(in Ray ray, in BVHNodePack pack) {
+  // Current node AABB surrounding child AABBs
+  AABB parent = AABB(vec3(unpackUnorm2x16(pack.aabb[0]), unpackUnorm2x16(pack.aabb[2]).x),
+                     vec3(unpackUnorm2x16(pack.aabb[1]), unpackUnorm2x16(pack.aabb[2]).y));
   
+  // Inverse of ray direction
+  vec3 d_rcp = 1.f / ray.d;
+
+  // Return value; bitmask where bits set which of <= 8 child nodes were hit
+  uint aabb_mask = 0u;
+
+  // Iterate children
+  for (uint child_i = 0; child_i < node_get_size(pack.data); child_i++) {
+    vec4 unpack_0 = unpackUnorm4x8(pack.child_aabb_0[child_i]);
+    vec4 unpack_1 = unpackUnorm4x8(pack.child_aabb_1[child_i / 2] >> (bool(child_i % 2) ? 16 : 0));
+
+    AABB child = AABB(fma(vec3(unpack_0.xy, unpack_1.x), parent.maxb, parent.minb),
+                      fma(vec3(unpack_0.zw, unpack_1.y), parent.maxb, parent.minb));
+
+    vec3 t_max = (child.maxb - ray.o) * d_rcp,
+         t_min = (child.minb - ray.o) * d_rcp;
+
+    if (d_rcp.x < 0.f) swap(t_min.x, t_max.x);
+    if (d_rcp.y < 0.f) swap(t_min.y, t_max.y);
+    if (d_rcp.z < 0.f) swap(t_min.z, t_max.z);
+
+    float t_in  = hmax(t_min), t_out = hmin(t_max);
+
+    // On closest hit (compared to initial ray distance), set child's bit in hit mask
+    if (t_out >= 0.f && t_in <= min(ray.t, t_out))
+      aabb_mask |= 1u << child_i;
+  }
+
+  return aabb_mask;
+}
+
+bool ray_intersect_blas(inout Ray ray, in uint mesh_i) {
   // Initiate small stack for traversal from root node
   // Stack values use 8 bits to flag nodes of interest, 
   // and 24 bits to store the offset to these nodes;
 #ifndef blas_stck
-  uint blas_stck[6];
+  uint blas_stck[5];
 #endif
   blas_stck[0] = blas_stck_init_value;
   
+  // Smaller leaf stack to improve primitive intersection coherency
+#ifndef leaf_stck
+  uint leaf_stck;
+#endif
+  leaf_stck = 0u;
+
+  // Return value
+  bool hit = false;
+
   // Continue traversal until stack is once again empty
   int stckc = 0; 
-  while (stckc >= 0) {
-    // Read next flagged bit and offset from stack, then remove flagged bit
-    int  node_bit  = findMSB(blas_stck[stckc] >> blas_stck_offset);
-    uint node_offs = blas_stck[stckc] & 0x00FFFFFF;
-    blas_stck[stckc] &= (~(1u << (blas_stck_offset + node_bit)));
+  while (stckc >= 0 || leaf_stck != 0u) {
+    // First, handle all entries on leaf stack until empty
+    while (leaf_stck != 0) {
+      // Read next flagged bit and offset from stack, then remove flagged bit
+      int leaf_bit = findMSB(leaf_stck >> blas_stck_offset);
+      leaf_stck = bitfieldInsert(leaf_stck, 0u, blas_stck_offset + leaf_bit, 1);
 
-    // If this was the last flagged bit, decrease stack count
-    if ((blas_stck[stckc] & 0xFF000000) == 0)
-      stckc--;
+      // Work out index of underlying primitive from node data
+      uint leaf_i = scene_blas_info(mesh_i).nodes_offs + (leaf_stck & 0x00FFFFFF) + leaf_bit;
+      uint prim_i = scene_blas_info(mesh_i).prims_offs + node_get_offs(scene_blas_node(leaf_i).data);
 
-    // Obtain next node parent data
-    uint node_i       = scene_blas_info(mesh_i).nodes_offs + node_offs + node_bit;
-    // BVHNode0Pack node = scene_blas_node0(node_i);
-    uint node = get_blas_node_data(node_i);
-
-    if (node_get_size(node) == 0) {
-      continue;
-    } else if (node_is_leaf(node)) {
-      // Iterate the node's primitives
-      uint prim_begin = scene_blas_info(mesh_i).prims_offs + node_get_offs(node);
-      for (uint prim_i = prim_begin; 
-                prim_i < prim_begin + node_get_size(node);
-              ++prim_i) {
-        // Obtain and unpack next prim, then test against it
-        Triangle prim = unpack_triangle(scene_blas_prim(prim_i));
-        if (ray_intersect(ray, prim)) {
-          // Store primitive index on a hit
-          record_set_object_primitive(ray.data, prim_i);
-          hit = true;
-        }
+      // Obtain next prim, then test against it; store primitive index on a hit
+      if (ray_intersect(ray, unpack_triangle(scene_blas_prim(prim_i)))) {
+        record_set_object_primitive(ray.data, prim_i);
+        hit = true;
       }
-    } else {
-      // Load packed node child data
-      AABB         parent_aabb = get_blas_node_aabb(node_i);
-      BVHNode1Pack children    = scene_blas_node1(node_i);
-      // AABB         parent_aabb = unpack_parent_aabb(node);
-
-      // Bitmask, initialized to all false
-      uint mask = 0;
-
-      // Iterate the node's children
-      for (uint child_i = 0;
-                child_i < node_get_size(node);
-              ++child_i) {
-        // Unpack the next child, then test against it; 
-        // on a hit, we flag its index in the bitmask
-        AABB child_aabb = unpack_child_aabb(parent_aabb, children, child_i);
-        if (ray_intersect_any(ray, child_aabb))
-          mask |= 1u << child_i;
-      } // for (uint i)
-
-      // If any children were flagged in the mask, push the child offset + mask on the stack
-      if (mask != 0)
-        blas_stck[++stckc] = (mask << blas_stck_offset) | node_get_offs(node);
+      
+      // If this was the last flagged bit, clear leaf stack
+      if ((leaf_stck & 0xFF000000) == 0)
+        leaf_stck = 0;
     }
-  } // while (stckc >= 0)
+
+    // Then, handle next entry on node stack
+    if (stckc >= 0) {
+      // Read next flagged node bit and offset from stack, then remove flagged bit
+      int node_bit = findMSB(blas_stck[stckc] >> blas_stck_offset);
+      blas_stck[stckc] = bitfieldInsert(blas_stck[stckc], 0u, blas_stck_offset + node_bit, 1);
+
+      // Obtain next node parent data
+      uint node_i = scene_blas_info(mesh_i).nodes_offs + (blas_stck[stckc] & 0x00FFFFFF) + node_bit;
+      uint node   = scene_blas_node(node_i).data;
+
+      // If this was the last flagged bit, decrease stack count
+      if ((blas_stck[stckc] & 0xFF000000) == 0)
+        stckc--;
+
+      // Intersect against node children, build intersection mask
+      uint aabb_mask = ray_intersect_aabb_mask(ray, scene_blas_node(node_i));
+      if (aabb_mask != 0u) {
+        // If any children were hit, push the child offset + mask on the stack;
+        // we separate and push the mask into node and leaf stacks
+        uint node_mask = (aabb_mask & ~node_get_mask(node)), 
+             leaf_mask = (aabb_mask & node_get_mask(node));
+        if (node_mask != 0)
+          blas_stck[++stckc] = (node_mask << blas_stck_offset) | node_get_offs(node);
+        if (leaf_mask != 0)
+          leaf_stck = (leaf_mask << blas_stck_offset) | node_get_offs(node);
+      }
+    }
+  } // while (...)
 
   return hit;
 }
 
-bool ray_intersect_bvh_any(in Ray ray, in uint mesh_i) {
+bool ray_intersect_blas_any(in Ray ray, in uint mesh_i) {
   // Initiate small stack for traversal from root node
   // Stack values use 8 bits to flag nodes of interest, 
   // and 24 bits to store the offset to these nodes;
-  // uvec4 blas_stck = { blas_stck_init_value, 0, 0, 0 };
 #ifndef blas_stck
-  uint blas_stck[6];
+  uint blas_stck[5];
 #endif
   blas_stck[0] = blas_stck_init_value;
+  
+  // Smaller leaf stack to improve primitive intersection coherency
+#ifndef leaf_stck
+  uint leaf_stck;
+#endif
+  leaf_stck = 0u;
 
   // Continue traversal until stack is once again empty
   int stckc = 0; 
-  while (stckc >= 0) {
-    // Read next flagged bit and offset from stack, then remove flagged bit
-    int  node_bit  = findMSB(blas_stck[stckc] >> blas_stck_offset);
-    uint node_offs = blas_stck[stckc] & 0x00FFFFFF;
-    blas_stck[stckc] &= (~(1u << (blas_stck_offset + node_bit)));
+  while (stckc >= 0 || leaf_stck != 0u) {
+    // First, handle all entries on leaf stack until empty
+    while (leaf_stck != 0) {
+      // Read next flagged bit and offset from stack, then remove flagged bit
+      int leaf_bit = findMSB(leaf_stck >> blas_stck_offset);
+      leaf_stck = bitfieldInsert(leaf_stck, 0u, blas_stck_offset + leaf_bit, 1);
 
-    // If this was the last flagged bit, decrease stack count
-    if ((blas_stck[stckc] & 0xFF000000) == 0)
-      stckc--;
+      // Work out index of underlying primitive from node data
+      uint leaf_i = scene_blas_info(mesh_i).nodes_offs + (leaf_stck & 0x00FFFFFF) + leaf_bit;
+      uint prim_i = scene_blas_info(mesh_i).prims_offs + node_get_offs(scene_blas_node(leaf_i).data);
 
-    // Obtain next node parent data
-    uint node_i       = scene_blas_info(mesh_i).nodes_offs + node_offs + node_bit;
-    BVHNode0Pack node = scene_blas_node0(node_i);
-
-    if (node_get_size(node) == 0) {
-      continue;
-    } else if (node_is_leaf(node)) {
-      // Iterate the node's primitives
-      uint prim_begin = scene_blas_info(mesh_i).prims_offs + node_get_offs(node);
-      for (uint prim_i = prim_begin; 
-                prim_i < prim_begin + node_get_size(node);
-              ++prim_i) {
-        // Obtain and unpack next prim, then test against it
-        Triangle prim = unpack_triangle(scene_blas_prim(prim_i));
-        if (ray_intersect(ray, prim)) {
-          return true;
-        }
-      }
-    } else {
-      // Load packed node child data
-      AABB         parent_aabb = unpack_parent_aabb(node);
-      BVHNode1Pack children    = scene_blas_node1(node_i);
-
-      // Bitmask, initialized to all false
-      uint mask = 0;
-
-      // Iterate the node's children
-      for (uint child_i = 0;
-                child_i < node_get_size(node);
-              ++child_i) {
-        // Unpack the next child, then test against it; 
-        // on a hit, we flag its index in the bitmask
-        AABB child_aabb = unpack_child_aabb(parent_aabb, children, child_i);
-        if (ray_intersect_any(ray, child_aabb))
-          mask |= 1u << child_i;
-      } // for (uint i)
-
-      // If any children were flagged in the mask, push the child offset + mask on the stack
-      if (mask != 0)
-        blas_stck[++stckc] = (mask << blas_stck_offset) | node_get_offs(node);
+      // Obtain next prim, then test against it; exit on hit
+      if (ray_intersect(ray, unpack_triangle(scene_blas_prim(prim_i))))
+        return true;
+      
+      // If this was the last flagged bit, clear leaf stack
+      if ((leaf_stck & 0xFF000000) == 0)
+        leaf_stck = 0;
     }
-  } // while (stckc >= 0)
 
+    // Then, handle next entry on node stack
+    if (stckc >= 0) {
+      // Read next flagged node bit and offset from stack, then remove flagged bit
+      int node_bit = findMSB(blas_stck[stckc] >> blas_stck_offset);
+      blas_stck[stckc] = bitfieldInsert(blas_stck[stckc], 0u, blas_stck_offset + node_bit, 1);
+
+      // Obtain next node parent data
+      uint node_i = scene_blas_info(mesh_i).nodes_offs + (blas_stck[stckc] & 0x00FFFFFF) + node_bit;
+      uint node   = scene_blas_node(node_i).data;
+
+      // If this was the last flagged bit, decrease stack count
+      if ((blas_stck[stckc] & 0xFF000000) == 0)
+        stckc--;
+
+      // Intersect against node children, build intersection mask
+      uint aabb_mask = ray_intersect_aabb_mask(ray, scene_blas_node(node_i));
+      if (aabb_mask != 0u) {
+        // If any children were hit, push the child offset + mask on the stack;
+        // we separate and push the mask into node and leaf stacks
+        uint node_mask = (aabb_mask & ~node_get_mask(node)), 
+             leaf_mask = (aabb_mask & node_get_mask(node));
+        if (node_mask != 0)
+          blas_stck[++stckc] = (node_mask << blas_stck_offset) | node_get_offs(node);
+        if (leaf_mask != 0)
+          leaf_stck = (leaf_mask << blas_stck_offset) | node_get_offs(node);
+      }
+    }
+  } // while (...)
+
+  // No hit
   return false;
 }
 

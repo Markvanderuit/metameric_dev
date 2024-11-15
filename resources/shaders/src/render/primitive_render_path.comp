@@ -79,12 +79,10 @@ layout(binding = 10) uniform b_buff_brdf_info {
 } buff_brdf_info;
 
 // Storage buffer declarations
-layout(binding = 0) restrict readonly buffer b_buff_blas_node0 { BVHNode0Pack  data[]; } buff_blas_node0;
-layout(binding = 1) restrict readonly buffer b_buff_blas_node1 { BVHNode1Pack  data[]; } buff_blas_node1;
-layout(binding = 2) restrict readonly buffer b_buff_blas_prim  { PrimitivePack data[]; } buff_blas_prim;
-layout(binding = 3) restrict readonly buffer b_buff_tlas_node0 { BVHNode0Pack  data[]; } buff_tlas_node0;
-layout(binding = 4) restrict readonly buffer b_buff_tlas_node1 { BVHNode1Pack  data[]; } buff_tlas_node1;
-layout(binding = 5) restrict readonly buffer b_buff_tlas_prim  { uint          data[]; } buff_tlas_prim;
+layout(binding = 0) restrict readonly buffer b_buff_blas_node { BVHNodePack   data[]; } buff_blas_node;
+layout(binding = 2) restrict readonly buffer b_buff_blas_prim { PrimitivePack data[]; } buff_blas_prim;
+layout(binding = 3) restrict readonly buffer b_buff_tlas_node { BVHNodePack   data[]; } buff_tlas_node;
+layout(binding = 5) restrict readonly buffer b_buff_tlas_prim { uint          data[]; } buff_tlas_prim;
 
 // Texture/image units, ergo samplers and output images
 layout(binding = 0)          uniform sampler1DArray   b_illm_1f; // Illuminant function data, 1 component
@@ -119,14 +117,16 @@ shared BLASInfo _blas_info[met_max_meshes];
 // per 256 invocs; 64b
 shared TLASInfo _tlas_info;
 
-// BLAS stack lives in shared memory
+// BLAS stacks live in shared memory
 // per 256 invocs; 6kb
-shared uint _blas_stack[gl_WorkGroupSize.x * gl_WorkGroupSize.y * gl_WorkGroupSize.z][6];
+shared uint _blas_stack[gl_WorkGroupSize.x * gl_WorkGroupSize.y * gl_WorkGroupSize.z][5];
 #define blas_stck _blas_stack[gl_LocalInvocationIndex]
+// shared uint _leaf_stack[gl_WorkGroupSize.x * gl_WorkGroupSize.y * gl_WorkGroupSize.z];
+// #define leaf_stck _leaf_stack[gl_LocalInvocationIndex]
 
-// // TLAS stack lives in shared memory
-// // per 256 invocs; 3kb
-// shared uint _tlas_stack[gl_WorkGroupSize.x * gl_WorkGroupSize.y * gl_WorkGroupSize.z][3];
+// TLAS stack lives in shared memory
+// per 256 invocs; 3kb
+// shared uint _tlas_stack[gl_WorkGroupSize.x * gl_WorkGroupSize.y * gl_WorkGroupSize.z][2];
 // #define tlas_stck _tlas_stack[gl_LocalInvocationIndex]
 
 // Declare scene data; creates functions to access and interact with
@@ -138,8 +138,8 @@ declare_scene_illuminant_data(b_illm_1f);
 declare_scene_emitter_data(buff_emitter_info.data, buff_emitter_info.n, buff_envmap_info);
 declare_scene_object_data(buff_objects.data, buff_objects.n);
 declare_scene_texture_data(buff_coef_info.data, buff_brdf_info.data, b_coef_4f, b_brdf_2f, b_bsis_1f);
-declare_scene_blas_data(buff_blas_prim.data, buff_blas_node0.data, buff_blas_node1.data, _blas_info);
-// declare_scene_tlas_data(buff_tlas_prim.data, buff_tlas_node0.data, buff_tlas_node1.data, _tlas_info);
+declare_scene_blas_data(buff_blas_prim.data, buff_blas_node.data, _blas_info);
+// declare_scene_tlas_data(buff_tlas_prim.data, buff_tlas_node.data, _tlas_info);
 
 // All includes from here on out require scene data to be declared above;
 // scene data that was not declared is default-set in defaults.glsl
@@ -241,6 +241,7 @@ ivec2 xy() {
 }
 
 void main() {
+  // Preload some objects into shared memory
   load_shared();
 
   // Take spp_per_iter samples and add to target measure
