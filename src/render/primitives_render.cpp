@@ -353,6 +353,10 @@ namespace met {
       program.bind("b_buff_blas_node0", scene.resources.meshes.gl.blas_nodes_0);
       program.bind("b_buff_blas_node1", scene.resources.meshes.gl.blas_nodes_1);
       program.bind("b_buff_blas_prim",  scene.resources.meshes.gl.blas_prims);
+      program.bind("b_buff_tlas_info",  scene.gl.tlas_info);
+      program.bind("b_buff_tlas_node0", scene.gl.tlas_nodes_0);
+      program.bind("b_buff_tlas_node1", scene.gl.tlas_nodes_1);
+      program.bind("b_buff_tlas_prim",  scene.gl.tlas_prims);
     }
 
     // Dispatch compute shader

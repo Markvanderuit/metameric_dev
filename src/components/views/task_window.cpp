@@ -37,7 +37,7 @@ namespace met {
       met_trace_full();
       
       // Open a file picker
-      if (fs::path path; detail::load_dialog(path, "json")) {
+      if (fs::path path; detail::load_dialog(path, { "json" })) {
         // Initialize existing project
         info.global("scene").getw<Scene>().load(path);
 
@@ -54,7 +54,7 @@ namespace met {
 
     bool handle_save_as(SchedulerHandle &info) {
       met_trace_full();
-      if (fs::path path; detail::save_dialog(path, "json")) {
+      if (fs::path path; detail::save_dialog(path, { "json" })) {
         info.global("scene").getw<Scene>().save(path);
         return true;
       }
@@ -182,14 +182,14 @@ namespace met {
 
         if (ImGui::BeginMenu("Import", is_loaded)) {
           if (ImGui::MenuItem("Wavefront (.obj)")) {
-            if (fs::path path; detail::load_dialog(path, "obj")) {
+            if (fs::path path; detail::load_dialog(path, { "obj" })) {
               auto &e_scene = info.global("scene").getw<Scene>();
               e_scene.import_scene(io::load_obj(path));
             }
           }
 
           if (ImGui::MenuItem("Image (.exr, .png, .jpg, ...)")) {
-            if (fs::path path; detail::load_dialog(path, "exr,png,jpg,jpeg,bmp")) {
+            if (fs::path path; detail::load_dialog(path, { "exr, png, jpg, jpeg, bmp" })) {
               auto &e_scene = info.global("scene").getw<Scene>();
               e_scene.resources.images.emplace(path.filename().string(), {{ .path = path  }});
             }
@@ -254,7 +254,7 @@ namespace met {
     }
     
     // Create an explicit dock space over the entire window's viewport, excluding the menu bar
-    ImGui::DockSpaceOverViewport(ImGui::GetMainViewport(), ImGuiDockNodeFlags_PassthruCentralNode);
+    ImGui::DockSpaceOverViewport(0, ImGui::GetMainViewport(), ImGuiDockNodeFlags_PassthruCentralNode);
 
     // Spawn close modal
     if (m_open_close_modal)  { 

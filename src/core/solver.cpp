@@ -77,9 +77,10 @@ namespace nlopt {
 
       // Placeholder for 'x' because the library enforces std::vector :S
       std::vector<double> x(range_iter(info.x_init));
+      double o;
 
       try {
-        result.code = desc.optimize(x, result.objective);
+        result.second = desc.optimize(x, o);
       } catch (const nlopt::roundoff_limited &e) {
         // ... fails silently for now
       } catch (const nlopt::forced_stop &e) {
@@ -89,7 +90,7 @@ namespace nlopt {
       }
 
       // Copy over potential solution to return value
-      rng::copy(x, result.x.begin());
+      rng::copy(x, result.first.begin());
     } // optimize
 
     return result;

@@ -261,8 +261,8 @@ namespace met::detail {
     // Block layout for std140 uniform buffer
     struct alignas(16) TLASInfoBufferLayout {
       alignas(16) eig::Matrix4f trf;
-      alignas(16) eig::Matrix4f inv;
     } *m_tlas_info_map;
+    static_assert(sizeof(TLASInfoBufferLayout) == 64u);
     
   public:
     // Packed TLAS BVH data, used in render/ray query primitives

@@ -49,7 +49,6 @@ namespace met::detail {
   };
   static_assert(sizeof(NodePack1) == 48);
 
-
   struct NodePack {
     uint aabb_pack_0;                 // lo.x, lo.y
     uint aabb_pack_1;                 // hi.x, hi.y
@@ -773,8 +772,8 @@ namespace met::detail {
     };
     std::vector<PrimitiveData> prims;
 
-    // Collect object data
-    for (uint i = 0; i < objects.size(); ++i) {
+    // Collect object data and AABB
+    for (int i = 0; i < objects.size(); ++i) {
       const auto &[object, state] = objects[i];
       guard_continue(object.is_active);
 
@@ -785,11 +784,13 @@ namespace met::detail {
       auto mesh_trf   = scene.resources.meshes.gl.unit_transforms[object.mesh_i];
       auto trf        = (object_trf * mesh_trf).eval();
 
-      prims.push_back({ .is_object = true, .i = i, .aabb = generate_rotated_aabb(trf) });
+      prims.push_back({ .is_object = true, 
+                        .i         = static_cast<uint>(i), 
+                        .aabb      = generate_rotated_aabb(trf) });
     }
 
-    // Collect emitter data
-    for (uint i = 0; i < emitters.size(); ++i) {
+    // Collect emitter data and AABB
+    for (int i = 0; i < emitters.size(); ++i) {
       const auto &[emitter, state] = emitters[i];
       guard_continue(emitter.is_active);
       guard_continue(emitter.type != Emitter::Type::eConstant && emitter.type != Emitter::Type::ePoint);
@@ -807,7 +808,9 @@ namespace met::detail {
         aabb = generate_rotated_aabb((trf.matrix() * transl).matrix().eval());
       }
 
-      prims.push_back({ .is_object = false, .i = i, .aabb = aabb });
+      prims.push_back({ .is_object = false,
+                        .i         = static_cast<uint>(i), 
+                        .aabb      = aabb });
     }
 
     // Get vector of AABBs only
@@ -837,17 +840,11 @@ namespace met::detail {
       });
 
     // Push transformations to buffer
-    m_tlas_info_map->trf = trf.inverse().eval();
-    m_tlas_info_map->inv = trf;
+    m_tlas_info_map->trf = trf;
     tlas_info.flush();
     
     // Create top-level BVH over AABBS
     BVH<8> bvh = {{ .aabb = prim_aabbs, .n_leaf_children = 1 }};
-
-    // Small helper to pack primitive data in a single integer
-    constexpr auto pack_prim = [](const PrimitiveData &prim) -> uint {
-      return (prim.is_object ? 0x00000000 : 0x80000000) | (prim.i & 0x00FFFFFF);
-    };
 
     // Pack BVH node/prim data tightly
     std::vector<uint>      prims_packed(bvh.prims.size());
@@ -856,23 +853,18 @@ namespace met::detail {
   
     // Pack primitive data tightly
     #pragma omp parallel for
-    for (int j = 0; j < bvh.prims.size(); ++j)
-      prims_packed[j] = pack_prim(prims[j]);
+    for (int j = 0; j < bvh.prims.size(); ++j) {
+      // Small helper to pack primitive data in a single integer
+      constexpr auto pack_prim = [](const PrimitiveData &prim) -> uint {
+        return (prim.is_object ? 0x00000000 : 0x80000000) | (prim.i & 0x00FFFFFF);
+      };
+      prims_packed[j] = pack_prim(prims[bvh.prims[j]]);
+    }
 
     // Pack node data tightly
     #pragma omp parallel for
-    for (int j = 0; j < bvh.nodes.size(); ++j)
-      std::tie(nodes_0_packed[j], 
-               nodes_1_packed[j]) = pack_pair(bvh.nodes[j]);
-
-    fmt::print("TLAS\n");
-    for (const auto &node : bvh.nodes) {
-      fmt::print("{} : {} -> {}\n", node.is_leaf(), node.offs(), node.offs() + node.size());
-      guard_continue(node.is_leaf());
-      std::vector<uint> idx;
-      for (uint i = node.offs(); i < node.offs() + node.size(); ++i)
-        idx.push_back(prims[i].i);
-      fmt::print("\tidx: {}\n", idx);
+    for (int j = 0; j < bvh.nodes.size(); ++j) {
+      std::tie(nodes_0_packed[j], nodes_1_packed[j]) = pack_pair(bvh.nodes[j]);
     }
 
     // Push BVH data to buffer

@@ -1,14 +1,12 @@
 #ifndef SCENE_GLSL_GUARD
 #define SCENE_GLSL_GUARD
 
-#include <render/blas.glsl>
-#include <render/emitter.glsl>
-#include <render/object.glsl>
+#include <render/tlas.glsl>
 
 bool scene_intersect(inout Ray ray) {
-  // Generate ray local to TLAS, then forward original ray and local ray to intersection test
-  // ray_intersect_tlas(ray, ray_transform(ray, scene_info().trf_inv));
-
+#ifdef SCENE_DATA_TLAS
+  return ray_intersect_tlas(ray);
+#else // SCENE_DATA_TLAS
   // Alternatively; loop all objects
   for (uint i = 0; i < scene_object_count(); ++i) {
     ray_intersect_object(ray, i);
@@ -17,11 +15,13 @@ bool scene_intersect(inout Ray ray) {
     ray_intersect_emitter(ray, i);
   }
   return is_valid(ray);
+#endif // SCENE_DATA_TLAS
 }
 
 bool scene_intersect_any(in Ray ray) {
-  // return ray_intersect_tlas_any(ray, ray_transform(ray, scene_info().trf_inv));
-
+#ifdef SCENE_DATA_TLAS
+  return ray_intersect_tlas_any(ray);
+#else // SCENE_DATA_TLAS
   // Alternatively; loop all objects
   for (uint i = 0; i < scene_object_count(); ++i) {
     if (ray_intersect_object_any(ray, i))
@@ -32,6 +32,7 @@ bool scene_intersect_any(in Ray ray) {
       return true;
   }
   return false;
+#endif // SCENE_DATA_TLAS
 }
 
 #endif // SCENE_GLSL_GUARD

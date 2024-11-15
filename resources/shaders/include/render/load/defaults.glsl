@@ -10,18 +10,18 @@
 #include <render/detail/path_types.glsl>
 
 #ifndef SCENE_DATA_BLAS
+BLASInfo      scene_blas_info(uint i)  { BLASInfo d; return d;      }
 PrimitivePack scene_blas_prim(uint i)  { PrimitivePack d; return d; }
 BVHNode0Pack  scene_blas_node0(uint i) { BVHNode0Pack d; return d;  } 
 BVHNode1Pack  scene_blas_node1(uint i) { BVHNode1Pack d; return d;  } 
-BLASInfo      scene_blas_info(uint i)  { BLASInfo d; return d;      }
 #endif // !SCENE_DATA_BLAS
 
-// #ifndef SCENE_DATA_TLAS
-// uint         scene_tlas_prim(uint i)  { return 0;                 }
-// BVHNode0Pack scene_tlas_node0(uint i) { BVHNode0Pack d; return d; } 
-// BVHNode1Pack scene_tlas_node1(uint i) { BVHNode1Pack d; return d; } 
-// TLASInfo     scene_tlas_info(uint i)  { TLASInfo d; return d;     }
-// #endif // !SCENE_DATA_TLAS
+#ifndef SCENE_DATA_TLAS
+TLASInfo     scene_tlas_info()        { TLASInfo d; return d;     }
+uint         scene_tlas_prim(uint i)  { return 0;                 }
+BVHNode0Pack scene_tlas_node0(uint i) { BVHNode0Pack d; return d; } 
+BVHNode1Pack scene_tlas_node1(uint i) { BVHNode1Pack d; return d; } 
+#endif // !SCENE_DATA_TLAS
 
 #ifndef SCENE_DATA_EMITTER
 EmitterInfo scene_emitter_info(uint i) { EmitterInfo d; return d; }

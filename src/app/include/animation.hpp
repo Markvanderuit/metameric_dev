@@ -149,7 +149,9 @@ namespace met::anim {
         }
 
         // Apply interpolation
-        m_data.handle.set_mismatch_position(m_data.values[0] + (m_data.values[1] - m_data.values[0]) * y);
+        Colr colr = m_data.values[0] + (m_data.values[1] - m_data.values[0]) * y;
+        fmt::print("{}\n", colr);
+        m_data.handle.set_mismatch_position(colr);
 
         return 0;
       }

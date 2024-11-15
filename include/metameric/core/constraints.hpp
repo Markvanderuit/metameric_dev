@@ -131,8 +131,7 @@ namespace met {
     bool operator==(const DirectSurfaceConstraint &o) const;
   };
   static_assert(is_linear_constraint<DirectSurfaceConstraint>);
-
-
+  
   // Constraint imposing specific color reproduction under a known illuminant,
   // accounting for nonlinear interreflections as well as linear constraints. 
   // The interreflection system is based on measured light transport data from a scene surface.

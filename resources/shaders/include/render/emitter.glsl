@@ -97,9 +97,10 @@ float pdf_emitters(in SurfaceInfo si, in vec4 wvls) {
   return pdf_emitter(si) * pdf_emitters_discrete(record_get_emitter(si.data));
 }
 
-void ray_intersect_emitter(inout Ray ray, in uint emitter_i) {
+bool ray_intersect_emitter(inout Ray ray, in uint emitter_i) {
   EmitterInfo em = scene_emitter_info(emitter_i);
-  guard(em.is_active);
+  if (!em.is_active)
+    return false;
 
   // Run intersection; flag result
   bool hit;
@@ -116,6 +117,8 @@ void ray_intersect_emitter(inout Ray ray, in uint emitter_i) {
   // Store emitter id in ray data on a closest hit
   if (hit)
     record_set_emitter(ray.data, emitter_i);
+  
+  return hit;
 }
 
 bool ray_intersect_emitter_any(in Ray ray, in uint emitter_i) {

@@ -69,7 +69,7 @@ find_package(NLopt     CONFIG REQUIRED)
 find_package(Qhull     CONFIG REQUIRED)
 find_package(tinyexr   CONFIG REQUIRED)
 find_package(Tracy     CONFIG REQUIRED)
-find_package(unofficial-nativefiledialog CONFIG REQUIRED)
+find_package(nfd       CONFIG REQUIRED)
 find_package(ZLIB      REQUIRED)
 find_package(embree    CONFIG REQUIRED)
 
@@ -126,7 +126,7 @@ set(component_dependencies
   imgui::imgui
   imguizmo::imguizmo
   implot::implot
-  unofficial::nativefiledialog::nfd
+  nfd::nfd
 )
 if(OpenMP_CXX_FOUND)
   list(APPEND core_dependencies OpenMP::OpenMP_CXX)
@@ -209,11 +209,11 @@ target_link_libraries(metameric_editor PRIVATE core render components)
 find_package(avcpp CONFIG REQUIRED)
 add_executable(ffw_video src/app/ffw_video.cpp)
 target_compile_features(ffw_video PUBLIC cxx_std_23)
-target_link_libraries(ffw_video PRIVATE core render components avcpp::FFmpeg avcpp::avcpp-static)
+target_link_libraries(ffw_video PRIVATE core render components avcpp::FFmpeg avcpp::avcpp)
 target_include_directories(ffw_video PRIVATE src/app/include)
 add_executable(presentation_videos src/app/presentation_videos.cpp)
 target_compile_features(presentation_videos PUBLIC cxx_std_23)
-target_link_libraries(presentation_videos PRIVATE core render components avcpp::FFmpeg avcpp::avcpp-static)
+target_link_libraries(presentation_videos PRIVATE core render components avcpp::FFmpeg avcpp::avcpp)
 target_include_directories(presentation_videos PRIVATE src/app/include)
 
 # Optionally setup Catch2 tests

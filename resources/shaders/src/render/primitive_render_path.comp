@@ -1,6 +1,7 @@
 #include <preamble.glsl>
 #include <sampler/uniform.glsl>
 #include <render/load/blas.glsl>
+// #include <render/load/tlas.glsl>
 #include <render/load/emitter.glsl>
 #include <render/load/object.glsl>
 #include <render/load/cmfs.glsl>
@@ -51,33 +52,39 @@ layout(binding = 3) uniform b_buff_blas_info {
   uint n;
   BLASInfo data[met_max_meshes];
 } buff_blas_info;
-layout(binding = 4) uniform b_buff_emitter_info {
+layout(binding = 4) uniform b_buff_tlas_info {
+  TLASInfo data;
+} buff_tlas_info;
+layout(binding = 5) uniform b_buff_emitter_info {
   uint n;
   EmitterInfo data[met_max_emitters];
 } buff_emitter_info;
-layout(binding = 5) uniform b_buff_wvls_distr {
+layout(binding = 6) uniform b_buff_wvls_distr {
   WavelengthDistribution data;
 } buff_wvls_distr;
-layout(binding = 6) uniform b_buff_emitters_distr {
+layout(binding = 7) uniform b_buff_emitters_distr {
   EmitterDistribution data;
 } buff_emitters_distr;
-layout(binding = 7) uniform b_buff_envmap_info {
+layout(binding = 8) uniform b_buff_envmap_info {
   bool envm_is_present;
   uint envm_i;
 } buff_envmap_info;
-layout(binding = 8) uniform b_buff_coef_info {
+layout(binding = 9) uniform b_buff_coef_info {
   uint n;
   AtlasInfo data[met_max_textures];
 } buff_coef_info;
-layout(binding = 9) uniform b_buff_brdf_info {
+layout(binding = 10) uniform b_buff_brdf_info {
   uint n;
   AtlasInfo data[met_max_textures];
 } buff_brdf_info;
 
 // Storage buffer declarations
-layout(binding = 0) restrict readonly buffer b_buff_blas_node0 { BVHNode0Pack data[]; } buff_blas_node0;
-layout(binding = 1) restrict readonly buffer b_buff_blas_node1 { BVHNode1Pack data[]; } buff_blas_node1;
+layout(binding = 0) restrict readonly buffer b_buff_blas_node0 { BVHNode0Pack  data[]; } buff_blas_node0;
+layout(binding = 1) restrict readonly buffer b_buff_blas_node1 { BVHNode1Pack  data[]; } buff_blas_node1;
 layout(binding = 2) restrict readonly buffer b_buff_blas_prim  { PrimitivePack data[]; } buff_blas_prim;
+layout(binding = 3) restrict readonly buffer b_buff_tlas_node0 { BVHNode0Pack  data[]; } buff_tlas_node0;
+layout(binding = 4) restrict readonly buffer b_buff_tlas_node1 { BVHNode1Pack  data[]; } buff_tlas_node1;
+layout(binding = 5) restrict readonly buffer b_buff_tlas_prim  { uint          data[]; } buff_tlas_prim;
 
 // Texture/image units, ergo samplers and output images
 layout(binding = 0)          uniform sampler1DArray   b_illm_1f; // Illuminant function data, 1 component
@@ -106,6 +113,22 @@ shared vec4   s_bucket_basis[n_wvl_buckets][wavelength_bases]; // Bucket of basi
 shared vec4   s_bucket_illm[n_wvl_buckets][met_max_emitters];
 shared mat4x3 s_bucket_cmfs[n_wvl_buckets]; */
 
+// Per 256 invocs; 256b
+shared BLASInfo _blas_info[met_max_meshes];
+
+// per 256 invocs; 64b
+shared TLASInfo _tlas_info;
+
+// BLAS stack lives in shared memory
+// per 256 invocs; 6kb
+shared uint _blas_stack[gl_WorkGroupSize.x * gl_WorkGroupSize.y * gl_WorkGroupSize.z][6];
+#define blas_stck _blas_stack[gl_LocalInvocationIndex]
+
+// // TLAS stack lives in shared memory
+// // per 256 invocs; 3kb
+// shared uint _tlas_stack[gl_WorkGroupSize.x * gl_WorkGroupSize.y * gl_WorkGroupSize.z][3];
+// #define tlas_stck _tlas_stack[gl_LocalInvocationIndex]
+
 // Declare scene data; creates functions to access and interact with
 // scene data without knowing the exact names of buffers, textures, etc
 declare_distr_sampler(wavelength, buff_wvls_distr.data, wavelength_samples);
@@ -115,30 +138,25 @@ declare_scene_illuminant_data(b_illm_1f);
 declare_scene_emitter_data(buff_emitter_info.data, buff_emitter_info.n, buff_envmap_info);
 declare_scene_object_data(buff_objects.data, buff_objects.n);
 declare_scene_texture_data(buff_coef_info.data, buff_brdf_info.data, b_coef_4f, b_brdf_2f, b_bsis_1f);
-declare_scene_blas_data(buff_blas_prim.data, buff_blas_node0.data, buff_blas_node1.data, buff_blas_info.data);
+declare_scene_blas_data(buff_blas_prim.data, buff_blas_node0.data, buff_blas_node1.data, _blas_info);
+// declare_scene_tlas_data(buff_tlas_prim.data, buff_tlas_node0.data, buff_tlas_node1.data, _tlas_info);
 
 // All includes from here on out require scene data to be declared above;
 // scene data that was not declared is default-set in defaults.glsl
 #include <render/path.glsl>
 
 // Preload object/mesh/emitter/texture info objects into shared memory
-/* void load_shared() {
-  // Step size for the coming loads
+void load_shared() {
   const uint iter = hprod(gl_WorkGroupSize.xyz);
 
-  // Stride across the different objects/meshes/emitters
-  for (uint i = gl_LocalInvocationIndex; i < buff_emitter_info.n; i += iter) 
-    s_emtr_info[i] = buff_emitter_info.data[i];
-  // for (uint i = gl_LocalInvocationIndex; i < buff_objects.n; i += iter)  
-  //   s_objc_info[i] = buff_objects.data[i];
-  // for (uint i = gl_LocalInvocationIndex; i < buff_blas_info.n; i += iter)   
-  //   s_mesh_info[i] = buff_blas_info.data[i];
-  // for (uint i = gl_LocalInvocationIndex; i < buff_coef_infofs.n; i += iter) 
-  //   s_coef_info[i] = buff_coef_infofs.data[i];
+  for (uint i = gl_LocalInvocationIndex; i < buff_blas_info.n; i += iter)
+    _blas_info[i] = buff_blas_info.data[i];
+  if (gl_LocalInvocationIndex == 0)
+    _tlas_info = buff_tlas_info.data;
 
   memoryBarrierShared();
   barrier();
-} */
+}
 
 // Pre-sample set of n wavelength datas into shared memory
 /* void load_wvl_buckets(in vec2 sample_2d) {
@@ -223,6 +241,8 @@ ivec2 xy() {
 }
 
 void main() {
+  load_shared();
+
   // Take spp_per_iter samples and add to target measure
   for (uint i = buff_sampler_state.spp_curr;
             i < buff_sampler_state.spp_curr + buff_sampler_state.spp_per_iter;

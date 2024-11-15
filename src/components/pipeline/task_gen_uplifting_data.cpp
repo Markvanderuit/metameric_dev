@@ -89,7 +89,7 @@ namespace met {
 
     // 1. Generate color system boundary (spectra)
     if (csys_stale) {
-      m_csys_boundary_coeffs = generate_color_system_ocs_coeffs({ .direct_objective = csys,
+      m_csys_boundary_coeffs = solve_color_solid_coef({ .direct_objective = csys,
                                                                   .basis            = e_basis.value(),
                                                                   .seed             = 4,
                                                                   .n_samples        = n_system_boundary_samples });

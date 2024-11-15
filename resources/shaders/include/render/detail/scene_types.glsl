@@ -89,8 +89,7 @@ struct BLASInfo {
 
 // Info object for the TLAS
 struct TLASInfo {
-  mat4 trf; // Transform to project ray into TLAS
-  mat4 inv; // Inverse of trf
+  mat4 trf; // Transform to project ray from TLAS to world
 };
 
 #endif // RENDER_DETAIL_SCENE_TYPES_GLSL_GUARD

@@ -31,7 +31,7 @@ namespace met {
     uint                        m_curr_samples  = 0;                       // How many samples are of the current vertex constraint
     uint                        m_prev_samples  = 0;                       // How many samples are of an old vertex constriant
     cnstr_type                  m_cstr_cache    = DirectColorConstraint(); // Cache of current vertex constraint, to detect mismatch volume change
-    uint                        m_iter_samples; // default is mmv_uplift_samples_iter
+    uint                        m_iter_samples;                            // default is mmv_uplift_samples_iter
 
     void insert(std::span<const MismatchSample> samples) {
       met_trace();

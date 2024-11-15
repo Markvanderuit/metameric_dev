@@ -3,7 +3,14 @@
 #include <metameric/core/fwd.hpp>
 
 namespace met {
-  // Argument struct and method for generating a spectral reflectance, given one or more
+  // Argument struct for generating a closest representation in the basis
+  // for a given spectral distribution.
+  struct SpectrumCoeffsInfo {
+    const Spec  &spec;  // Input spectrum to fit
+    const Basis &basis; // Spectral basis functions
+  };
+
+  // Argument struct for generating a spectral reflectance, given one or more
   // known color signals in corresponding color systems
   struct DirectSpectrumInfo {
     using LinearConstraint = std::pair<ColrSystem, Colr>;
@@ -12,9 +19,8 @@ namespace met {
     std::vector<LinearConstraint> linear_constraints = { }; // Direct metamerism constraints
     const Basis &basis;                                     // Spectral basis functions
   };
-  Basis::vec_type generate_spectrum_coeffs(const DirectSpectrumInfo &info);
 
-  // Argument struct and method for generating a spectral reflectance, given a system of
+  // Argument struct for generating a spectral reflectance, given a system of
   // interreflections expressed as a truncated power series
   struct IndirectSpectrumInfo {
     using LinearConstraint  = std::pair<ColrSystem, Colr>;
@@ -25,12 +31,11 @@ namespace met {
     std::vector<NLinearConstraint> nlinear_constraints = { }; // Indirect metamerism constraints
     const Basis &basis;                                       // Spectral basis functions
   };
-  Basis::vec_type generate_spectrum_coeffs(const IndirectSpectrumInfo &info);
 
-  // Argument struct and method for generating points on the object color solid of a metameric
+  // Argument struct for generating points on the object color solid of a metameric
   // mismatching between two or more color systems, following the method of Mackiewicz et al., 2019 
   // "Spherical sampling methods for the calculation of metamer mismatch volumes"
-  struct DirectMismatchingOCSInfo {
+  struct DirectMismatchSolidInfo {
     using LinearConstraint = std::pair<ColrSystem, Colr>;
 
   public:
@@ -41,17 +46,15 @@ namespace met {
     uint seed      = 4;  // Seed for (pcg) sampler state
     uint n_samples = 32; // Nr. of samples to solve for
   };
-  std::vector<Basis::vec_type> generate_mismatching_ocs_coeffs(const DirectMismatchingOCSInfo &info);
   
-  // Argument struct and method for generating points on the object color solid of a metameric
+  // Argument struct for generating points on the object color solid of a metameric
   // mismatching between signal in a number of base color systems, and a interreflection system
   // expressed as a truncated power series
-  struct IndirectMismatchingOCSInfo {
-    using LinearConstraint   = std::pair<ColrSystem,         Colr>;
+  struct IndirectMismatchSolidInfo {
+    using LinearConstraint  = std::pair<ColrSystem,         Colr>;
     using NLinearConstraint = std::pair<IndirectColrSystem, Colr>;
       
   public:
-    std::vector<ColrSystem>         linear_objectives   = { }; // Direct parts of the objective function
     std::vector<IndirectColrSystem> nlinear_objectives  = { }; // Indirect parts of the objective function
     std::vector<LinearConstraint>   linear_constraints  = { }; // Direct metamerism constraints
     std::vector<NLinearConstraint>  nlinear_constraints = { }; // Indirect metamerism constraints
@@ -60,45 +63,41 @@ namespace met {
     uint seed      = 4;  // Seed for (pcg) sampler state
     uint n_samples = 32; // Nr. of samples to solve for
   };
-  std::vector<Basis::vec_type> generate_mismatching_ocs_coeffs(const IndirectMismatchingOCSInfo &info);
 
   // Argument struct and method for generating points on the object color solid of a color system,
-  // following the method of Mackiewicz et al., 2019 
-  // "Spherical sampling methods for the calculation of metamer mismatch volumes"
-  struct DirectColorSystemOCSInfo {
+  // following the method of Mackiewicz et al., 2019, "Spherical sampling methods for the calculation of metamer mismatch volumes".
+  struct ColorSolidInfo {
     ColrSystem direct_objective; // Color system that builds objective function
-
-    const Basis &basis;  // Spectral basis functions
-    uint seed      = 4;  // Seed for (pcg) sampler state
-    uint n_samples = 32; // Nr. of samples to solve for
+    const Basis &basis;          // Spectral basis functions
+    uint seed      = 4;          // Seed for (pcg) sampler state
+    uint n_samples = 32;         // Nr. of samples to solve for
   };
-  std::vector<Basis::vec_type> generate_color_system_ocs_coeffs(const DirectColorSystemOCSInfo &info);
-  std::vector<Spec>            generate_color_system_ocs(const DirectColorSystemOCSInfo &info);
-
-  // Argument struct and method for generating a closest representation in the basis
-  // for a given spectral distribution.
-  struct SpectrumCoeffsInfo {
-    const Spec  &spec;  // Input spectrum to fit
-    const Basis &basis; // Spectral basis functions
-  };
-  Basis::vec_type generate_spectrum_coeffs(const SpectrumCoeffsInfo &info);
 
   // Return type shorthands for metamer generation
   using SpectrumSample = std::pair<Spec, Basis::vec_type>;
   using MismatchSample = std::tuple<Colr, Spec, Basis::vec_type>;
 
-  // Helpers; generate coefficients producing a spectrum in a basis, and return said spectrum
+  // Function calls corresponding to the above info objects
+  Basis::vec_type              solve_spectrum_coef(const SpectrumCoeffsInfo &info);
+  Basis::vec_type              solve_spectrum_coef(const DirectSpectrumInfo &info);
+  Basis::vec_type              solve_spectrum_coef(const IndirectSpectrumInfo &info);
+  std::vector<Basis::vec_type> solve_color_solid_coef(const ColorSolidInfo &info);
+  std::vector<Basis::vec_type> solve_mismatch_solid_coef(const DirectMismatchSolidInfo &info);
+  std::vector<Basis::vec_type> solve_mismatch_solid_coef(const IndirectMismatchSolidInfo &info);
+  std::vector<SpectrumSample>  solve_color_solid(const ColorSolidInfo &info);
+  std::vector<MismatchSample>  solve_mismatch_solid(const DirectMismatchSolidInfo &info);
+  std::vector<MismatchSample>  solve_mismatch_solid(const IndirectMismatchSolidInfo &info);
+
+  // Helper; generate coefficients producing a spectrum in a basis, and return said spectrum
   // plus the coefficients 
-  SpectrumSample generate_spectrum(const auto &info) {
+  SpectrumSample solve_spectrum(const auto &info) {
     met_trace();
-    auto c = generate_spectrum_coeffs(info);
+    auto c = solve_spectrum_coef(info);
     return { info.basis(c), c };
   }
 
   // Helpers; generate coefficients, the resulting spectrum, and the mismatched color, assuming
   // the last constraint is a "free variable"
-  std::vector<MismatchSample> generate_mismatching_ocs(const DirectMismatchingOCSInfo &info);
-  std::vector<MismatchSample> generate_mismatching_ocs(const IndirectMismatchingOCSInfo &info);
 
   /* // Helper struct to recover spectra by "rolling window" mismatch volume generation. The resulting
   // convex structure is then used to construct interior spectra through linear interpolation. 

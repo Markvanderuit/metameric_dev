@@ -115,15 +115,21 @@ namespace met {
      vertices describing spectral behavior. Kept separate from Scene object,
      given its centrality to the codebase. */
   struct Uplifting {
+    // Interior vertex for the tessellation; encapsulates std::variant of different constraint types
+    // and generates vertex position and associated spectral reflectance through the constraint;
+    // some vertices expose SurfaceInfo data user-picked from the scene, which backs the constraint.
     struct Vertex {
       using cnstr_type = std::variant<MeasurementConstraint,   DirectColorConstraint,
                                       DirectSurfaceConstraint, IndirectSurfaceConstraint>;
                                       
-      std::string name;             // Associated name
+      std::string name;             // Associated name user can set in front-end
       cnstr_type  constraint;       // Underlying, user-specified constraint
-      bool        is_active = true; // Whether the constraint is used in the scene
+      bool        is_active = true; // Whether the constraint is enabled
 
     public: // Public methods
+      // Get vertex' position in the tesselation
+      Colr get_vertex_position() const;
+
       // Realize a spectral metamer, which forms the vertex' position in the uplifting tesselation,
       // and attempts to satisfy the vertex' attached constraint
       MismatchSample realize(const Scene &scene, const Uplifting &uplifting) const;
@@ -147,16 +153,22 @@ namespace met {
       // is intentional as the base linear constraint may be disabled 
       bool is_position_shifting() const;
 
-      // Get vertex' position in the tesselation
-      Colr get_vertex_position() const;
 
     public: // Constraint-specific boilerplate; depend on which constraint is used
       bool operator==(const Vertex &o) const = default;
-      bool has_mismatching(const Scene &scene, const Uplifting &uplifting) const; // Does the underlying constraint allow for mismatching?
-      bool has_surface()                                                   const; // Does the underlying constraint expose surface data?
+      
+      // Does the underlying constraint allow for mismatching?
+      bool has_mismatching(const Scene &scene, const Uplifting &uplifting) const; 
+
+      // Does the underlying constraint expose surface data?
+      bool has_surface() const;
+
+      // Access (last or all) underlying surface data (last is active part)
       const SurfaceInfo &surface() const;
+      std::span<const SurfaceInfo> surfaces() const;
+
+      // Set surface data
       void set_surface(const SurfaceInfo &sr);
-      std::vector<SurfaceInfo> surfaces() const;
     };
 
   public: // Public members

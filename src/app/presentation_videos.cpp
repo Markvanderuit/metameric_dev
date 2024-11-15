@@ -417,14 +417,12 @@ std::queue<RenderTaskInfo> generate_task_queue() {
 
   queue.push(RenderTaskInfo {
     .scene_path   = scene_path  / "fold.json",
-    .out_path     = render_path / "fold_testmp4",
+    .out_path     = render_path / "fold_test.mp4",
     .view_name    = "Default view",
     .view_scale   = 1.f,
     .fps          = 60u,
-    .spp          = 1u,
+    .spp          = 4u,
     .spp_per_step = 1u,
-    .start_time   = 0.f,
-    .end_time     = 5.f,
     .init_events  = [](auto &info, Scene &scene) {
       met_trace();
 
@@ -432,17 +430,18 @@ std::queue<RenderTaskInfo> generate_task_queue() {
 
       std::array<Colr, 5> values = {
         vert.get_mismatch_position(), // 0 -> 1 
-        Colr { 0.461, 0.430, 0.330 }, // 1 -> 2 
-        Colr { 0.409, 0.444, 0.444 }, // 2 -> 3 
-        Colr { 0.444, 0.388, 0.468 }, // 3 -> 4 
-        Colr { 0.317, 0.381, 0.447 }  // 4 -> 0
+        Colr { 0.351, 0.404, 0.447 }, // 1 -> 2 
+        Colr { 0.436, 0.409, 0.457 }, // 2 -> 3 
+        Colr { 0.437, 0.442, 0.402 }, // 3 -> 4 
+        Colr { 0.354, 0.425, 0.390 }  // 4 -> 0
       };
 
       for (uint i = 0; i < values.size(); ++i) {
         anim::add_twokey<Uplifting::Vertex>(info.events, {
           .handle = vert,
           .values = { values[i], values[(i + 1) % values.size()] },
-          .times  = { static_cast<float>(i), static_cast<float>(i + 1) },
+          .times  = { 2.f * static_cast<float>(i), 2.f * static_cast<float>(i + 1) - .05f },
+          .motion = anim::MotionType::eLinear,
           .fps    = info.fps
         });
       }
@@ -462,19 +461,14 @@ int main() {
     
     // Process input tasks
     while (!queue.empty()) {
-      auto info = queue.front();
+      auto task = queue.front();
       queue.pop();
 
-      debug::check_expr(fs::exists(info.scene_path));
-      fmt::print("Starting {}\n", info.scene_path.string());
-
-      /* // Overwrite quality settings for consistenncy
-      info.view_scale   = 1.f;
-      info.spp          = 4u;
-      info.spp_per_step = 1u; */
+      debug::check_expr(fs::exists(task.scene_path));
+      fmt::print("Starting {}\n", task.scene_path.string());
       
       // RenderTask consumes task
-      RenderTask app(std::move(info));
+      RenderTask app(std::move(task));
       app.run();
     }
   } catch (const std::exception &e) {

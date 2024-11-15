@@ -212,7 +212,8 @@ namespace met {
       VideoOutputStream os(m_info.out_path.string(), m_image.size(), m_info.fps);
       
       for (uint frame = anim::time_to_frame(m_info.start_time, m_info.fps); ; ++frame) {
-        fmt::print("\tGenerating ({}): s={}, f={}\n", m_info.scene_path.filename().string(), frame / m_info.fps, frame);
+        fmt::print("Generating ({}): s={}, f={}\n",
+          m_info.scene_path.filename().string(), frame / m_info.fps, frame);
 
         // Evaluate motion; exit loop if no more animations are left
         guard_break(run_events(frame));

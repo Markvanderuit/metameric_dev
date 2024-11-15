@@ -246,22 +246,18 @@ namespace met {
     };
   }
 
-  std::vector<SurfaceInfo> Uplifting::Vertex::surfaces() const {
+  std::span<const SurfaceInfo> Uplifting::Vertex::surfaces() const {
     met_trace();
     return constraint | visit {
       [](const DirectSurfaceConstraint &c) { 
-        return std::vector<SurfaceInfo> { c.surface };
+        return std::span<const SurfaceInfo> { &c.surface, 1 };
       },
       [](const IndirectSurfaceConstraint &c) { 
-        return vws::zip(c.cstr_j, c.surfaces)
-          | vws::filter([](const auto &p) { return std::get<0>(p).is_active; })
-          | vws::values
-          | rng::to<std::vector>();
+        return std::span<const SurfaceInfo>(c.surfaces);
       },
-      [&](const auto &) { return std::vector<SurfaceInfo>(); }
+      [&](const auto &) { return std::span<const SurfaceInfo>(); }
     };
   }
-  
 
   bool Uplifting::Vertex::has_mismatching(const Scene &scene, const Uplifting &uplifting) const {
     met_trace();

@@ -25,7 +25,7 @@
     "imguizmo",
     "implot",
     "meshoptimizer",
-    "nativefiledialog",
+    "nativefiledialog-extended",
     "nlohmann-json",
     "nlopt",
     "qhull",
@@ -34,22 +34,5 @@
     "tinyexr",
     "zlib",
     "zstr"
-  ],
-  "vcpkg-configuration": {
-    "default-registry": {
-      "kind": "builtin",
-      "baseline": "c3801cf53c614ffc54c94051d124eba097b057b1"
-    },
-    "registries": [
-      {
-        "kind": "filesystem",
-        "baseline": "2023-02-22",
-        "path": "third_party/vcpkg-registry",
-        "packages": [
-          "meshoptimizer",
-          "nlopt"
-        ]
-      }
-    ]
-  }
+  ]
 }

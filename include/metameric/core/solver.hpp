@@ -57,13 +57,12 @@ namespace nlopt {
     std::optional<double>    rel_xpar_tol; // 1e-4
   };
 
-  // NLOpt result description
+  // NLOpt result description is std::pair<vector, code>
   template <met::uint N>
-  struct Result {
-    Wrapper<N>::vec x;         // Result value
-    double             objective; // Last objective value
-    nlopt::result      code;      // Optional return codes; 1 == success
-  };
+  using Result = std::pair<
+    typename Wrapper<N>::vec, // Result value
+    nlopt::result             // Optional NLOPT return code; 1 == success
+  >;
 
   // Given a problem description, solve and generate a result 
   template <met::uint N>
