@@ -1,5 +1,5 @@
 #include <metameric/core/math.hpp>
-#include <metameric/core/scene.hpp>
+#include <metameric/scene/scene.hpp>
 #include <metameric/core/scheduler.hpp> 
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/ranges.hpp>

@@ -154,13 +154,6 @@ function(add_library_r target dir)
   target_compile_features(${target} PUBLIC cxx_std_23)
   target_compile_definitions(${target} PUBLIC _USE_MATH_DEFINES ${preprocessor_defines})
 
-  # Specify unity build, batching 8 files per object
-  # set_target_properties(${target} PROPERTIES 
-  #   UNITY_BUILD ON 
-  #   UNITY_BUILD_MODE BATCH 
-  #   UNITY_BUILD_BATCH_SIZE 4
-  # )
-
   # Enable /bigobj (or the closest thing for gcc)
   # Src: https://stackoverflow.com/questions/69903253/cmake-bigobj-no-such-file-or-directory
   if (MSVC)
@@ -175,9 +168,14 @@ add_library_r(core core)
 target_link_libraries(core PUBLIC ${core_dependencies})
 add_library_pch(core)
 
+# Set up scene library
+add_library_r(scene scene)
+target_link_libraries(scene PUBLIC core)
+target_precompile_headers(scene REUSE_FROM core)
+
 # Set up render library
 add_library_r(render render)
-target_link_libraries(render PUBLIC core)
+target_link_libraries(render PUBLIC scene)
 target_precompile_headers(render REUSE_FROM core)
 
 # Set up components library

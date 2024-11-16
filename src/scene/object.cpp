@@ -1,6 +1,5 @@
-#include <metameric/core/components/object.hpp>
+#include <metameric/scene/scene.hpp>
 #include <metameric/core/ranges.hpp>
-#include <metameric/core/scene.hpp>
 
 namespace met {
   bool Object::operator==(const Object &o) const {

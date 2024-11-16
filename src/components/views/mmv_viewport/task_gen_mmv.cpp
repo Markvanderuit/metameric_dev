@@ -2,7 +2,7 @@
 #include <metameric/core/distribution.hpp>
 #include <metameric/core/metamer.hpp>
 #include <metameric/core/record.hpp>
-#include <metameric/core/scene.hpp>
+#include <metameric/scene/scene.hpp>
 #include <metameric/core/ranges.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/components/views/mmv_viewport/task_gen_mmv.hpp>

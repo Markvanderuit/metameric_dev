@@ -2,13 +2,14 @@
 
 #include <metameric/core/fwd.hpp>
 #include <metameric/core/record.hpp>
-#include <metameric/core/detail/scene_components.hpp>
-#include <metameric/core/components/emitter.hpp>
-#include <metameric/core/components/uplifting.hpp>
-#include <metameric/core/components/object.hpp>
-#include <metameric/core/components/settings.hpp>
-#include <metameric/core/components/view.hpp>
-#include <metameric/core/detail/scene_components_gl.hpp>
+#include <metameric/scene/resources.hpp>
+#include <metameric/scene/emitter.hpp>
+#include <metameric/scene/uplifting.hpp>
+#include <metameric/scene/object.hpp>
+#include <metameric/scene/settings.hpp>
+#include <metameric/scene/view.hpp>
+#include <metameric/scene/detail/components.hpp>
+#include <metameric/scene/detail/resources.hpp>
 
 namespace met {
   // Scene data layout.

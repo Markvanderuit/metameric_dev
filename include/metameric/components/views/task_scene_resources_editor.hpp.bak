@@ -1,7 +1,7 @@
 #pragma once
 
 #include <metameric/core/scheduler.hpp>
-#include <metameric/core/scene.hpp>
+#include <metameric/scene/scene.hpp>
 #include <metameric/core/moments.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
 #include <metameric/components/views/detail/file_dialog.hpp>

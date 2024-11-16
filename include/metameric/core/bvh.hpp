@@ -32,22 +32,6 @@ namespace met {
       std::array<AABB, K> child_aabb; // AABB of <= K child node
       std::array<bool, K> child_mask; // Mask of <= K is_leaf/!is_leaf
     };
-    
-    /* // BVH node representation; not for gpu-side packing
-    struct Node {
-      // AABBs of children; is not set for leaves
-      std::array<AABB, K> child_aabb;
-      std::array<bool, K> child_mask; // Mask of <= K is_leaf/!is_leaf
-
-      // Offset into child nodes or primitives, overlapped with flag bit
-      // to indicate leaves
-      uint offs_data, size_data;
-
-    public:
-      inline constexpr bool is_leaf() const { return offs_data & 0x80000000u;    }
-      inline constexpr uint    offs() const { return offs_data & (~0x80000000u); }
-      inline constexpr uint    size() const { return size_data;                  }
-    }; */
 
   public: // Internal BVH data
     std::vector<Node> nodes; // Tree structure of inner nodes and leaves

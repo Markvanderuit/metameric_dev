@@ -5,7 +5,7 @@
 #include <metameric/core/record.hpp>
 #include <metameric/core/convex.hpp>
 #include <metameric/core/ranges.hpp>
-#include <metameric/core/scene.hpp>
+#include <metameric/scene/scene.hpp>
 #include <metameric/core/detail/scheduler_subtasks.hpp>
 #include <small_gl/array.hpp>
 #include <small_gl/buffer.hpp>
@@ -47,8 +47,8 @@ namespace met {
       }
 
       // Add new samples to the end of the queue
-      m_colr_samples.append_range(samples | vws::elements<0>);
-      m_coef_samples.append_range(samples | vws::elements<2>);
+      m_colr_samples.append_range(samples | vws::transform(&MismatchSample::colr));
+      m_coef_samples.append_range(samples | vws::transform(&MismatchSample::coef));
 
       // Determine extents of current full point set
       auto maxb = rng::fold_left_first(m_colr_samples, [](auto a, auto b) { return a.max(b).eval(); }).value();
@@ -163,19 +163,17 @@ namespace met {
     // per-pixel coefficients on a parameterized texture over the object surface.
     using SpecCoefLayout = eig::Array<float, wavelength_bases, 4>;
 
-    // Packed spectrum representation; four spectra interleaved per tetrahedron
-    // ensure we can access all four spectra as one texture sample during rendering
-    using SpecPackLayout  = eig::Array<float, wavelength_samples, 4>;
-
     // Helper builders; one per constraint, which iteratively refine constraints
     // by generating surrounding mismatch volumes (tends to be easier)
     std::vector<MetamerConstraintBuilder> m_mmv_builders;
     uint                                  m_mmv_builder_samples;
 
-    // Miscellaneous data
-    uint                         m_uplifting_i;
-    std::vector<Spec>            m_csys_boundary_spectra;
-    std::vector<Basis::vec_type> m_csys_boundary_coeffs;
+    // Index of associated uplifting
+    uint m_uplifting_i;
+
+    // Construction data; color positions, corresponding spectra, derived coefficients
+    std::vector<MismatchSample> m_boundary_samples;
+    std::vector<MismatchSample> m_tessellation_samples;
 
     // Delaunay tesselation connecting colors/spectra on both
     // the boundary and interally in the color space, as well
@@ -185,18 +183,6 @@ namespace met {
     std::span<MeshPackLayout> m_tesselation_pack_map;
     MeshDataLayout           *m_tesselation_data_map;
     std::span<SpecCoefLayout> m_tesselation_coef_map;
-
-    // Color positions, corresponding assigned spectra, and derived coefficients
-    // in the delaunay tesselation
-    std::vector<Colr>            m_tesselation_points;
-    std::vector<Spec>            m_tesselation_spectra;
-    std::vector<Basis::vec_type> m_tesselation_coeffs;
-
-    // Buffer and accompanying mapping, store per-tetrahedron spectra
-    // in an interleaved format. This data is copied to upliftings.gl
-    // for fast sampled access during rendering
-    gl::Buffer                m_buffer_spec_pack;
-    std::span<SpecPackLayout> m_buffer_spec_pack_map;
 
     // Buffers for mesh data, if a accompanying viewer exists
     gl::Array  m_buffer_viewer_array;

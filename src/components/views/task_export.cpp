@@ -1,6 +1,6 @@
 #include <metameric/core/io.hpp>
 #include <metameric/core/image.hpp>
-#include <metameric/core/scene.hpp>
+#include <metameric/scene/scene.hpp>
 #include <metameric/components/views/task_export.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
 #include <metameric/components/views/detail/file_dialog.hpp>

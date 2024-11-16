@@ -1,6 +1,6 @@
-#include <metameric/core/components/uplifting.hpp>
+#include <metameric/scene/scene.hpp>
+#include <metameric/core/metamer.hpp>
 #include <metameric/core/ranges.hpp>
-#include <metameric/core/scene.hpp>
 
 namespace met {
   namespace detail {
@@ -21,6 +21,18 @@ namespace met {
     return std::tie(observer_i, illuminant_i, basis_i)
       == std::tie(o.observer_i, o.illuminant_i, o.basis_i) 
       && rng::equal(verts, o.verts);
+  }
+  
+  std::vector<MismatchSample> Uplifting::sample_color_solid(const Scene &scene, uint seed, uint n) const {
+    met_trace();
+    // Assemble color system data, then forward to metamer.hpp to 
+    // generate n points on color system boundary
+    ColrSystem csys = { .cmfs       = *scene.resources.observers[observer_i],
+                        .illuminant = *scene.resources.illuminants[illuminant_i] };
+    return solve_color_solid({ .direct_objective = csys,
+                               .basis            = *scene.resources.bases[basis_i],
+                               .seed             = seed,
+                               .n_samples        = n });
   }
 
   MismatchSample Uplifting::Vertex::realize(const Scene &scene, const Uplifting &uplifting) const {

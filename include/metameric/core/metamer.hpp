@@ -75,7 +75,11 @@ namespace met {
 
   // Return type shorthands for metamer generation
   using SpectrumSample = std::pair<Spec, Basis::vec_type>;
-  using MismatchSample = std::tuple<Colr, Spec, Basis::vec_type>;
+  struct MismatchSample {
+    Colr            colr;
+    Spec            spec;
+    Basis::vec_type coef;
+  };
 
   // Function calls corresponding to the above info objects
   Basis::vec_type              solve_spectrum_coef(const SpectrumCoeffsInfo &info);
@@ -84,7 +88,7 @@ namespace met {
   std::vector<Basis::vec_type> solve_color_solid_coef(const ColorSolidInfo &info);
   std::vector<Basis::vec_type> solve_mismatch_solid_coef(const DirectMismatchSolidInfo &info);
   std::vector<Basis::vec_type> solve_mismatch_solid_coef(const IndirectMismatchSolidInfo &info);
-  std::vector<SpectrumSample>  solve_color_solid(const ColorSolidInfo &info);
+  std::vector<MismatchSample>  solve_color_solid(const ColorSolidInfo &info);
   std::vector<MismatchSample>  solve_mismatch_solid(const DirectMismatchSolidInfo &info);
   std::vector<MismatchSample>  solve_mismatch_solid(const IndirectMismatchSolidInfo &info);
 

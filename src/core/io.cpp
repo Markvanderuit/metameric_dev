@@ -1,7 +1,7 @@
 #include <metameric/core/io.hpp>
 #include <metameric/core/mesh.hpp>
 #include <metameric/core/ranges.hpp>
-#include <metameric/core/scene.hpp>
+#include <metameric/scene/scene.hpp>
 #include <metameric/core/utility.hpp>
 #include <nlohmann/json.hpp>
 #include <rapidobj/rapidobj.hpp>

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <metameric/core/fwd.hpp>
+#include <metameric/scene/detail/utility.hpp>
 
 namespace met {
   // Camera and render settings data layout; a simple description

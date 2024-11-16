@@ -1,5 +1,5 @@
+#include <metameric/scene/scene.hpp>
 #include <metameric/core/io.hpp>
-#include <metameric/core/scene.hpp>
 #include <metameric/core/json.hpp>
 #include <metameric/core/metamer.hpp>
 #include <metameric/core/ranges.hpp>

@@ -1,7 +1,7 @@
 #pragma once
 
 #include <metameric/core/math.hpp>
-#include <metameric/core/scene.hpp>
+#include <metameric/scene/scene.hpp>
 #include <metameric/core/utility.hpp>
 
 namespace met::anim {

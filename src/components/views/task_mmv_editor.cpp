@@ -1,6 +1,6 @@
 #include <metameric/core/ranges.hpp>
 #include <metameric/core/convex.hpp>
-#include <metameric/core/scene.hpp>
+#include <metameric/scene/scene.hpp>
 #include <metameric/components/views/task_mmv_editor.hpp>
 #include <metameric/components/views/mmv_viewport/task_gen_mmv.hpp>
 #include <metameric/components/views/mmv_viewport/task_draw_mmv.hpp>

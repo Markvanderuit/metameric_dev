@@ -1,4 +1,4 @@
-#include <metameric/core/scene.hpp>
+#include <metameric/scene/scene.hpp>
 #include <metameric/components/views/scene_viewport/task_render.hpp>
 #include <metameric/components/views/detail/arcball.hpp>
 #include <metameric/components/views/detail/imgui.hpp>

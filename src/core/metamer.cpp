@@ -354,15 +354,17 @@ namespace met {
     return output;
   }
 
-  std::vector<SpectrumSample> solve_color_solid(const ColorSolidInfo &info) {
+  std::vector<MismatchSample> solve_color_solid(const ColorSolidInfo &info) {
     met_trace();
     auto coeffs = solve_color_solid_coef(info);
-    std::vector<SpectrumSample> s(coeffs.size());
+    std::vector<MismatchSample> s(coeffs.size());
     std::transform(std::execution::par_unseq,
                    range_iter(coeffs),
                    s.begin(),
                    [&](const auto &coef) { 
-                    return std::pair { info.basis(coef), coef }; 
+                    auto spec = info.basis(coef);
+                    auto colr = info.direct_objective(spec);
+                    return MismatchSample { colr, spec, coef }; 
                   });
     return s;
   }
@@ -398,27 +400,29 @@ namespace met {
     return coeffs.cast<float>().cwiseMax(-1.f).cwiseMin(1.f).eval();
   }
   
-  std::vector<std::tuple<Colr, Spec, Basis::vec_type>> solve_mismatch_solid(const DirectMismatchSolidInfo &info) {
+  std::vector<MismatchSample> solve_mismatch_solid(const DirectMismatchSolidInfo &info) {
     met_trace();
     auto c = solve_mismatch_solid_coef(info);
-    std::vector<std::tuple<Colr, Spec, Basis::vec_type>> v(c.size());
+    std::vector<MismatchSample> v(c.size());
     std::transform(std::execution::par_unseq,
                    range_iter(c), v.begin(),
                    [&info](const auto &c) { 
-                    auto s = info.basis(c);
-                    return std::tuple { info.linear_objectives.back()(s), s, c }; }); // the differentiating color system generates output
+                    auto spec = info.basis(c);
+                    auto colr = info.linear_objectives.back()(spec);
+                    return MismatchSample { colr, spec, c }; }); // the differentiating color system generates output
     return v;
   }
   
-  std::vector<std::tuple<Colr, Spec, Basis::vec_type>> solve_mismatch_solid(const IndirectMismatchSolidInfo &info) {
+  std::vector<MismatchSample> solve_mismatch_solid(const IndirectMismatchSolidInfo &info) {
     met_trace();
     auto c = solve_mismatch_solid_coef(info);
-    std::vector<std::tuple<Colr, Spec, Basis::vec_type>> v(c.size());
+    std::vector<MismatchSample> v(c.size());
     std::transform(std::execution::par_unseq,
                    range_iter(c), v.begin(),
                    [&info](const auto &c) { 
-                    auto s = info.basis(c);
-                    return std::tuple { info.nlinear_objectives.back()(s), s, c }; }); // the differentiating color system generates output
+                    auto spec = info.basis(c);
+                    auto colr = info.nlinear_objectives.back()(spec);
+                    return MismatchSample { colr, spec, c }; }); // the differentiating color system generates output
     return v;
   }
 } // namespace met

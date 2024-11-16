@@ -187,4 +187,14 @@ namespace met {
   constexpr void operator| (std::variant<Ts...> & v, visit_single<F> const& f) {
     v | visit { f, [](auto &) {} };
   }
+
+  // Syntactic sugar to do c++20 style projection on std::tuple as tuple_project<I>
+  // Src: https://stackoverflow.com/questions/64963075/how-to-project-stdtuple-in-c20-constrained-algorithms
+  template<size_t n> struct tuple_project_t {
+    template<typename T> decltype(auto) operator()(T&& t) const {
+      using std::get;
+      return get<n>(std::forward<T>(t));
+    }
+  };
+  template<size_t n> inline constexpr tuple_project_t<n> tuple_project;
 } // namespace met

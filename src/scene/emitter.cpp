@@ -1,6 +1,5 @@
-#include <metameric/core/components/emitter.hpp>
+#include <metameric/scene/scene.hpp>
 #include <metameric/core/ranges.hpp>
-#include <metameric/core/scene.hpp>
 
 namespace met::detail {
   SceneGLHandler<met::Emitter>::SceneGLHandler() {

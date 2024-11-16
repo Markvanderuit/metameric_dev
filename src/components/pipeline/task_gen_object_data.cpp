@@ -1,4 +1,4 @@
-#include <metameric/core/scene.hpp>
+#include <metameric/scene/scene.hpp>
 #include <metameric/components/pipeline/task_gen_object_data.hpp>
 #include <small_gl/texture.hpp>
 #include <small_gl/detail/program_cache.hpp>

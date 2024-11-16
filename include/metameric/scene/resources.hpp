@@ -6,6 +6,7 @@
 #include <metameric/core/mesh.hpp>
 #include <metameric/core/image.hpp>
 #include <metameric/core/detail/packing.hpp>
+#include <metameric/scene/detail/utility.hpp>
 #include <small_gl/array.hpp>
 #include <small_gl/buffer.hpp>
 #include <small_gl/texture.hpp>

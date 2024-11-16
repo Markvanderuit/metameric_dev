@@ -1,4 +1,4 @@
-#include <metameric/core/scene.hpp>
+#include <metameric/scene/scene.hpp>
 #include <metameric/components/views/task_scene_viewport.hpp>
 #include <metameric/components/views/scene_viewport/task_input_query.hpp>
 #include <metameric/components/views/scene_viewport/task_input_editor.hpp>

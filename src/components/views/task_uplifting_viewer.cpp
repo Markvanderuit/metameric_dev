@@ -1,4 +1,4 @@
-#include <metameric/core/scene.hpp>
+#include <metameric/scene/scene.hpp>
 #include <metameric/components/views/task_uplifting_viewer.hpp>
 #include <metameric/components/views/uplifting_viewport/task_draw_color_system.hpp>
 #include <metameric/components/views/uplifting_viewport/task_draw_srgb_cube.hpp>

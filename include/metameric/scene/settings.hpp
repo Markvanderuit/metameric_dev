@@ -1,7 +1,7 @@
 #pragma once
 
 #include <metameric/core/fwd.hpp>
-#include <metameric/core/detail/scene_components_utility.hpp>
+#include <metameric/scene/detail/utility.hpp>
 
 namespace met {
   // Scene settings data layout

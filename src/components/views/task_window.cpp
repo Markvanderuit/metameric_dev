@@ -1,4 +1,4 @@
-#include <metameric/core/scene.hpp>
+#include <metameric/scene/scene.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/components/schedule.hpp>
 #include <metameric/components/misc/task_lambda.hpp>
