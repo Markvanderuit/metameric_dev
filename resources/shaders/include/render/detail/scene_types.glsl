@@ -72,7 +72,7 @@ struct EmitterInfo {
 struct BRDFInfo {
   #define BRDFTypeNull       0
   #define BRDFTypeDiffuse    1
-  #define BRDFTypePrincipled 2
+  #define BRDFTypeMicrofacet 2
 
   uint  type;     // Type of BRDF: null, diffuse, principled for now
   vec4  r;        // Underlying surface albedo for four wavelengths

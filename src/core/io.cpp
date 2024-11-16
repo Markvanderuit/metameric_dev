@@ -249,27 +249,27 @@ namespace met::io {
         if (obj_mat.metallic_texname.empty()) {
           metallic = obj_mat.metallic;
           if (obj_mat.roughness != 1.f || obj_mat.metallic != 0.f)
-            brdf_type = Object::BRDFType::ePrincipled;
+            brdf_type = Object::BRDFType::eMicrofacet;
         } else {
           // Assign an allocated texture id from texture_load_list or get a new one
           metallic = texture_load_list.insert({ 
             obj_mat.metallic_texname,                   // filename of texture as key
             static_cast<uint>(texture_load_list.size()) // New texture id at end of list
           }).first->second;
-          brdf_type = Object::BRDFType::ePrincipled;
+          brdf_type = Object::BRDFType::eMicrofacet;
         }
         
         if (obj_mat.roughness_texname.empty()) {
           roughness = obj_mat.roughness;
           if (obj_mat.roughness != 1.f || obj_mat.metallic != 0.f)
-            brdf_type = Object::BRDFType::ePrincipled;
+            brdf_type = Object::BRDFType::eMicrofacet;
         } else {
           // Assign an allocated texture id from texture_load_list or get a new one
           roughness = texture_load_list.insert({ 
             obj_mat.roughness_texname,                   // filename of texture as key
             static_cast<uint>(texture_load_list.size()) // New texture id at end of list
           }).first->second;
-          brdf_type = Object::BRDFType::ePrincipled;
+          brdf_type = Object::BRDFType::eMicrofacet;
         }
       }
 

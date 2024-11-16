@@ -34,30 +34,55 @@ namespace met {
 
     // From a RayRecord, recover underlying surface information in the scene
     SurfaceInfo get_surface_info(const Scene &scene, const eig::Array3f &p, const SurfaceRecord &rc) {
-      // Get relevant resources; mostly gl-side resources
+      // Get relevant resources; mostly caches of gl-side resources
       const auto &object    = *scene.components.objects[rc.object_i()];
       const auto &uplifting = *scene.components.upliftings[object.uplifting_i];
+      const auto &mesh_data = scene.resources.meshes.gl.mesh_cache[object.mesh_i];
 
-      // Get object*mesh transform and ivnerse
+      // Get object*mesh transform and inverse
       auto object_trf = object.transform.affine().matrix().eval();
-      auto mesh_trf   = scene.resources.meshes.gl.unit_transforms[object.mesh_i].eval();
+      auto mesh_trf   = mesh_data.unit_trf;
       auto trf        = (object_trf * mesh_trf).eval();
 
       // Assemble SurfaceInfo object
       SurfaceInfo si = { .object = object, .uplifting = uplifting  };
       si.record = rc;
 
-      // Unpack relevant primitive data
-      auto prim = scene.resources.meshes.gl.blas_prims_cpu[rc.primitive_i()].unpack();
+      // Assemble relevant primitive data from mesh cache
+      std::array<Vertex, 3> prim;
+      {
+        // Extract element indices, un-scattering data from the weird BVH leaf node order
+        const Mesh &mesh = mesh_data.mesh;
+        const auto &blas = mesh_data.bvh;
+        const auto &elem = mesh.elems[blas.prims[rc.primitive_i() - mesh_data.prims_offs]]; 
+        
+        // Iterate element indices, building primitive vertices
+        for (uint i = 0; i < 3; ++i) {
+          uint j = elem[i];
+          
+          // Get vertex data, and force UV to [0, 1]
+          auto vert = mesh.verts[j];
+          auto norm = mesh.has_norms() ? mesh.norms[j] : eig::Array3f(0, 0, 1);
+          auto txuv = mesh.has_txuvs() ? mesh.txuvs[j] : eig::Array2f(0.5);
+          txuv = txuv.unaryExpr([](float f) {
+            int   i = static_cast<int>(f);
+            float a = f - static_cast<float>(i);
+            return (i % 2) ? 1.f - a : a;
+          });
+
+          // Assemble primitive vertex
+          prim[i] = { .p = vert, .n = norm, .tx = txuv };
+        }
+      }
 
       // Generate barycentric coordinates
       eig::Vector3f pinv = (trf.inverse() * eig::Vector4f(p.x(), p.y(), p.z(), 1.f)).head<3>();
-      eig::Vector3f bary = get_barycentric_coords(pinv, prim.v0.p, prim.v1.p, prim.v2.p);
+      eig::Vector3f bary = get_barycentric_coords(pinv, prim[0].p, prim[1].p, prim[2].p);
 
       // Recover surface geometric data
-      si.p  = bary.x() * prim.v0.p  + bary.y() * prim.v1.p  + bary.z() * prim.v2.p;
-      si.n  = bary.x() * prim.v0.n  + bary.y() * prim.v1.n  + bary.z() * prim.v2.n;
-      si.tx = bary.x() * prim.v0.tx + bary.y() * prim.v1.tx + bary.z() * prim.v2.tx;
+      si.p  = bary.x() * prim[0].p  + bary.y() * prim[1].p  + bary.z() * prim[2].p;
+      si.n  = bary.x() * prim[0].n  + bary.y() * prim[1].n  + bary.z() * prim[2].n;
+      si.tx = bary.x() * prim[0].tx + bary.y() * prim[1].tx + bary.z() * prim[2].tx;
       si.p  = (trf * eig::Vector4f(si.p.x(), si.p.y(), si.p.z(), 1.f)).head<3>();
       si.n  = (trf * eig::Vector4f(si.n.x(), si.n.y(), si.n.z(), 0.f)).head<3>();
       si.n.normalize();

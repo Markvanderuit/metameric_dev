@@ -103,7 +103,7 @@ namespace met {
       if (value.brdf_type != Object::BRDFType::eNull) {
         push_texture_variant_selector_3f("Albedo", scene.resources.images, value.diffuse);
       }
-      if (value.brdf_type == Object::BRDFType::ePrincipled) {
+      if (value.brdf_type == Object::BRDFType::eMicrofacet) {
         push_texture_variant_selector_1f("Roughness", scene.resources.images, value.roughness);
         push_texture_variant_selector_1f("Metallic",  scene.resources.images, value.metallic);
       }

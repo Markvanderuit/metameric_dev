@@ -1,6 +1,6 @@
 #include <metameric/core/ranges.hpp>
 #include <metameric/core/constraints.hpp>
-#include <metameric/core/components.hpp>
+#include <metameric/core/components/uplifting.hpp>
 #include <metameric/core/scene.hpp>
 #include <metameric/core/ranges.hpp>
 #include <metameric/core/utility.hpp>

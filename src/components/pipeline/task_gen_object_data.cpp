@@ -141,9 +141,9 @@ namespace met {
       // if no UVs are present, we fall back on a rectangle's UVs to simply fill the patch
       gl::MultiDrawInfo::DrawCommand command;
       if (e_mesh.has_txuvs() && e_object.diffuse.index() == 1) {
-        command = e_scene.resources.meshes.gl.draw_commands[e_object.mesh_i];
+        command = e_scene.resources.meshes.gl.mesh_draw[e_object.mesh_i];
       } else {
-        command = e_scene.resources.meshes.gl.draw_commands[0]; // Rectangle
+        command = e_scene.resources.meshes.gl.mesh_draw[0]; // Rectangle
       }
 
       // Insert barrier for previous elements
@@ -162,7 +162,7 @@ namespace met {
                            { gl::DrawCapability::eCullOp,    false },
                            { gl::DrawCapability::eBlendOp,   false }},
         .draw_op        = gl::DrawOp::eFill,
-        .bindable_array = &e_scene.resources.meshes.gl.array
+        .bindable_array = &e_scene.resources.meshes.gl.mesh_array
       });
       
       // Line fill to overlap boundaries
@@ -174,7 +174,7 @@ namespace met {
                            { gl::DrawCapability::eCullOp,    false },
                            { gl::DrawCapability::eBlendOp,   false }},
         .draw_op        = gl::DrawOp::eLine,
-        .bindable_array = &e_scene.resources.meshes.gl.array
+        .bindable_array = &e_scene.resources.meshes.gl.mesh_array
       });
     }
 
@@ -228,9 +228,9 @@ namespace met {
       // if no UVs are present, we fall back on a rectangle's UVs to simply fill the patch
       gl::MultiDrawInfo::DrawCommand command;
       if (e_mesh.has_txuvs() && e_object.roughness.index() == 1 || e_object.metallic.index() == 1) {
-        command = e_scene.resources.meshes.gl.draw_commands[e_object.mesh_i];
+        command = e_scene.resources.meshes.gl.mesh_draw[e_object.mesh_i];
       } else {
-        command = e_scene.resources.meshes.gl.draw_commands[0]; // Rectangle
+        command = e_scene.resources.meshes.gl.mesh_draw[0]; // Rectangle
       }
 
       // Insert barrier for previous elements
@@ -249,7 +249,7 @@ namespace met {
                            { gl::DrawCapability::eCullOp,    false },
                            { gl::DrawCapability::eBlendOp,   false }},
         .draw_op        = gl::DrawOp::eFill,
-        .bindable_array = &e_scene.resources.meshes.gl.array
+        .bindable_array = &e_scene.resources.meshes.gl.mesh_array
       });
       
       // Line fill to overlap boundaries
@@ -261,7 +261,7 @@ namespace met {
                            { gl::DrawCapability::eCullOp,    false },
                            { gl::DrawCapability::eBlendOp,   false }},
         .draw_op        = gl::DrawOp::eLine,
-        .bindable_array = &e_scene.resources.meshes.gl.array
+        .bindable_array = &e_scene.resources.meshes.gl.mesh_array
       });
     }
   }

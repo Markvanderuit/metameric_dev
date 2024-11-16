@@ -38,8 +38,7 @@ namespace met::detail {
   };
 
   // Base template that implements changed state tracking of any contained type; can be specialized
-  // (and is specialized for variants/vectors below). See scene_components_state.hpp for particular
-  // component-/resource-specific overloads.
+  // (and is specialized for variants/vectors below). See components/*.hpp for specific overloads.
   template <typename Ty>
   class SceneStateHandler : public SceneStateHandlerBase<Ty> {
     using SceneStateHandlerBase<Ty>::m_mutated;

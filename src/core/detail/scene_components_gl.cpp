@@ -12,31 +12,6 @@
 #include <numeric>
 
 namespace met::detail {
-  eig::Array2u pack_material_3f(const std::variant<Colr, uint> &v) {
-    met_trace();
-    std::array<uint, 2> u;
-    if (v.index()) {
-      u[0] = std::get<1>(v);
-      u[1] = 0x00010000;
-    } else {
-      Colr c = std::get<0>(v);
-      u[0] = detail::pack_half_2x16(c.head<2>());
-      u[1] = detail::pack_half_2x16({ c.z(), 0 });
-    }
-    return { u[0], u[1] };
-  }
-
-  uint pack_material_1f(const std::variant<float, uint> &v) {
-    met_trace();
-    uint u;
-    if (v.index()) {
-      u = (0x0000FFFF & static_cast<ushort>(std::get<1>(v))) | 0x00010000;
-    } else {
-      u = (0x0000FFFF & detail::to_float16(std::get<0>(v)));
-    }
-    return u;
-  }
-
   struct NodePack {
     uint data;                        // type 1b | child mask 8b | size 4b | offs 19b
     std::array<uint, 3> aabb;         // [lo.x, lo.y], [hi.x, hi.y], [lo.z, hi.z]
@@ -75,14 +50,6 @@ namespace met::detail {
            | ((0x00000FFu & child_mask)  << 23) // 8 bits,  child leaf/node mask
            | ((0x0000001u & node.type)   << 31) // 1 bit,   current leaf/node type
            ;
-    
-    // uint copy_mask = (p.data >> 23) & 0x00000FFu;
-    // if (!node.type)
-    //   fmt::print("{} -> {} -> {}\n", node.child_mask, child_mask, copy_mask);
-    // if (copy_mask != child_mask) {
-    //   // for (auto [i, b] : enumerate_view(node.child_mask))
-    //   //   fmt::print("\t{} -> {}\n", i, (uint(b) << i));
-    // }
 
     // Child AABBs are packed in 6 bytes per child
     p.child_aabb_0.fill(0);
@@ -140,284 +107,6 @@ namespace met::detail {
     return AABB { minb, maxb };
   }
 
-  SceneGLHandler<met::Object>::SceneGLHandler() {
-    met_trace_full();
-
-    // Preallocate up to a number of objects and obtain writeable/flushable mapping
-    std::tie(object_info, m_object_info_map) = gl::Buffer::make_flusheable_object<BufferLayout>();
-  }
-
-  void SceneGLHandler<met::Object>::update(const Scene &scene) {
-    met_trace_full();
-
-    const auto &objects = scene.components.objects;
-    guard(!objects.empty() && objects);
-
-    // Set appropriate object count, then flush change to buffer
-    m_object_info_map->size = static_cast<uint>(objects.size());
-    object_info.flush(sizeof(uint));
-
-    // Write updated objects to mapping
-    for (uint i = 0; i < objects.size(); ++i) {
-      const auto &[object, state] = objects[i];
-      guard_continue(state);
-      
-      // Get mesh transform, incorporate into gl-side object transform
-      auto object_trf = object.transform.affine().matrix().eval();
-      auto mesh_trf   = scene.resources.meshes.gl.unit_transforms[object.mesh_i];
-      auto trf        = (object_trf * mesh_trf).eval();
-
-      // Fill in object struct data
-      m_object_info_map->data[i] = {
-        .trf            = trf,
-        .is_active      = object.is_active,
-        .mesh_i         = object.mesh_i,
-        .uplifting_i    = object.uplifting_i,
-        .brdf_type      = static_cast<uint>(object.brdf_type),
-        .albedo_data    = pack_material_3f(object.diffuse),
-        .metallic_data  = pack_material_1f(object.metallic),
-        .roughness_data = pack_material_1f(object.roughness),
-      };
-
-      // Flush change to buffer; most changes to objects are local,
-      // so we flush specific regions instead of the whole
-      object_info.flush(sizeof(BlockLayout), sizeof(BlockLayout) * i + sizeof(uint));
-    } // for (uint i)
-
-    // Generate top-level acceleration structure
-  }
-
-  SceneGLHandler<met::Uplifting>::SceneGLHandler() {
-    met_trace_full();
-
-    // Initialize texture atlaess to hold per-object data
-    texture_coef = {{ .levels  = 1, .padding = 0 }};
-    texture_brdf = {{ .levels  = 1, .padding = 0 }};
-
-    // Initialize basis function data
-    texture_basis = {{ .size = { wavelength_samples, wavelength_bases } }};
-
-    // Initialize warped phase data for spectral MESE method
-    auto warp_data = generate_warped_phase();
-    texture_warp = {{ .size = static_cast<uint>(warp_data.size()), 
-                      .data = cnt_span<const float>(warp_data) }};
-  }
-
-  void SceneGLHandler<met::Uplifting>::update(const Scene &scene) {
-    met_trace_full();
-
-    // Get relevant resources
-    const auto &e_objects    = scene.components.objects;
-    const auto &e_upliftings = scene.components.upliftings;
-    const auto &e_images     = scene.resources.images;
-    const auto &e_settings   = scene.components.settings;
-    
-    // Flag that the atlas' internal texture has **not** been invalidated by internal resize
-    e_upliftings.gl.texture_coef.set_invalitated(false);
-    e_upliftings.gl.texture_brdf.set_invalitated(false);
-
-    // Only rebuild if there are upliftings and objects
-    guard(!e_upliftings.empty() && !e_upliftings.empty());
-    guard(e_upliftings                                        || 
-          e_objects                                           ||
-          e_settings.state.texture_size                       ||
-          !e_upliftings.gl.texture_coef.texture().is_init()   ||
-          !e_upliftings.gl.texture_coef.buffer().is_init()    );
-    
-    // Handle texture_coef
-    {
-      // Gather necessary texture sizes for each object
-      // If the texture index was specified, we insert the texture size as an input
-      // for the atlas. If a color was specified, we allocate a small patch
-      std::vector<eig::Array2u> inputs(e_objects.size());
-      rng::transform(e_objects, inputs.begin(), [&](const auto &object) -> eig::Array2u {
-        return object->diffuse | visit {
-          [&](uint i) { return e_images[i]->size(); },
-          [&](Colr f) { return eig::Array2u { 16, 16 }; },
-        };
-      });
-
-      // Scale atlas inputs to respect the maximum texture size set in Settings::texture_size
-      eig::Array2u maximal = rng::fold_left(inputs, eig::Array2u(0), [](auto a, auto b) { return a.cwiseMax(b).eval(); });
-      eig::Array2f scaled  = e_settings->apply_texture_size(maximal).cast<float>() / maximal.cast<float>();
-      for (auto &input : inputs)
-        input = (input.cast<float>() * scaled).max(2.f).cast<uint>().eval();
-
-      // Regenerate atlas if inputs don't match the atlas' current layout
-      // Note; barycentric weights will need a full rebuild, which is detected
-      //       by the nr. of objects changing or the texture setting changing. A bit spaghetti-y :S
-      texture_coef.resize(inputs);
-      if (texture_coef.is_invalitated()) {
-        // The barycentric texture was re-allocated, which means underlying memory was all invalidated.
-        // So in a case of really bad spaghetti-code, we force object-dependent parts to update
-        auto &e_scene = const_cast<Scene &>(scene);
-        e_scene.components.objects.set_mutated(true);
-      }
-    }
-
-    // Handle texture_brdf
-    {
-      // Gather necessary texture sizes for each object
-      // If the texture index was specified, we insert the texture size as an input
-      // for the atlas. If a value was specified, we allocate a small patch
-      // As we'd like to cram multiple brdf values into a single lookup, we will
-      // take the larger size for each patch. Makes baking slightly more expensive
-      std::vector<eig::Array2u> inputs(e_objects.size());
-      rng::transform(e_objects, inputs.begin(), [&](const auto &object) -> eig::Array2u {
-        auto metallic_size = object->metallic | visit {
-          [&](uint  i) { return e_images[i]->size(); },
-          [&](float f) { return eig::Array2u { 16, 16 }; },
-        };
-        auto roughness_size = object->roughness | visit {
-          [&](uint  i) { return e_images[i]->size(); },
-          [&](float f) { return eig::Array2u { 16, 16 }; },
-        };
-        return metallic_size.cwiseMax(roughness_size).eval();
-      });
-
-      // Scale atlas inputs to respect the maximum texture size set in Settings::texture_size
-      eig::Array2u maximal = rng::fold_left(inputs, eig::Array2u(0), [](auto a, auto b) { return a.cwiseMax(b).eval(); });
-      eig::Array2f scaled  = e_settings->apply_texture_size(maximal).cast<float>() / maximal.cast<float>();
-      for (auto &input : inputs)
-        input = (input.cast<float>() * scaled).max(2.f).cast<uint>().eval();
-      
-      // Regenerate atlas if inputs don't match the atlas' current layout
-      // Note; barycentric weights will need a full rebuild, which is detected
-      //       by the nr. of objects changing or the texture setting changing. A bit spaghetti-y :S
-      texture_brdf.resize(inputs);
-      if (texture_brdf.is_invalitated()) {
-        // The barycentric texture was re-allocated, which means underlying memory was all invalidated.
-        // So in a case of really bad spaghetti-code, we force object-dependent parts to update
-        auto &e_scene = const_cast<Scene &>(scene);
-        e_scene.components.objects.set_mutated(true);
-      }
-    }
-
-    // Push basis function data, just default set for now
-    {
-      const auto &basis = scene.resources.bases[0].value();
-      texture_basis.set(obj_span<const float>(basis.func));
-    }
-  }
-
-  SceneGLHandler<met::Emitter>::SceneGLHandler() {
-    met_trace_full();
-
-    // Preallocate up to a number of objects and obtain writeable/flushable mapping
-    // for regular emitters and an envmap
-    std::tie(emitter_info, m_em_info_map) = gl::Buffer::make_flusheable_object<EmBufferLayout>();
-    std::tie(emitter_envm_info, m_envm_info_data) = gl::Buffer::make_flusheable_object<EnvBufferLayout>();
-  }
-
-  void SceneGLHandler<met::Emitter>::update(const Scene &scene) {
-    met_trace_full();
-    
-    const auto &emitters = scene.components.emitters;
-    guard(!emitters.empty() && emitters);
-
-    // Set appropriate component count, then flush change to buffer
-    m_em_info_map->size = static_cast<uint>(emitters.size());
-    emitter_info.flush(sizeof(uint));
-
-    // Write updated components to mapping
-    for (uint i = 0; i < emitters.size(); ++i) {
-      const auto &[emitter, state] = emitters[i];
-      guard_continue(state);
-
-      m_em_info_map->data[i] = {
-        .trf              = emitter.transform.affine().matrix(),
-        .type             = static_cast<uint>(emitter.type),
-        .is_active        = emitter.is_active,
-        .illuminant_i     = emitter.illuminant_i,
-        .illuminant_scale = emitter.illuminant_scale
-      };
-
-      // Flush change to buffer; most changes to objects are local,
-      // so we flush specific regions instead of the whole
-      emitter_info.flush(sizeof(EmBlockLayout), sizeof(EmBlockLayout) * i + sizeof(uint));
-    } // for (uint i)
-
-    /* // Build per-wavelength sampling distributions over emitter's
-    // relative spectral output, weighted by approximate emitter surface area
-    eig::Matrix<float, met_max_emitters, wavelength_samples> spectral_distr = 0.f;
-    #pragma omp parallel for
-    for (int i = 0; i < emitters.size(); ++i) {
-      const auto &[emitter, state] = emitters[i];
-      guard_continue(emitter.is_active);
-
-      // Get relative spectral output of emitter
-      Spec s = scene.resources.illuminants[emitter.illuminant_i].value() 
-             * emitter.illuminant_scale;
-      
-      // Multiply by either approx. surface area, or hemisphere
-      switch (emitter.type) {
-        case Emitter::Type::eSphere:
-          s *= 
-            .5f *
-            4.f * std::numbers::pi_v<float> * std::pow(emitter.transform.scaling.x(), 2.f);
-          break;
-        case Emitter::Type::eRect:
-          s *= 
-            emitter.transform.scaling.x() * emitter.transform.scaling.y();
-          break;
-        default:
-          s *= 2.f * std::numbers::pi_v<float>; // half a hemisphere
-          break;
-      } 
-
-      spectral_distr.row(i) = s;
-    }
-    
-    auto array_distr = DistributionArray<wavelength_samples>(cnt_span<float>(spectral_distr));   
-    emitter_distr_buffer = array_distr.to_buffer_std140(); */
-
-    // Build sampling distribution over emitter's relative output
-    std::vector<float> emitter_distr(met_max_emitters, 0.f);
-    #pragma omp parallel for
-    for (int i = 0; i < emitters.size(); ++i) {
-      const auto &[emitter, state] = emitters[i];
-      guard_continue(emitter.is_active);
-
-      // Get corresponding observer luminance for output spd under xyz/d65
-      Spec  s = scene.resources.illuminants[emitter.illuminant_i].value() * emitter.illuminant_scale;
-      float w = luminance(ColrSystem { .cmfs = models::cmfs_cie_xyz, .illuminant = models::emitter_cie_d65 }(s));
-
-      // Multiply by either approx. surface area, or hemisphere
-      switch (emitter.type) {
-        case Emitter::Type::eSphere:
-          w *= 
-            .5f *
-            4.f * std::numbers::pi_v<float> * std::pow(emitter.transform.scaling.x(), 2.f);
-          break;
-        case Emitter::Type::eRect:
-          w *= 
-            emitter.transform.scaling.x() * emitter.transform.scaling.y();
-          break;
-        default:
-          w *= 2.f * std::numbers::pi_v<float>; // half a hemisphere
-          break;
-      }
-
-      emitter_distr[i] = w;
-    }
-
-    auto distr = Distribution(cnt_span<float>(emitter_distr));   
-    emitter_distr_buffer = distr.to_buffer_std140();
-
-    // Store information on first co  nstant emitter, if one is present and active;
-    // we don't support multiple environment emitters
-    m_envm_info_data->envm_is_present = false;
-    for (uint i = 0; i < emitters.size(); ++i) {
-      const auto &[emitter, state] = emitters[i];
-      if (emitter.is_active && emitter.type == Emitter::Type::eConstant) {
-        m_envm_info_data->envm_is_present = true;
-        m_envm_info_data->envm_i          = i;
-        break;
-      }
-    }
-    emitter_envm_info.flush();
-  }
-
   SceneGLHandler<met::Mesh>::SceneGLHandler() {
     met_trace_full();
 
@@ -431,25 +120,22 @@ namespace met::detail {
     const auto &meshes = scene.resources.meshes;
     guard(!meshes.empty() && meshes);
 
-    // Resize cache vectors, which keep cleaned, simplified mesh data around 
-    m_meshes.resize(meshes.size());
-    m_blas.resize(meshes.size());
-    unit_transforms.resize(meshes.size());
+    // Resize cache vector, which keeps cleaned, simplified mesh data around 
+    mesh_cache.resize(meshes.size());
 
     // Set appropriate mesh count in buffer
     m_blas_info_map->size = static_cast<uint>(meshes.size());
 
-    // Generate cleaned, simplified mesh data
+    // For each mesh, we simplify the mesh, fit it to a [0, 1] cube, and finally
+    // compute a BVH over the result. The result is cached cpu-side
     #pragma omp parallel for
     for (int i = 0; i < meshes.size(); ++i) {
       const auto &[value, state] = meshes[i];
       guard_continue(state);
-
-      // We simplify a copy of the mesh, fit it to a [0, 1] cube, and finally
-      // build a bvh to represent this mess
-      m_meshes[i]        = fixed_degenerate_uvs<met::Mesh>(simplified_mesh<met::Mesh>(value, 262144, 5e-3));
-      unit_transforms[i] = unitize_mesh<met::Mesh>(m_meshes[i]);
-      m_blas[i]          = {{ .mesh = m_meshes[i], .n_leaf_children = 1 }};
+      MeshData &data = mesh_cache[i];
+      data.mesh     = fixed_degenerate_uvs<met::Mesh>(simplified_mesh<met::Mesh>(value, 262144, 5e-3));
+      data.unit_trf = unitize_mesh<met::Mesh>(data.mesh);
+      data.bvh      = {{ .mesh = data.mesh, .n_leaf_children = 1 }};
     }
 
     // Pack mesh/BVH data tightly and fill in corresponding mesh layout info
@@ -462,31 +148,36 @@ namespace met::detail {
                       elems_offs(meshes.size()); // Nr. of elems prior to mesh i
     
     // Fill in vert/node/elem sizes and scans
-    rng::transform(m_meshes, verts_size.begin(), [](const auto &m) -> uint { return m.verts.size(); });
-    rng::transform(m_blas,   nodes_size.begin(), [](const auto &m) -> uint { return m.nodes.size(); });
-    rng::transform(m_meshes, elems_size.begin(), [](const auto &m) -> uint { return m.elems.size(); });
+    rng::transform(mesh_cache, verts_size.begin(), [](const auto &m) -> uint { return m.mesh.verts.size(); });
+    rng::transform(mesh_cache, nodes_size.begin(), [](const auto &m) -> uint { return m.bvh.nodes.size();  });
+    rng::transform(mesh_cache, elems_size.begin(), [](const auto &m) -> uint { return m.mesh.elems.size(); });
     std::exclusive_scan(range_iter(verts_size), verts_offs.begin(), 0u);
     std::exclusive_scan(range_iter(nodes_size), nodes_offs.begin(), 0u);
     std::exclusive_scan(range_iter(elems_size), elems_offs.begin(), 0u);
     
-    // Fill in gl-side mesh layout info
+    // Fill in mesh layout info
+    #pragma omp parallel for
     for (int i = 0; i < meshes.size(); ++i) {
       auto &layout = m_blas_info_map->data[i];
+      auto &data   = mesh_cache[i];
       layout.nodes_offs = nodes_offs[i];
       layout.prims_offs = elems_offs[i];
+      data.nodes_offs   = nodes_offs[i];
+      data.prims_offs   = elems_offs[i];
     }
 
     // Mostly temporary data packing vectors; will be copied to gpu-side buffers after
-    std::vector<VertexPack>   verts_packed(verts_size.back() + verts_offs.back()); // Compressed and packed
-    std::vector<NodePack>     nodes_packed(nodes_size.back() + nodes_offs.back()); // Partially compressed 8-way blas
-    std::vector<eig::Array3u> elems_packed(elems_size.back() + elems_offs.back()); // Not compressed, just packed
-    blas_prims_cpu.resize(elems_size.back() + elems_offs.back());                  // Compressed and packed
+    std::vector<VertexPack>    verts_packed(verts_size.back() + verts_offs.back()); // Compressed and packed vertex data
+    std::vector<eig::Array3u>  elems_packed(elems_size.back() + elems_offs.back()); // Uncompressed, just packed element indices
+    std::vector<NodePack>      nodes_packed(nodes_size.back() + nodes_offs.back()); // Compressed 8-way BLAS node data
+    std::vector<PrimitivePack> prims_packed(elems_size.back() + elems_offs.back()); // Compressed 8-way BLAS leaf data, ergo duplicated mesh primitives
 
     // Pack data tightly into pack data vectors
     #pragma omp parallel for
     for (int i = 0; i < meshes.size(); ++i) {
-      const auto &blas = m_blas[i];
-      const auto &mesh = m_meshes[i];
+      const auto &mesh_data = mesh_cache[i];
+      const auto &blas = mesh_data.bvh;
+      const auto &mesh = mesh_data.mesh;
 
       // Pack vertex data tightly and copy to the correctly offset range
       #pragma omp parallel for
@@ -512,7 +203,7 @@ namespace met::detail {
       for (int j = 0; j < blas.prims.size(); ++j) {
         // BVH primitives are packed in bvh order
         auto el = mesh.elems[blas.prims[j]];
-        blas_prims_cpu[elems_offs[i] + j] = PrimitivePack {
+        prims_packed[elems_offs[i] + j] = PrimitivePack {
           .v0 = verts_packed[verts_offs[i] + el[0]],
           .v1 = verts_packed[verts_offs[i] + el[1]],
           .v2 = verts_packed[verts_offs[i] + el[2]]
@@ -531,20 +222,20 @@ namespace met::detail {
     }
 
     // Copy data to buffers
-    mesh_verts = {{ .data = cnt_span<const std::byte>(verts_packed)   }};
-    mesh_elems = {{ .data = cnt_span<const std::byte>(elems_packed)   }};
+    mesh_verts = {{ .data = cnt_span<const std::byte>(verts_packed) }};
+    mesh_elems = {{ .data = cnt_span<const std::byte>(elems_packed) }};
     blas_nodes = {{ .data = cnt_span<const std::byte>(nodes_packed) }};
-    blas_prims = {{ .data = cnt_span<const std::byte>(blas_prims_cpu)  }};
+    blas_prims = {{ .data = cnt_span<const std::byte>(prims_packed) }};
 
     // Define corresponding vertex array object and generate multidraw command info
-    array = {{
+    mesh_array = {{
       .buffers = {{ .buffer = &mesh_verts, .index = 0, .stride = sizeof(eig::Array4u)      }},
       .attribs = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e4 }},
       .elements = &mesh_elems
     }};
-    draw_commands.resize(meshes.size());
+    mesh_draw.resize(meshes.size());
     for (uint i = 0; i < meshes.size(); ++i) {
-      draw_commands[i] = { .vertex_count = elems_size[i] * 3, .vertex_first = elems_offs[i] * 3 };
+      mesh_draw[i] = { .vertex_count = elems_size[i] * 3, .vertex_first = elems_offs[i] * 3 };
     }
 
     // Flush changes to layout data
@@ -737,7 +428,7 @@ namespace met::detail {
 
       // Get mesh transform, incorporate into object transform
       auto object_trf = object.transform.affine().matrix().eval();
-      auto mesh_trf   = scene.resources.meshes.gl.unit_transforms[object.mesh_i];
+      auto mesh_trf   = scene.resources.meshes.gl.mesh_cache[object.mesh_i].unit_trf;
       auto trf        = (object_trf * mesh_trf).eval();
 
       prims.push_back({ .is_object = true, 

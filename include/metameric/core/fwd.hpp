@@ -4,10 +4,8 @@
 #include <metameric/core/spectrum.hpp>
 
 namespace met {
-  // Major components
+  // Scene and its internal components
   struct Scene;
-
-  // Scene components
   struct Emitter;
   struct Object;
   struct Settings;
@@ -15,9 +13,9 @@ namespace met {
   struct View;
 
   // Scene resources
+  struct Image;
   template <uint K>
   struct BVH;
-  struct Image;
   template <typename Vt, typename El>
   struct MeshBase;
   template <typename Vt> 

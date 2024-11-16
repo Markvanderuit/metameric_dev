@@ -1,7 +1,6 @@
-#include <metameric/core/components.hpp>
+#include <metameric/core/components/uplifting.hpp>
 #include <metameric/core/ranges.hpp>
 #include <metameric/core/scene.hpp>
-#include <tuple>
 
 namespace met {
   namespace detail {
@@ -17,43 +16,6 @@ namespace met {
       return false;
     }
   } // namespace detail
-
-  bool View::operator==(const View &o) const {
-    guard(film_size.isApprox(o.film_size), false);
-    return std::tie(draw_frustrum, observer_i, camera_trf, camera_fov_y)
-        == std::tie(o.draw_frustrum, o.observer_i, o.camera_trf, o.camera_fov_y);
-  }
- 
-  bool Object::operator==(const Object &o) const {
-    guard(std::tie(is_active,   transform,   mesh_i,   uplifting_i,   brdf_type) == 
-          std::tie(o.is_active, o.transform, o.mesh_i, o.uplifting_i, o.brdf_type), 
-          false);
-
-    guard(diffuse.index() == o.diffuse.index(), false);
-    switch (diffuse.index()) {
-      case 0: guard(std::get<Colr>(diffuse).isApprox(std::get<Colr>(o.diffuse)), false); break;
-      case 1: guard(std::get<uint>(diffuse) == std::get<uint>(o.diffuse), false); break;
-    }
-
-    guard(metallic.index() == o.metallic.index(), false);
-    switch (metallic.index()) {
-      case 0: guard(std::get<float>(metallic) == std::get<float>(o.metallic), false); break;
-      case 1: guard(std::get<uint>(metallic) == std::get<uint>(o.metallic), false); break;
-    }
-
-    guard(roughness.index() == o.roughness.index(), false);
-    switch (roughness.index()) {
-      case 0: guard(std::get<float>(roughness) == std::get<float>(o.roughness), false); break;
-      case 1: guard(std::get<uint>(roughness) == std::get<uint>(o.roughness), false); break;
-    }
-   
-    return true;
-  }
-
-  bool Emitter::operator==(const Emitter &o) const {
-    return std::tie(type, is_active, transform, illuminant_i, illuminant_scale) 
-        == std::tie(o.type, o.is_active, o.transform, o.illuminant_i, o.illuminant_scale);
-  }
   
   bool Uplifting::operator==(const Uplifting &o) const {
     return std::tie(observer_i, illuminant_i, basis_i)
@@ -199,6 +161,45 @@ namespace met {
     };
   }
 
+  bool Uplifting::Vertex::has_mismatching(const Scene &scene, const Uplifting &uplifting) const {
+    met_trace();
+    return constraint | visit { 
+      [&](const DirectColorConstraint &c) {
+        // Merge all known color system data
+        auto cstr = c.cstr_j
+                  | vws::filter(&LinearConstraint::is_active)
+                  | vws::transform([](const auto &v) { return std::pair { v.cmfs_j, v.illm_j }; })
+                  | rng::to<std::vector>();
+        cstr.push_back(std::pair { uplifting.observer_i, uplifting.illuminant_i });
+
+        // Mismatching only occurs if there are two or more color systems, and all are unique
+        return cstr.size() > 1 && !detail::has_duplicates(cstr);
+      },
+      [&](const DirectSurfaceConstraint &c) {
+        // Merge all known color system data
+        auto cstr = c.cstr_j
+                  | vws::filter(&LinearConstraint::is_active)
+                  | vws::transform([](const auto &v) { return std::pair { v.cmfs_j, v.illm_j }; })
+                  | rng::to<std::vector>();
+        cstr.push_back(std::pair { uplifting.observer_i, uplifting.illuminant_i });
+        
+        // Mismatching only occurs if there are two or more color systems, and all are unique
+        return cstr.size() > 1 && !detail::has_duplicates(cstr);
+      },
+      [&](const IndirectSurfaceConstraint &c) {
+        auto cstr = c.cstr_j
+                  | vws::filter(&NLinearConstraint::is_active)
+                  | rng::to<std::vector>();
+        return !cstr.empty() 
+            && !detail::has_duplicates(cstr) 
+            && !cstr.back().powr_j.empty();
+      },
+      [&](const MeasurementConstraint &v) { 
+        return false;
+      }
+    };
+  }
+
   bool Uplifting::Vertex::has_surface() const {
     met_trace();
     return constraint | visit {
@@ -259,42 +260,109 @@ namespace met {
     };
   }
 
-  bool Uplifting::Vertex::has_mismatching(const Scene &scene, const Uplifting &uplifting) const {
-    met_trace();
-    return constraint | visit { 
-      [&](const DirectColorConstraint &c) {
-        // Merge all known color system data
-        auto cstr = c.cstr_j
-                  | vws::filter(&LinearConstraint::is_active)
-                  | vws::transform([](const auto &v) { return std::pair { v.cmfs_j, v.illm_j }; })
-                  | rng::to<std::vector>();
-        cstr.push_back(std::pair { uplifting.observer_i, uplifting.illuminant_i });
-
-        // Mismatching only occurs if there are two or more color systems, and all are unique
-        return cstr.size() > 1 && !detail::has_duplicates(cstr);
-      },
-      [&](const DirectSurfaceConstraint &c) {
-        // Merge all known color system data
-        auto cstr = c.cstr_j
-                  | vws::filter(&LinearConstraint::is_active)
-                  | vws::transform([](const auto &v) { return std::pair { v.cmfs_j, v.illm_j }; })
-                  | rng::to<std::vector>();
-        cstr.push_back(std::pair { uplifting.observer_i, uplifting.illuminant_i });
+  namespace detail {
+    SceneGLHandler<met::Uplifting>::SceneGLHandler() {
+      met_trace_full();
+      texture_coef  = {{ .levels  = 1, .padding = 0 }};
+      texture_brdf  = {{ .levels  = 1, .padding = 0 }};
+      texture_basis = {{ .size = { wavelength_samples, wavelength_bases } }};
+    }
         
-        // Mismatching only occurs if there are two or more color systems, and all are unique
-        return cstr.size() > 1 && !detail::has_duplicates(cstr);
-      },
-      [&](const IndirectSurfaceConstraint &c) {
-        auto cstr = c.cstr_j
-                  | vws::filter(&NLinearConstraint::is_active)
-                  | rng::to<std::vector>();
-        return !cstr.empty() 
-            && !detail::has_duplicates(cstr) 
-            && !cstr.back().powr_j.empty();
-      },
-      [&](const MeasurementConstraint &v) { 
-        return false;
+    void SceneGLHandler<met::Uplifting>::update(const Scene &scene) {
+      met_trace_full();
+
+      // Get relevant resources
+      const auto &e_objects    = scene.components.objects;
+      const auto &e_upliftings = scene.components.upliftings;
+      const auto &e_images     = scene.resources.images;
+      const auto &e_settings   = scene.components.settings;
+      
+      // Flag that the atlas' internal texture has **not** been invalidated by internal resize
+      e_upliftings.gl.texture_coef.set_invalitated(false);
+      e_upliftings.gl.texture_brdf.set_invalitated(false);
+
+      // Only rebuild if there are upliftings and objects
+      guard(!e_upliftings.empty() && !e_upliftings.empty());
+      guard(e_upliftings                                        || 
+            e_objects                                           ||
+            e_settings.state.texture_size                       ||
+            !e_upliftings.gl.texture_coef.texture().is_init()   ||
+            !e_upliftings.gl.texture_coef.buffer().is_init()    );
+      
+      // Check for texture_coef resize
+      {
+        // Gather necessary texture sizes for each object
+        // If the texture index was specified, we insert the texture size as an input
+        // for the atlas. If a color was specified, we allocate a small patch
+        std::vector<eig::Array2u> inputs(e_objects.size());
+        rng::transform(e_objects, inputs.begin(), [&](const auto &object) -> eig::Array2u {
+          return object->diffuse | visit {
+            [&](uint i) { return e_images[i]->size(); },
+            [&](Colr f) { return eig::Array2u { 16, 16 }; },
+          };
+        });
+
+        // Scale atlas inputs to respect the maximum texture size set in Settings::texture_size
+        eig::Array2u maximal = rng::fold_left(inputs, eig::Array2u(0), [](auto a, auto b) { return a.cwiseMax(b).eval(); });
+        eig::Array2f scaled  = e_settings->apply_texture_size(maximal).cast<float>() / maximal.cast<float>();
+        for (auto &input : inputs)
+          input = (input.cast<float>() * scaled).max(2.f).cast<uint>().eval();
+
+        // Regenerate atlas if inputs don't match the atlas' current layout
+        // Note; barycentric weights will need a full rebuild, which is detected
+        //       by the nr. of objects changing or the texture setting changing. A bit spaghetti-y :S
+        texture_coef.resize(inputs);
+        if (texture_coef.is_invalitated()) {
+          // The barycentric texture was re-allocated, which means underlying memory was all invalidated.
+          // So in a case of really bad spaghetti-code, we force object-dependent parts to update
+          auto &e_scene = const_cast<Scene &>(scene);
+          e_scene.components.objects.set_mutated(true);
+        }
       }
-    };
-  }
+
+      // Check for texture_brdf resize
+      {
+        // Gather necessary texture sizes for each object
+        // If the texture index was specified, we insert the texture size as an input
+        // for the atlas. If a value was specified, we allocate a small patch
+        // As we'd like to cram multiple brdf values into a single lookup, we will
+        // take the larger size for each patch. Makes baking slightly more expensive
+        std::vector<eig::Array2u> inputs(e_objects.size());
+        rng::transform(e_objects, inputs.begin(), [&](const auto &object) -> eig::Array2u {
+          auto metallic_size = object->metallic | visit {
+            [&](uint  i) { return e_images[i]->size(); },
+            [&](float f) { return eig::Array2u { 16, 16 }; },
+          };
+          auto roughness_size = object->roughness | visit {
+            [&](uint  i) { return e_images[i]->size(); },
+            [&](float f) { return eig::Array2u { 16, 16 }; },
+          };
+          return metallic_size.cwiseMax(roughness_size).eval();
+        });
+
+        // Scale atlas inputs to respect the maximum texture size set in Settings::texture_size
+        eig::Array2u maximal = rng::fold_left(inputs, eig::Array2u(0), [](auto a, auto b) { return a.cwiseMax(b).eval(); });
+        eig::Array2f scaled  = e_settings->apply_texture_size(maximal).cast<float>() / maximal.cast<float>();
+        for (auto &input : inputs)
+          input = (input.cast<float>() * scaled).max(2.f).cast<uint>().eval();
+        
+        // Regenerate atlas if inputs don't match the atlas' current layout
+        // Note; barycentric weights will need a full rebuild, which is detected
+        //       by the nr. of objects changing or the texture setting changing. A bit spaghetti-y :S
+        texture_brdf.resize(inputs);
+        if (texture_brdf.is_invalitated()) {
+          // The barycentric texture was re-allocated, which means underlying memory was all invalidated.
+          // So in a case of really bad spaghetti-code, we force object-dependent parts to update
+          auto &e_scene = const_cast<Scene &>(scene);
+          e_scene.components.objects.set_mutated(true);
+        }
+      }
+
+      // Push basis function data, just defaulted to basis 0 for now
+      {
+        const auto &basis = scene.resources.bases[0].value();
+        texture_basis.set(obj_span<const float>(basis.func));
+      }
+    }
+  } // namespace detail
 } // namespace met

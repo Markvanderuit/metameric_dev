@@ -2,15 +2,20 @@
 
 #include <metameric/core/fwd.hpp>
 #include <metameric/core/record.hpp>
+#include <metameric/core/detail/scene_components.hpp>
+#include <metameric/core/components/emitter.hpp>
+#include <metameric/core/components/uplifting.hpp>
+#include <metameric/core/components/object.hpp>
+#include <metameric/core/components/settings.hpp>
+#include <metameric/core/components/view.hpp>
 #include <metameric/core/detail/scene_components_gl.hpp>
-#include <metameric/core/detail/scene_components_state.hpp>
 
 namespace met {
-  /* Scene data layout.
-     Simple indexed scene; no graph, just a library of objects and 
-     their dependencies. Contains most program data, pushes data to GPU for rendering/viewing
-     and handles state tracking for the program pipeline. 
-  */
+  // Scene data layout.
+  // Simple indexed scene; no graph, just vectors of objects and resource dependencies. 
+  // Saves/loads most program data, handles update to GL before
+  // render and view pipeline at frame start, and handles fine-grained state tracking
+  // of user edits from view, so we can push updated data only.
   struct Scene {
     // Scene components, directly visible or influential in the scene (stored in json on disk)
     struct {
@@ -83,7 +88,7 @@ namespace met {
     const Uplifting::Vertex &uplifting_vertex(ConstraintRecord cs) const;
     Uplifting::Vertex &uplifting_vertex(ConstraintRecord cs);
 
-    // Force update check of stale (gl-side) components and state-trackers
+    // Run update check of stale (gl-side) components and state-trackers
     void update();
 
   public: // Serialization

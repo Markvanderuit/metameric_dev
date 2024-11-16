@@ -240,7 +240,7 @@ namespace met {
     dstr_views();
 
     // Allocate the new underlying texture
-    Texture texture = {{ .size = new_capacity, .levels = m_levels }};
+    TextureArray texture = {{ .size = new_capacity, .levels = m_levels }};
 
     // Copy over the new_texture's overlap from m_texture, then swap objects
     m_texture.copy_to(texture, 0, texture.size());
