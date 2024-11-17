@@ -63,15 +63,13 @@ namespace met {
       = e_active_constraints
       | vws::transform([&](ConstraintRecord cs) { return e_scene.uplifting_vertex(cs); })
       | vws::transform([](const auto &v) { return v.surfaces(); })
-      | vws::join
-      | rng::to<std::vector>();
+      | vws::join;
 
     // Generate view over surface points that are "free variables" in all active scene constraints
     auto active_surfaces
       = e_active_constraints
       | vws::transform([&](ConstraintRecord cs) { return e_scene.uplifting_vertex(cs); })
-      | vws::transform([](const auto &v) { return v.surface(); })
-      | rng::to<std::vector>();
+      | vws::transform([](const auto &v) { return v.surface(); });
 
     // Draw vertex for each vertex at its surface
     for (const auto &si : all_surfaces) {
@@ -168,12 +166,12 @@ namespace met {
       // Determine rectangle of points around the image plane in world space
       auto image_world = quad | vws::transform([full_trf](const auto &v) { 
         return eig::screen_to_world_space(v.head<2>().eval(), full_trf);
-      }) | rng::to<std::vector>();
+      }) | view_to<std::vector<eig::Vector3f>>();
       
       // Determine second rectangle of points, offset into camera frustrum
       auto frust_world = image_world | vws::transform([center = e_view.camera_trf.position](const auto &v) {
         return (center + 0.25 * (v - center).matrix().normalized()).array().eval();
-      }) | rng::to<std::vector>();
+      }) | view_to<std::vector<eig::Vector3f>>();
 
       // Compute window-space representations
       auto image_window = image_world | vws::transform([&](const auto &v) {
@@ -183,7 +181,7 @@ namespace met {
           return eig::Vector2f(0);
         else
           return eig::screen_to_window_space(trf.head<2>() * .5f + .5f, viewport_offs, viewport_size);
-      }) | rng::to<std::vector>();
+      }) | view_to<std::vector<eig::Vector2f>>();
       auto frust_window = frust_world | vws::transform([&](const auto &v) {
         auto trf = (e_arcball.full() * (eig::Vector4f() << v, 1).finished()).array().eval();
         trf /= trf.w();
@@ -191,7 +189,7 @@ namespace met {
           return eig::Vector2f(0);
         else
           return eig::screen_to_window_space(trf.head<2>() * .5f + .5f, viewport_offs, viewport_size);
-      }) | rng::to<std::vector>();
+      }) | view_to<std::vector<eig::Vector2f>>();
 
       // Draw frustrum
       auto dl = ImGui::GetWindowDrawList();

@@ -248,7 +248,7 @@ namespace met {
     met_trace();
     
     // Filter out inactive constraints
-    auto direct_cstr = cstr_j | vws::filter(&LinearConstraint::is_active) | rng::to<std::vector>();
+    auto direct_cstr = cstr_j | vws::filter(&LinearConstraint::is_active) | view_to<std::vector<LinearConstraint>>();
 
     // Assemble info object for generating boundary spectra
     DirectMismatchSolidInfo info = {
@@ -282,7 +282,7 @@ namespace met {
     met_trace();
     
     // Filter out inactive constraints
-    auto direct_cstr = cstr_j | vws::filter(&LinearConstraint::is_active) | rng::to<std::vector>();
+    auto direct_cstr = cstr_j | vws::filter(&LinearConstraint::is_active) |  view_to<std::vector<LinearConstraint>>();
 
     // Assemble info object for generating boundary spectra
     DirectMismatchSolidInfo info = {
@@ -316,7 +316,7 @@ namespace met {
     met_trace();
 
     // Filter out inactive constraints
-    auto indrct_cstr = cstr_j | vws::filter(&NLinearConstraint::is_active) | rng::to<std::vector>();
+    auto indrct_cstr = cstr_j | vws::filter(&NLinearConstraint::is_active) |  view_to<std::vector<NLinearConstraint>>();
 
     // Assemble info object for generating boundary spectra
     IndirectMismatchSolidInfo info = {

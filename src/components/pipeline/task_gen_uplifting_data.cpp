@@ -133,7 +133,7 @@ namespace met {
     // 3. Generate color system tesselation and pack for the gl-side
     if (tssl_stale) {
       // Generate new tesselation
-      auto points = m_tessellation_samples | vws::transform(&MismatchSample::colr) | rng::to<std::vector>();
+      auto points = m_tessellation_samples | vws::transform(&MismatchSample::colr) | view_to<std::vector<Colr>>();
       m_tesselation = generate_delaunay<AlDelaunay, Colr>(points);
 
       // Update packed data for fast per-object delaunay traversal

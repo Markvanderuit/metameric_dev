@@ -45,10 +45,10 @@ namespace met {
         auto illums = emitters
                     | vws::transform([ ](const auto &comp) { return comp.value.illuminant_i; })
                     | vws::transform([&](uint i) { return *scene.resources.illuminants[i];   })
-                    | rng::to<std::vector>();
+                    | view_to<std::vector<Spec>>();
         auto scales = emitters
                     | vws::transform([](const auto &comp) { return comp.value.illuminant_scale; })
-                    | rng::to<std::vector>();
+                    | view_to<std::vector<float>>();
     
         // Generate average over scaled distributions
         m_wavelength_distr = 1.f;
@@ -159,13 +159,14 @@ namespace met {
 
     // Assemble appropriate draw commands for each object in the scene
     // by taking the relevant draw command from its mesh data
+    auto commands = scene.components.objects.data()
+                  | vws::transform(&detail::Component<Object>::value)
+                  | vws::filter(&Object::is_active)
+                  | vws::transform(&Object::mesh_i)
+                  | index_into_view(scene.resources.meshes.gl.mesh_draw);
+    m_draw.commands.clear();
+    rng::copy(commands, std::back_inserter(m_draw.commands));
     m_draw.bindable_array = &scene.resources.meshes.gl.mesh_array;
-    m_draw.commands = scene.components.objects.data()
-                    | vws::transform(&detail::Component<Object>::value)
-                    | vws::filter(&Object::is_active)
-                    | vws::transform(&Object::mesh_i)
-                    | index_into_view(scene.resources.meshes.gl.mesh_draw)
-                    | rng::to<std::vector>();
     
     // Specify draw states
     gl::state::set_viewport(sensor.film_size);    

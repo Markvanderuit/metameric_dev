@@ -156,10 +156,10 @@ namespace met {
 
       // Dependent on node type, do...
       if (auto node_p = dynamic_cast<BuildNodeInner<K> *>(next_p)) {
-        // Get view over all non-nulled children
+        // Get coipy of non-nulled child data
         auto nodes = node_p->child_nodes
                    | vws::filter([](auto ptr) { return ptr != nullptr; })
-                   | rng::to<std::vector>();
+                   | view_to<std::vector<BuildNode *>>();
         
         // Store AABBs of children, currently uncompressed
         node.child_aabb = node_p->child_aabbs;
@@ -173,10 +173,10 @@ namespace met {
         // Push child pointers on back of queue for continued traversal
         rng::copy(nodes, std::back_inserter(work_queue));
       } else if (auto leaf_p = dynamic_cast<BuildNodeLeaf<K> *>(next_p)) {
-        // Get view over all contained primitive indices
+        // Get copy of all contained primitive indices
         auto prims = std::span(leaf_p->prim_p, leaf_p->n_prims)
                    | vws::transform(&RTCBuildPrimitive::primID)
-                   | rng::to<std::vector>();
+                   | view_to<std::vector<uint>>();
         
         // Store AABBs of children, currently uncompressed
         // Child data remains unspecified

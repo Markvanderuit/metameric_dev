@@ -459,7 +459,7 @@ namespace met::detail {
     }
 
     // Get vector of AABBs only
-    auto prim_aabbs = vws::transform(prims, &PrimitiveData::aabb) | rng::to<std::vector>();
+    auto prim_aabbs = vws::transform(prims, &PrimitiveData::aabb) | view_to<std::vector<AABB>>();
 
     // Generate scene-enclosing bounding box
     AABB scene_aabb = std::reduce(

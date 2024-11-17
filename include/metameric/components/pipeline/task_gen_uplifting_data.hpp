@@ -58,7 +58,7 @@ namespace met {
       // because QHull can throw a fit on small inputs
       // if (m_colr_samples.size() >= 6 && (maxb - minb).minCoeff() > .005f) {
       if (m_colr_samples.size() >= 6 && (maxb - minb).minCoeff() > .0005f) {
-        chull = {{ .data = m_colr_samples | rng::to<std::vector>() }};
+        chull = {{ .data = m_colr_samples | view_to<std::vector<Colr>>() }};
       } else {
         chull = { };
       }
@@ -95,7 +95,7 @@ namespace met {
         // nonlinear solver runs. Find the best enclosing simplex, and then mix the
         // attached coefficients to generate a spectrum at said position
         auto [bary, elem] = chull.find_enclosing_elem(vert.get_mismatch_position());
-        auto coeffs       = elem | index_into_view(m_coef_samples) | rng::to<std::vector>();
+        auto coeffs       = elem | index_into_view(m_coef_samples) | view_to<std::vector<Basis::vec_type>>();
 
         // Linear combination reconstructs coefficients for this metamer
         auto coef =(bary[0] * coeffs[0] + bary[1] * coeffs[1]

@@ -208,7 +208,7 @@ namespace met {
                         });
       
       // Apply filter and return selected vertices
-      auto verts = path.data | verts_view | rng::to<std::vector<CompactTetrRecord>>();
+      auto verts = path.data | verts_view | view_to<std::vector<CompactTetrRecord>>();
       
       // Get the "fixed" part of the path's throughput, by taking the constraint's current refl.
       // and dividing it out of the assembled energy (note; this data is from last frame)

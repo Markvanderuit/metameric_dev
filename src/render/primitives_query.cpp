@@ -65,10 +65,10 @@ namespace met {
       auto illums = emitters
                   | vws::transform([ ](const auto &comp) { return comp.value.illuminant_i; })
                   | vws::transform([&](uint i) { return *scene.resources.illuminants[i];   })
-                  | rng::to<std::vector>();
+                  | view_to<std::vector<Spec>>();
       auto scales = emitters
                   | vws::transform([](const auto &comp) { return comp.value.illuminant_scale; })
-                  | rng::to<std::vector>();
+                  | view_to<std::vector<float>>();
   
       // Generate average over scaled distributions
       m_wavelength_distr = 1.f;

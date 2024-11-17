@@ -1,6 +1,7 @@
 #include <metameric/core/ranges.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/components/views/detail/file_dialog.hpp>
+#include <vector>
 #include <nfd.h>
 
 namespace met::detail {
@@ -11,7 +12,7 @@ namespace met::detail {
       = type_filters
       | vws::transform([](const std::string &name) {
         return nfdu8filteritem_t { .name = nullptr, .spec = name.c_str() }; })
-      | rng::to<std::vector>();
+      | view_to<std::vector<nfdu8filteritem_t>>();
 
     nfdchar_t  *out = nullptr;
     nfdresult_t res = NFD_OpenDialog(&out, filters.data(), filters.size(), nullptr);
@@ -30,7 +31,7 @@ namespace met::detail {
       = type_filters
       | vws::transform([](const std::string &name) {
         return nfdu8filteritem_t { .name = nullptr, .spec = name.c_str() }; })
-      | rng::to<std::vector>();
+      | view_to<std::vector<nfdu8filteritem_t>>();
 
     const nfdpathset_t *out;
     nfdpathsetsize_t out_count;
@@ -57,7 +58,7 @@ namespace met::detail {
       = type_filters
       | vws::transform([](const std::string &name) {
         return nfdu8filteritem_t { .name = nullptr, .spec = name.c_str() }; })
-      | rng::to<std::vector>();
+      | view_to<std::vector<nfdu8filteritem_t>>();
 
     nfdchar_t  *out = nullptr;
     nfdresult_t res = NFD_SaveDialog(&out, filters.data(), filters.size(), nullptr, nullptr);

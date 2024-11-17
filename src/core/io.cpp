@@ -64,10 +64,11 @@ namespace met::io {
     std::string line;
     while (std::getline(ss, line)) {
       std::ranges::replace(line, '\t', ' ');
-      auto split_vect = line 
-                      | std::views::split(' ') 
-                      | std::views::transform([](auto &&r) { return std::string(r.begin(), r.end()); })
-                      | std::ranges::to<std::vector>();
+      auto split = line 
+                 | std::views::split(' ') 
+                 | std::views::transform([](auto &&r) { return std::string(r.begin(), r.end()); });
+      std::vector<std::string> split_vect;
+      rng::copy(split, std::back_inserter(split_vect));
 
       // Skip empty and commented lines
       guard_continue(!split_vect.empty() && split_vect[0][0] != '#');
@@ -109,10 +110,11 @@ namespace met::io {
     std::string line;
     uint        line_nr = 0;
     while (std::getline(ss, line)) {
-      auto split_vect = line 
-                      | std::views::split(' ') 
-                      | std::views::transform([](auto &&r) { return std::string(r.begin(), r.end()); })
-                      | std::ranges::to<std::vector>();
+      auto split = line 
+                 | std::views::split(' ') 
+                 | std::views::transform([](auto &&r) { return std::string(r.begin(), r.end()); });
+      std::vector<std::string> split_vect;
+      rng::copy(split, std::back_inserter(split_vect));
 
       // Skip empty and commented lines
       guard_continue(!split_vect.empty() && split_vect[0][0] != '#');
@@ -339,9 +341,10 @@ namespace met::io {
       auto split = line 
                  | vws::split(' ') 
                  | vws::take(1 + wavelength_bases)
-                 | vws::transform([](auto &&r) { return std::string(range_iter(r)); })
-                 | rng::to<std::vector>();
-      auto data = std::span(split); // span representation for slicing
+                 | vws::transform([](auto &&r) { return std::string(range_iter(r)); });
+      std::vector<std::string> data_;
+      rng::copy(split, std::back_inserter(data_));
+      auto data = std::span(data_); // representation for slicing
 
       // Skip empty or commented lines
       guard_continue(!data.empty() && data[0][0] != '#' && !data[0].empty());

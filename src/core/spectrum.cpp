@@ -127,7 +127,7 @@ namespace met {
     if (as_rgb)
       csys = (models::xyz_to_srgb_transform * csys.matrix().transpose()).transpose();
     return powers | vws::transform([&csys](const Spec &pwr) { 
-      return (csys.array().colwise() * pwr).eval(); }) | rng::to<std::vector<CMFS>>();
+      return (csys.array().colwise() * pwr).eval(); }) | view_to<std::vector<CMFS>>();
   }
 
   Colr IndirectColrSystem::apply(const Spec &s, bool as_rgb) const {

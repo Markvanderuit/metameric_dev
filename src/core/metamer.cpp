@@ -240,8 +240,8 @@ namespace met {
     // Add indirect color system equality constraints, upholding uplifting roundtrip
     for (const auto [csys, colr] : info.nlinear_constraints) {
       auto A = csys.finalize(false)
-            | vws::transform([](const CMFS &cmfs) { return cmfs.transpose().cast<double>().eval(); })
-            | rng::to<std::vector>();
+             | vws::transform([](const CMFS &cmfs) { return cmfs.transpose().cast<double>().eval(); })
+             | view_to<std::vector<eig::Matrix<double, 3, wavelength_samples>>>();
       auto b = lrgb_to_xyz(colr).cast<double>().eval();
       
       // Specify constraint
@@ -289,7 +289,7 @@ namespace met {
         // Project nonlinear objective matrices along sampled unit vector
         auto A = S | vws::transform([sample = samples[i]](const eig::MatrixXf &cmfs) {
           return eig::Vector<double, wavelength_samples>((cmfs * sample).cast<double>());
-        }) | rng::to<std::vector>();
+        }) | view_to<std::vector<eig::Vector<double, wavelength_samples>>>();
 
         // Specify objective
         local_solver.objective = ad::wrap_capture<wavelength_bases>([A, B](const bvec &x) {

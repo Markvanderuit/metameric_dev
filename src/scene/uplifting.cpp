@@ -181,7 +181,7 @@ namespace met {
         auto cstr = c.cstr_j
                   | vws::filter(&LinearConstraint::is_active)
                   | vws::transform([](const auto &v) { return std::pair { v.cmfs_j, v.illm_j }; })
-                  | rng::to<std::vector>();
+                  | view_to<std::vector<std::pair<uint, uint>>>();
         cstr.push_back(std::pair { uplifting.observer_i, uplifting.illuminant_i });
 
         // Mismatching only occurs if there are two or more color systems, and all are unique
@@ -192,7 +192,7 @@ namespace met {
         auto cstr = c.cstr_j
                   | vws::filter(&LinearConstraint::is_active)
                   | vws::transform([](const auto &v) { return std::pair { v.cmfs_j, v.illm_j }; })
-                  | rng::to<std::vector>();
+                  | view_to<std::vector<std::pair<uint, uint>>>();
         cstr.push_back(std::pair { uplifting.observer_i, uplifting.illuminant_i });
         
         // Mismatching only occurs if there are two or more color systems, and all are unique
@@ -201,7 +201,7 @@ namespace met {
       [&](const IndirectSurfaceConstraint &c) {
         auto cstr = c.cstr_j
                   | vws::filter(&NLinearConstraint::is_active)
-                  | rng::to<std::vector>();
+                  | view_to<std::vector<NLinearConstraint>>();
         return !cstr.empty() 
             && !detail::has_duplicates(cstr) 
             && !cstr.back().powr_j.empty();
