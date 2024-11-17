@@ -400,7 +400,7 @@ namespace met {
 
     // Forward mesh data to atlas
     auto err = xatlas::AddMesh(atlas, mesh_decl, 1);
-    debug::check_expr(!err, std::format("xatlas::Addmesh(...) returned error code {}", static_cast<uint>(err)));   
+    debug::check_expr(!err, fmt::format("xatlas::Addmesh(...) returned error code {}", static_cast<uint>(err)));   
 
     // Finally, generate atlas
     xatlas::Generate(atlas, {}, {

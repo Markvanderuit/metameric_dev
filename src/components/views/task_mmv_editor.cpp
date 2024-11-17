@@ -29,7 +29,7 @@ namespace met {
       const auto &e_vert  = e_scene.uplifting_vertex(e_cs);
 
       // Define window name
-      auto name = std::format("Editing: {} (uplifting {}, vertex {})", 
+      auto name = fmt::format("Editing: {} (uplifting {}, vertex {})", 
         e_vert.name, e_cs.uplifting_i, e_cs.vertex_i);  
       
       // Define window size on first open
@@ -256,7 +256,7 @@ namespace met {
       const auto &e_scene   = info.global("scene").getr<Scene>();
       const auto &e_cs      = info.parent()("selection").getr<ConstraintRecord>();
       const auto &e_vert    = e_scene.uplifting_vertex(e_cs);
-      auto uplf_handle      = info.task(std::format("gen_upliftings.gen_uplifting_{}", e_cs.uplifting_i)).mask(info);
+      auto uplf_handle      = info.task(fmt::format("gen_upliftings.gen_uplifting_{}", e_cs.uplifting_i)).mask(info);
       const auto &e_hulls   = uplf_handle("mismatch_hulls").getr<std::vector<ConvexHull>>();
       const auto &e_hull    = e_hulls[e_cs.vertex_i];
       const auto &i_clip    = info("clip_point").getr<bool>();

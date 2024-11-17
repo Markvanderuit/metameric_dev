@@ -27,7 +27,7 @@ namespace met {
     const auto &e_cs      = info.parent()("selection").getr<ConstraintRecord>();
     const auto &e_uplift  = e_scene.components.upliftings[e_cs.uplifting_i].value;
     const auto &e_basis   = e_scene.resources.bases[e_uplift.basis_i].value();
-    auto uplf_handle      = info.task(std::format("gen_upliftings.gen_uplifting_{}", e_cs.uplifting_i)).mask(info);
+    auto uplf_handle      = info.task(fmt::format("gen_upliftings.gen_uplifting_{}", e_cs.uplifting_i)).mask(info);
     const auto &e_spectra = uplf_handle("constraint_samples").getr<std::vector<MismatchSample>>();
     const auto &e_hulls   = uplf_handle("mismatch_hulls").getr<std::vector<ConvexHull>>();
     const auto &e_hull    = e_hulls[e_cs.vertex_i];
@@ -275,7 +275,7 @@ namespace met {
 
             // Direct constraint rows
             for (uint j = 0; j < cstr.cstr_j.size(); ++j) {
-              auto name = std::format("Direct #{}", j);
+              auto name = fmt::format("Direct #{}", j);
               auto actn = push_colr_cstr_row(name, cstr.cstr_j, j);
               if (actn == PushReturnAction::eDelete) {
                 cstr.cstr_j.erase(cstr.cstr_j.begin() + j);
@@ -314,7 +314,7 @@ namespace met {
 
             // Indirect constraint rows
             for (uint j = 0; j < cstr.cstr_j.size(); ++j) {
-              auto name = std::format("Indirect #{}", j);
+              auto name = fmt::format("Indirect #{}", j);
               auto actn = push_powr_cstr_row(name, cstr.cstr_j, j);
               if (actn == PushReturnAction::eDelete) {
                 cstr.cstr_j.erase(cstr.cstr_j.begin() + j);
@@ -416,7 +416,7 @@ namespace met {
             // Spawn color button viewing the srgb-transformed patch color
             Colr lrgb = e_patches[i];
             auto srgb = (eig::Array4f() << lrgb_to_srgb(lrgb), 1.f).finished();
-            if (ImGui::ColorButton(std::format("##patch_{}", i).c_str(), srgb, ImGuiColorEditFlags_Float))
+            if (ImGui::ColorButton(fmt::format("##patch_{}", i).c_str(), srgb, ImGuiColorEditFlags_Float))
               vert.set_mismatch_position(lrgb);
             
             if (i < e_patches.size() - 1)

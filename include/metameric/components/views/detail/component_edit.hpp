@@ -151,7 +151,7 @@ namespace met {
     met_trace();
 
     // Set local scope ID j.i.c.
-    auto _scope = ImGui::ScopedID(std::format("{}_edit_{}", typeid(Ty).name(), data_i));
+    auto _scope = ImGui::ScopedID(fmt::format("{}_edit_{}", typeid(Ty).name(), data_i));
 
     // Get external resources and shorthands
     const auto &scene = info.global("scene").getr<Scene>();
@@ -239,7 +239,7 @@ namespace met {
     met_trace();
 
     // Set local scope ID j.i.c.
-    auto _scope = ImGui::ScopedID(std::format("{}_list", typeid(Ty).name()));
+    auto _scope = ImGui::ScopedID(fmt::format("{}_list", typeid(Ty).name()));
     
     // Get external resources and shorthands
     const auto &scene  = info.global("scene").getr<Scene>();

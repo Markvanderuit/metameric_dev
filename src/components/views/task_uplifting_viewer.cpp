@@ -44,7 +44,7 @@ namespace met {
       const auto &e_scene       = info.global("scene").getr<Scene>();
 
       // Define window name
-      auto name = std::format("Uplifting viewer ({})",
+      auto name = fmt::format("Uplifting viewer ({})",
         e_scene.components.upliftings[m_uplifting_i].name);
       
       // Ensure sensible window size on first open

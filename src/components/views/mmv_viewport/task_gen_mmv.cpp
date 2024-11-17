@@ -30,7 +30,7 @@ namespace met {
     // Get shared resources
     const auto &e_scene = info.global("scene").getr<Scene>();
     const auto &e_cs    = info.parent()("selection").getr<ConstraintRecord>();
-    auto uplf_handle    = info.task(std::format("gen_upliftings.gen_uplifting_{}", e_cs.uplifting_i)).mask(info);
+    auto uplf_handle    = info.task(fmt::format("gen_upliftings.gen_uplifting_{}", e_cs.uplifting_i)).mask(info);
 
     // Exit early unless inputs have changed somehow
     guard(is_first_eval() || uplf_handle("mismatch_hulls").is_mutated());

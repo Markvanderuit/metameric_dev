@@ -117,7 +117,7 @@ namespace ImGui {
       // Plot data lines
       if (legend.empty()) {
         for (const auto &[i, sd] : met::enumerate_view(reflectances))
-          ImPlot::PlotLine(std::format("{}", i).c_str(), x_values.data(), sd.data(), wavelength_samples);
+          ImPlot::PlotLine(fmt::format("{}", i).c_str(), x_values.data(), sd.data(), wavelength_samples);
       } else {
         for (const auto &[text, sd] : met::vws::zip(legend, reflectances))
           ImPlot::PlotLine(text.c_str(), x_values.data(), sd.data(), wavelength_samples);

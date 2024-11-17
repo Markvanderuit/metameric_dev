@@ -102,18 +102,22 @@ namespace met {
   } // namespace detail
 } // namespace met
 
-namespace std {
-  // Format Object::BRDFType, wich is an enum class
-  template <>
-  struct std::formatter<met::Object::BRDFType> : std::formatter<string_view> {
-    auto format(const met::Object::BRDFType& ty, std::format_context& ctx) const {
-      std::string s;
-      switch (ty) {
-        case met::Object::BRDFType::eNull       : s = "null";        break;
-        case met::Object::BRDFType::eDiffuse    : s = "diffuse";     break;
-        case met::Object::BRDFType::eMicrofacet : s = "microfacet";  break;
-      };
-      return std::formatter<std::string_view>::format(s, ctx);
+template<>
+struct fmt::formatter<met::Object::BRDFType>{
+  template <typename context_ty>
+  constexpr auto parse(context_ty& ctx) { 
+    return ctx.begin(); 
+  }
+
+  template <typename fmt_context_ty>
+  constexpr auto format(const met::Object::BRDFType& ty, fmt_context_ty& ctx) const {
+    std::string s;
+    switch (ty) {
+      case met::Object::BRDFType::eNull        : s = "null"; break;
+      case met::Object::BRDFType::eDiffuse     : s = "diffuse"; break;
+      case met::Object::BRDFType::eMicrofacet  : s = "microfacet"; break;
+      default                                  : s = "undefined"; break;
     }
-  };
-} // namespace std
+    return fmt::format_to(ctx.out(), "{}", s);
+  }
+};

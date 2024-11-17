@@ -30,7 +30,7 @@ namespace met {
     met_trace_full();
 
     // Get handle to the accompanying data generating task
-    auto gen_task_name = std::format("gen_upliftings.gen_uplifting_{}", m_uplifting_i);
+    auto gen_task_name = fmt::format("gen_upliftings.gen_uplifting_{}", m_uplifting_i);
     auto gen_task_info = info.task(gen_task_name).mask(info);
 
     // Get shared resources

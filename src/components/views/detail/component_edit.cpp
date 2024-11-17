@@ -16,19 +16,19 @@ namespace met {
       ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x * 0.75);
       if (std::holds_alternative<Colr>(variant)) {
         auto lrgb = std::get<Colr>(variant);
-        ImGui::ColorEdit3(std::format("##_{}_lrgb", title).c_str(), lrgb.data()/* , ImGuiColorEditFlags_Float */);
+        ImGui::ColorEdit3(fmt::format("##_{}_lrgb", title).c_str(), lrgb.data()/* , ImGuiColorEditFlags_Float */);
         ImGui::SameLine();
-        if (auto srgb = lrgb_to_srgb(lrgb); ImGui::ColorEdit3(std::format("##_{}_srgb", title).c_str(), srgb.data(), ImGuiColorEditFlags_NoInputs /* | ImGuiColorEditFlags_Float */))
+        if (auto srgb = lrgb_to_srgb(lrgb); ImGui::ColorEdit3(fmt::format("##_{}_srgb", title).c_str(), srgb.data(), ImGuiColorEditFlags_NoInputs /* | ImGuiColorEditFlags_Float */))
           lrgb = srgb_to_lrgb(srgb);
         variant = lrgb;
       } else if (std::holds_alternative<uint>(variant)) {
-        push_resource_selector(std::format("##_{}_txtr", title), resources, std::get<uint>(variant));
+        push_resource_selector(fmt::format("##_{}_txtr", title), resources, std::get<uint>(variant));
       }
       
       // Then, spawn a combobox to switch between the variant's types
       ImGui::SameLine();
       ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-      if (ImGui::BeginCombo(std::format("##_{}_data", title).c_str(), title.c_str())) {
+      if (ImGui::BeginCombo(fmt::format("##_{}_data", title).c_str(), title.c_str())) {
         if (ImGui::Selectable("Value", std::holds_alternative<Colr>(variant)))
           variant = Colr(1);
         if (ImGui::Selectable("Texture", std::holds_alternative<uint>(variant)))
@@ -45,17 +45,17 @@ namespace met {
       ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x * 0.75);
       if (std::holds_alternative<float>(variant)) {
         auto value = std::get<float>(variant);
-        ImGui::SliderFloat(std::format("##_{}_value", title).c_str(), &value, 0.f, 1.f);
+        ImGui::SliderFloat(fmt::format("##_{}_value", title).c_str(), &value, 0.f, 1.f);
         ImGui::SameLine();
         variant = value;
       } else if (std::holds_alternative<uint>(variant)) {
-        push_resource_selector(std::format("##_{}_txtr", title), resources, std::get<uint>(variant));
+        push_resource_selector(fmt::format("##_{}_txtr", title), resources, std::get<uint>(variant));
       }
       
       // Then, spawn a combobox to switch between the variant's types
       ImGui::SameLine();
       ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-      if (ImGui::BeginCombo(std::format("##_{}_data", title).c_str(), title.c_str())) {
+      if (ImGui::BeginCombo(fmt::format("##_{}_data", title).c_str(), title.c_str())) {
         if (ImGui::Selectable("Value", std::holds_alternative<float>(variant)))
           variant = float(0.f);
         if (ImGui::Selectable("Texture", std::holds_alternative<uint>(variant)))
@@ -88,10 +88,10 @@ namespace met {
       ImGui::Separator();
 
       // Type selector
-      if (ImGui::BeginCombo("BRDF Type", std::format("{}", value.brdf_type).c_str())) {
+      if (ImGui::BeginCombo("BRDF Type", fmt::format("{}", value.brdf_type).c_str())) {
         for (uint i = 0; i < 3; ++i) {
           auto type = static_cast<Object::BRDFType>(i);
-          auto name = std::format("{}", type);
+          auto name = fmt::format("{}", type);
           if (ImGui::Selectable(name.c_str(), value.brdf_type == type)) {
             value.brdf_type = type;
           }
@@ -117,10 +117,10 @@ namespace met {
       auto &value = component.value;
       
       // Type selector
-      if (ImGui::BeginCombo("Type", std::format("{}", value.type).c_str())) {
+      if (ImGui::BeginCombo("Type", fmt::format("{}", value.type).c_str())) {
         for (uint i = 0; i < 4; ++i) {
           auto type = static_cast<Emitter::Type>(i);
-          auto name = std::format("{}", type);
+          auto name = fmt::format("{}", type);
           if (ImGui::Selectable(name.c_str(), value.type == type)) {
             value.type = type;
           }
@@ -180,7 +180,7 @@ namespace met {
         for (uint j = 0; j < value.verts.size(); ++j) {
           ImGui::TableNextRow();
           auto &vert = value.verts[j];
-          auto scope = ImGui::ScopedID(std::format("table_row_{}", j));
+          auto scope = ImGui::ScopedID(fmt::format("table_row_{}", j));
 
           // Name editor column
           ImGui::TableSetColumnIndex(0);
@@ -196,10 +196,10 @@ namespace met {
           {
             // Iterate over the types in the std::variant of constraints
             // for this combobox
-            auto combo_str = to_capital(std::format("{}", vert.constraint));
+            auto combo_str = to_capital(fmt::format("{}", vert.constraint));
             if (ImGui::BeginCombo("##constraint_type", combo_str.c_str())) {
               vert.constraint | visit_types([&](auto default_v, bool holds_alternative) {
-                auto selectable_str = to_capital(std::format("{}", default_v));
+                auto selectable_str = to_capital(fmt::format("{}", default_v));
                 if (ImGui::Selectable(selectable_str.c_str(), holds_alternative) && !holds_alternative)
                   vert.constraint = default_v;
               });
@@ -242,7 +242,7 @@ namespace met {
           {
             // Edit button spawns MMVEditorTask window
             if (ImGui::Button("Edit")) {
-              auto child_name   = std::format("mmv_editor_{}_{}", i, j);
+              auto child_name   = fmt::format("mmv_editor_{}_{}", i, j);
               auto child_handle = info.child_task(child_name);
               if (!child_handle.is_init()) {
                 child_handle.init<MMVEditorTask>(
@@ -263,7 +263,7 @@ namespace met {
             // Insert delete button at end of line
             if (ImGui::Button("X")) {
               // Despawn MMVEditorTask window if necessary
-              auto child_name   = std::format("mmv_editor_{}_{}", i, j);
+              auto child_name   = fmt::format("mmv_editor_{}_{}", i, j);
               auto child_handle = info.child_task(child_name);
               if (child_handle.is_init()) {
                 child_handle.mask(info)("is_active").set(false);

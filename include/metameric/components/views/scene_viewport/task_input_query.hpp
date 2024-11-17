@@ -71,7 +71,7 @@ namespace met {
       // Collect handles to all uplifting tasks
       std::vector<TaskHandle> uplf_handles;
       rng::transform(vws::iota(0u, static_cast<uint>(e_scene.components.upliftings.size())), 
-        std::back_inserter(uplf_handles), [&](uint i) { return info.task(std::format("gen_upliftings.gen_uplifting_{}", i)); });
+        std::back_inserter(uplf_handles), [&](uint i) { return info.task(fmt::format("gen_upliftings.gen_uplifting_{}", i)); });
 
       // Integration color matching functions, s.t. a unit spectrum integrates to 1 luminance
       CMFS cmfs = ColrSystem { .cmfs = e_scene.primary_observer(), .illuminant = Spec(1) }.finalize();

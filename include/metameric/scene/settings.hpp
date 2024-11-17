@@ -63,18 +63,22 @@ namespace met {
   } // namespace detail
 } // namespace met
 
-namespace std {
-  // Format Settings::RendererType, wich is an enum class
-  template <>
-  struct std::formatter<met::Settings::RendererType> : std::formatter<string_view> {
-    auto format(const met::Settings::RendererType& ty, std::format_context& ctx) const {
-      std::string s;
-      switch (ty) {
-        case met::Settings::RendererType::ePath   : s = "path";    break;
-        case met::Settings::RendererType::eDirect : s = "direct";  break;
-        case met::Settings::RendererType::eDebug  : s = "debug";   break;
-      };
-      return std::formatter<std::string_view>::format(s, ctx);
+template<>
+struct fmt::formatter<met::Settings::RendererType> {
+  template <typename context_ty>
+  constexpr auto parse(context_ty& ctx) { 
+    return ctx.begin(); 
+  }
+
+  template <typename fmt_context_ty>
+  constexpr auto format(const met::Settings::RendererType& ty, fmt_context_ty& ctx) const {
+    std::string s;
+    switch (ty) {
+      case met::Settings::RendererType::ePath   : s = "path";      break;
+      case met::Settings::RendererType::eDirect : s = "direct";    break;
+      case met::Settings::RendererType::eDebug  : s = "debug";     break;
+      default                                   : s = "undefined"; break;
     }
-  };
-} // namespace std
+    return fmt::format_to(ctx.out(), "{}", s);
+  }
+};

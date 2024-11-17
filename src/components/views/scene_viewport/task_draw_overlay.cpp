@@ -223,7 +223,7 @@ namespace met {
     auto view_offs = (viewport_offs + intr_offs).eval();
     auto view_size = eig::Array2f(160, 42);
     
-    auto text = std::format("scene: {}\nres: {} x {}\nspp: {}", 
+    auto text = fmt::format("scene: {}\nres: {} x {}\nspp: {}", 
       e_scene.save_path.filename().string(),
       e_render.film().size().x(), 
       e_render.film().size().y(), 

@@ -35,10 +35,10 @@ namespace met {
       }
 
       // Renderer selector; path, direct, spectral, rgb etc
-      if (ImGui::BeginCombo("Renderer", std::format("{}", m_render_type).c_str())) {
+      if (ImGui::BeginCombo("Renderer", fmt::format("{}", m_render_type).c_str())) {
         for (uint i = 0; i < 6; ++i) {
           auto type = static_cast<Settings::RendererType>(i);
-          auto name = std::format("{}", type);
+          auto name = fmt::format("{}", type);
           if (ImGui::Selectable(name.c_str(), m_render_type == type))
             m_render_type = type;
         } // for (uint i)
@@ -68,7 +68,7 @@ namespace met {
           ImGui::EndDisabled();
       } else {
         auto prg = static_cast<float>(m_spp_curr) / static_cast<float>(m_spp_trgt);
-        auto str = std::format("{} / {} ({})", m_spp_curr, m_spp_trgt, prg);
+        auto str = fmt::format("{} / {} ({})", m_spp_curr, m_spp_trgt, prg);
         fmt::print("render progress: {}\n", str);
         ImGui::ProgressBar(prg, { 0, 0 }, str.c_str());
         ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);

@@ -4,7 +4,6 @@
 #include <execution>
 #include <cstdint>
 #include <limits>
-#include <format>
 #include <type_traits>
 #include <functional>
 #include <unordered_map>
@@ -154,7 +153,7 @@ namespace met {
       // Attempt to read EXR version data
       if (int ret = ParseEXRVersionFromFile(&exr_version, cpath); ret) {
         debug::check_expr(false,
-          std::format("Could not parse EXR version, image path \"{}\", return code \"{}\"", info.path.string(), ret));
+          fmt::format("Could not parse EXR version, image path \"{}\", return code \"{}\"", info.path.string(), ret));
       }
 
       // Attempt to read EXR header data
@@ -162,7 +161,7 @@ namespace met {
         std::string err_copy(error);
         FreeEXRErrorMessage(error);
         debug::check_expr(false,
-          std::format("Could not parse EXR header, image path \"{}\", error \"{}\"", info.path.string(), err_copy));
+          fmt::format("Could not parse EXR header, image path \"{}\", error \"{}\"", info.path.string(), err_copy));
       }
 
       // Read HALF channel as FLOAT
@@ -178,7 +177,7 @@ namespace met {
         std::string err_copy(error);
         FreeEXRErrorMessage(error);
         debug::check_expr(false,
-          std::format("Could not load EXR image, image path \"{}\", error \"{}\"", info.path.string(), err_copy));
+          fmt::format("Could not load EXR image, image path \"{}\", error \"{}\"", info.path.string(), err_copy));
       }
 
       // Note; here be the assumptions because I really don't have time for this
@@ -534,6 +533,6 @@ namespace met {
     const char *error = nullptr;
     if (int ret = SaveEXRImageToFile(&exr_image, &exr_header, cpath, &error); ret)
       debug::check_expr(false,
-        std::format("Could not save to EXR, image path \"{}\", return code \"{}\"", path.string(), ret));
+        fmt::format("Could not save to EXR, image path \"{}\", return code \"{}\"", path.string(), ret));
   }
 } // namespace met

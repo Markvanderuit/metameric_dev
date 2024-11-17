@@ -80,19 +80,23 @@ namespace met {
   } // namespace detail
 } // namespace met
 
-namespace std {
-  // Format Emitter::Type, wich is an enum class
-  template <>
-  struct std::formatter<met::Emitter::Type> : std::formatter<string_view> {
-    auto format(const met::Emitter::Type& ty, std::format_context& ctx) const {
-      std::string s;
-      switch (ty) {
-        case met::Emitter::Type::eConstant : s = "constant"; break;
-        case met::Emitter::Type::ePoint    : s = "point"; break;
-        case met::Emitter::Type::eRect     : s = "rect"; break;
-        case met::Emitter::Type::eSphere   : s = "sphere"; break;
-      };
-      return std::formatter<std::string_view>::format(s, ctx);
+template<>
+struct fmt::formatter<met::Emitter::Type>{
+  template <typename context_ty>
+  constexpr auto parse(context_ty& ctx) { 
+    return ctx.begin(); 
+  }
+
+  template <typename fmt_context_ty>
+  constexpr auto format(const met::Emitter::Type& ty, fmt_context_ty& ctx) const {
+    std::string s;
+    switch (ty) {
+      case met::Emitter::Type::eConstant : s = "constant"; break;
+      case met::Emitter::Type::ePoint    : s = "point"; break;
+      case met::Emitter::Type::eRect     : s = "rect"; break;
+      case met::Emitter::Type::eSphere   : s = "sphere"; break;
+      default                            : s = "undefined"; break;
     }
-  };
-} // namespace std
+    return fmt::format_to(ctx.out(), "{}", s);
+  }
+};

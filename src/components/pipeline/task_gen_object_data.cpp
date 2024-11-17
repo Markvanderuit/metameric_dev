@@ -2,7 +2,6 @@
 #include <metameric/components/pipeline/task_gen_object_data.hpp>
 #include <small_gl/texture.hpp>
 #include <small_gl/detail/program_cache.hpp>
-#include <format>
 
 namespace met {
   GenObjectDataTask:: GenObjectDataTask(uint object_i)
@@ -97,7 +96,7 @@ namespace met {
       // Get external resources from object's corresponding, selected uplifting
       // An object has only one uplifting structure associated to it,
       // but several objects can reuse the same uplifting
-      auto uplifting_task_name       = std::format("gen_upliftings.gen_uplifting_{}", e_object.uplifting_i);
+      auto uplifting_task_name       = fmt::format("gen_upliftings.gen_uplifting_{}", e_object.uplifting_i);
       const auto &e_tesselation_data = info(uplifting_task_name, "tesselation_data").getr<gl::Buffer>();
       const auto &e_tesselation_pack = info(uplifting_task_name, "tesselation_pack").getr<gl::Buffer>();
       const auto &e_tesselation_coef = info(uplifting_task_name, "tesselation_coef").getr<gl::Buffer>();

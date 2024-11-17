@@ -35,7 +35,7 @@ namespace met {
     // Get shared resources
     auto gizmo_active   = info.relative("viewport_guizmo")("is_active").getr<bool>();
     const auto &e_cs    = info.parent()("selection").getr<ConstraintRecord>();
-    auto uplf_handle    = info.task(std::format("gen_upliftings.gen_uplifting_{}", e_cs.uplifting_i)).mask(info);
+    auto uplf_handle    = info.task(fmt::format("gen_upliftings.gen_uplifting_{}", e_cs.uplifting_i)).mask(info);
     const auto &e_hulls = uplf_handle("mismatch_hulls").getr<std::vector<ConvexHull>>();
     const auto &e_hull  = e_hulls[e_cs.vertex_i];
 
@@ -53,7 +53,7 @@ namespace met {
     // Get shared resources
     auto gizmo_active   = info.relative("viewport_guizmo")("is_active").getr<bool>();
     const auto &e_cs    = info.parent()("selection").getr<ConstraintRecord>();
-    auto uplf_handle    = info.task(std::format("gen_upliftings.gen_uplifting_{}", e_cs.uplifting_i)).mask(info);
+    auto uplf_handle    = info.task(fmt::format("gen_upliftings.gen_uplifting_{}", e_cs.uplifting_i)).mask(info);
     const auto &e_hulls = uplf_handle("mismatch_hulls").getr<std::vector<ConvexHull>>();
     const auto &e_hull  = e_hulls[e_cs.vertex_i];
     auto &i_patches     = info("patches").getw<std::vector<Colr>>();

@@ -153,13 +153,16 @@ namespace met {
   } // namespace detail
 } // namespace met
 
-namespace std {
-  // Format Uplifting::Vertex::cstr_type, which is a std::variant
-  template <>
-  struct std::formatter<met::Uplifting::Vertex::cnstr_type> : std::formatter<string_view> {
-    auto format(const met::Uplifting::Vertex::cnstr_type& constraint, std::format_context& ctx) const {
-      auto s = constraint | met::visit { [&](const auto &arg) { return std::format("{}", arg); } };
-      return std::formatter<std::string_view>::format(s, ctx);
-    }
-  };
-} // namespace std
+template<>
+struct fmt::formatter<met::Uplifting::Vertex::cnstr_type>{
+  template <typename context_ty>
+  constexpr auto parse(context_ty& ctx) { 
+    return ctx.begin(); 
+  }
+
+  template <typename fmt_context_ty>
+  constexpr auto format(const met::Uplifting::Vertex::cnstr_type& ty, fmt_context_ty& ctx) const {
+    auto s = ty | met::visit { [&](const auto &arg) { return fmt::format("{}", arg); } };
+    return fmt::format_to(ctx.out(), "{}", s);
+  }
+};

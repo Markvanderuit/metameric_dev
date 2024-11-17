@@ -23,10 +23,10 @@ namespace met {
         auto settings = e_settings;
         
         // Renderer type
-        if (ImGui::BeginCombo("Renderer", std::format("{}", settings.renderer_type).c_str())) {
+        if (ImGui::BeginCombo("Renderer", fmt::format("{}", settings.renderer_type).c_str())) {
           for (uint i = 0; i < 3; ++i) {
             auto type = static_cast<Settings::RendererType>(i);
-            auto name = std::format("{}", type);
+            auto name = fmt::format("{}", type);
             if (ImGui::Selectable(name.c_str(), settings.renderer_type == type)) {
               settings.renderer_type = type;
             }

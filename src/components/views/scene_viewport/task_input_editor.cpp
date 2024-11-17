@@ -158,7 +158,7 @@ namespace met {
 
     // Collect handle to relevant uplifting task
     // const auto &e_uplf_task = uplf_handles[cs.uplifting_i].realize<GenUpliftingDataTask>();
-    const auto &e_uplf_task = info.task(std::format("gen_upliftings.gen_uplifting_{}", cs.uplifting_i))
+    const auto &e_uplf_task = info.task(fmt::format("gen_upliftings.gen_uplifting_{}", cs.uplifting_i))
                                   .realize<GenUpliftingDataTask>();
     
     // Get the current reflectance distribution used during rendering operations for this constraint
@@ -312,7 +312,7 @@ namespace met {
     for (const auto &[i, uplifting] : enumerate_view(e_scene.components.upliftings)) {
       for (const auto &[j, vert] : enumerate_view(uplifting->verts)) {
         // Only constraints currently being edited are shown
-        auto str = std::format("scene_components_editor.mmv_editor_{}_{}", i, j);
+        auto str = fmt::format("scene_components_editor.mmv_editor_{}_{}", i, j);
         guard_continue(info.task(str).is_init());
         
         // Only active surface constraints are shown

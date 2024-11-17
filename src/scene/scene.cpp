@@ -10,7 +10,6 @@
 #include <zstr.hpp>
 #include <algorithm>
 #include <execution>
-#include <format>
 #include <numbers>
 #include <queue>
 #include <unordered_map>
@@ -501,7 +500,7 @@ namespace met {
 
   std::string Scene::csys_name(uint cmfs_i, uint illm_i) const {
     met_trace();
-    return std::format("{}, {}", 
+    return fmt::format("{}, {}", 
                        resources.observers[cmfs_i].name, 
                        resources.illuminants[illm_i].name);
   }
