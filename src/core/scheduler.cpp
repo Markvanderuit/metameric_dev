@@ -4,7 +4,6 @@
 #include <execution>
 #include <list>
 #include <ranges>
-#include <fmt/core.h>
 
 namespace met {
   detail::TaskNode *LinearScheduler::add_task_impl(detail::TaskInfo &&info) {

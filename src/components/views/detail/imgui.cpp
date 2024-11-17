@@ -7,7 +7,6 @@
 #include <imgui_internal.h>
 #include <ImGuizmo.h>
 #include <implot.h>
-#include <fmt/core.h>
 
 namespace ImGui {
   static bool appl_imgui_init = false;

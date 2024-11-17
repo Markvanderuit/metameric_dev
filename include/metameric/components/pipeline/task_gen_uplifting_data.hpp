@@ -13,6 +13,7 @@
 #include <unordered_set>
 
 namespace met {
+  // Nr of points for mismatch volume generation, total and per iteration
   constexpr static uint mmv_uplift_samples_max  = 256u;
   constexpr static uint mmv_uplift_samples_iter = 16u;
 
@@ -31,7 +32,6 @@ namespace met {
     uint                        m_curr_samples  = 0;                       // How many samples are of the current vertex constraint
     uint                        m_prev_samples  = 0;                       // How many samples are of an old vertex constriant
     cnstr_type                  m_cstr_cache    = DirectColorConstraint(); // Cache of current vertex constraint, to detect mismatch volume change
-    uint                        m_iter_samples;                            // default is mmv_uplift_samples_iter
 
     void insert(std::span<const MismatchSample> samples) {
       met_trace();
@@ -65,10 +65,6 @@ namespace met {
     }
 
   public: // Public methods
-    // Constructor sets nr. of samples taken per iter
-    MetamerConstraintBuilder(uint iter_samples = mmv_uplift_samples_iter)
-    : m_iter_samples(iter_samples) { }
-
     // Generate a spectrum and matching color in the uplifting's color system
     MismatchSample realize(const Uplifting::Vertex &vert, const Scene &scene, const Uplifting &uplifting) {
       met_trace();
@@ -166,13 +162,13 @@ namespace met {
     // Helper builders; one per constraint, which iteratively refine constraints
     // by generating surrounding mismatch volumes (tends to be easier)
     std::vector<MetamerConstraintBuilder> m_mmv_builders;
-    uint                                  m_mmv_builder_samples;
 
     // Index of associated uplifting
     uint m_uplifting_i;
 
     // Construction data; color positions, corresponding spectra, derived coefficients
     std::vector<MismatchSample> m_boundary_samples;
+    std::vector<MismatchSample> m_interior_samples;
     std::vector<MismatchSample> m_tessellation_samples;
 
     // Delaunay tesselation connecting colors/spectra on both
@@ -184,13 +180,8 @@ namespace met {
     MeshDataLayout           *m_tesselation_data_map;
     std::span<SpecCoefLayout> m_tesselation_coef_map;
 
-    // Buffers for mesh data, if a accompanying viewer exists
-    gl::Array  m_buffer_viewer_array;
-    gl::Buffer m_buffer_viewer_verts;
-    gl::Buffer m_buffer_viewer_elems;
-
   public:
-    GenUpliftingDataTask(uint uplifting_i, uint mmv_builder_samples = mmv_uplift_samples_iter);
+    GenUpliftingDataTask(uint uplifting_i) : m_uplifting_i(uplifting_i) { }
 
     bool is_active(SchedulerHandle &) override;
     void init(SchedulerHandle &)      override;
@@ -205,12 +196,8 @@ namespace met {
 
   class GenUpliftingsTask : public detail::TaskNode {
     detail::Subtasks<GenUpliftingDataTask> m_subtasks;
-    uint                                   m_mmv_builder_samples;
 
   public:
-    GenUpliftingsTask(uint mmv_builder_samples = mmv_uplift_samples_iter)
-    : m_mmv_builder_samples(mmv_builder_samples) { }
-
     void init(SchedulerHandle &info) override {
       met_trace();
 
@@ -219,8 +206,8 @@ namespace met {
 
       // Add subtasks of type GenUpliftingDataTask
       m_subtasks.init(info, e_scene.components.upliftings.size(), 
-        [](uint i)          { return fmt::format("gen_uplifting_{}", i);             },
-        [&](auto &, uint i) { return GenUpliftingDataTask(i, m_mmv_builder_samples); });
+        [](uint i)          { return fmt::format("gen_uplifting_{}", i); },
+        [&](auto &, uint i) { return GenUpliftingDataTask(i); });
     }
 
     void eval(SchedulerHandle &info) override {
