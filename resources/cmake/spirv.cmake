@@ -18,21 +18,31 @@ add_executable(stb_include_app                     ${CMAKE_SOURCE_DIR}/resources
 target_include_directories(stb_include_app PRIVATE ${CMAKE_SOURCE_DIR}/resources/cmake/stb_include/include)
 
 function(compile_glsl_to_spirv glsl_src_fp spirv_dependencies)
-  # Obtain path, stripped of lead and filename
+  # Obtain path, stripped of lead
   cmake_path(RELATIVE_PATH glsl_src_fp
              BASE_DIRECTORY ${PROJECT_SOURCE_DIR}/resources/shaders/src
              OUTPUT_VARIABLE glsl_rel_fp)
 
+  # Obtain directory, stripped of filename
+  cmake_path(GET glsl_rel_fp PARENT_PATH glsl_rel_dp)
+
+  # Path shorthands
   set(spirv_parse_fp "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/resources/shaders/${glsl_rel_fp}")
   set(spirv_temp_fp  "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/resources/shaders/${glsl_rel_fp}.temp")
   set(spirv_bin_fp   "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/resources/shaders/${glsl_rel_fp}.spv")
   set(spirv_refl_fp  "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/resources/shaders/${glsl_rel_fp}.json")
+
+  # Ensure enclosing directory exist
 
   # Add preprocessor stage to handle #include as well as > c98 preprocessing
   # we reuse the local c++ compiler to avoid google_include extensions and
   # allow for varargs
   add_custom_command(
     OUTPUT  ${spirv_bin_fp} ${spirv_refl_fp}
+
+    # Beforehand; ensure output/working directory exists
+    COMMAND ${CMAKE_COMMAND}
+            -E make_directory "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/resources/shaders/${glsl_rel_dp}"
 
     # First command; parse includes; we avoid use of GL_ARB_shading_language_include as it
     # and glslangvalidator seem to be... finicky?

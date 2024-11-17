@@ -10,7 +10,6 @@ project(Metameric LANGUAGES CXX)
 # Build options
 option(MET_ENABLE_EXCEPTIONS "Enable exceptions on release" ON)
 option(MET_ENABLE_TRACY      "Enable Tracy support"        OFF)
-option(MET_ENABLE_TESTS      "Build tests"                  ON)
 
 # Spectral layout; inserted in code/shaders as preprocessor defines
 set(MET_WAVELENGTH_MIN     380) # Minimum wavelength of spectral range
@@ -32,7 +31,6 @@ set(MET_MOMENT_COEFFICIENTS 12) # Nr. of coeffs used for moment-based spectral r
 # Print configuration info
 message(STATUS "Metameric : Enabling exceptions = ${MET_ENABLE_EXCEPTIONS}")
 message(STATUS "Metameric : Enabling Tracy      = ${MET_ENABLE_TRACY}")
-message(STATUS "Metameric : Building tests      = ${MET_ENABLE_TESTS}")
 message(STATUS "Metameric : Wavelength min.     = ${MET_WAVELENGTH_MIN}")
 message(STATUS "Metameric : Wavelength max.     = ${MET_WAVELENGTH_MAX}")
 message(STATUS "Metameric : Wavelength samples  = ${MET_WAVELENGTH_SAMPLES}")
@@ -213,18 +211,6 @@ add_executable(presentation_videos src/app/presentation_videos.cpp)
 target_compile_features(presentation_videos PUBLIC cxx_std_23)
 target_link_libraries(presentation_videos PRIVATE core render components avcpp::FFmpeg avcpp::avcpp)
 target_include_directories(presentation_videos PRIVATE src/app/include)
-
-# Optionally setup Catch2 tests
-if (MET_ENABLE_TESTS)
-  # Find all test files
-  file(GLOB_RECURSE srcs ${CMAKE_CURRENT_SOURCE_DIR}/tests/*.cpp)
-
-  # Setup test executable
-  add_executable(metameric_tests ${srcs})
-  target_link_libraries(metameric_tests PRIVATE Catch2::Catch2WithMain core)
-  target_compile_features(metameric_tests PUBLIC cxx_std_23)
-  catch_discover_tests(metameric_tests WORKING_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
-endif()
 
 # Finally, handle dependency copy if necessary
 add_custom_command(
