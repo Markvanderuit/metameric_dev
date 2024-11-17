@@ -152,13 +152,10 @@ function(add_library_r target dir)
   target_compile_features(${target} PUBLIC cxx_std_23)
   target_compile_definitions(${target} PUBLIC _USE_MATH_DEFINES ${preprocessor_defines})
 
-  # Enable /bigobj (or the closest thing for gcc)
-  # Src: https://stackoverflow.com/questions/69903253/cmake-bigobj-no-such-file-or-directory
+  # Enable /bigobj to make MSVC stop complaining about its restricted object sizes
   if (MSVC)
     target_compile_options(${target} PRIVATE /bigobj)
-  else ()
-    target_compile_options(${target} PRIVATE -Wa,-mbig-obj)
-  endif ()
+  endif()
 endfunction()
 
 # Set up core library
