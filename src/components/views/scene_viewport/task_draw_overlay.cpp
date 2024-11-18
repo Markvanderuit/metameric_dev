@@ -26,11 +26,11 @@ namespace met {
 
       // Initialize program object
       m_program = {{ .type       = gl::ShaderType::eVertex,
-                     .spirv_path = "resources/shaders/views/draw_paths.vert.spv",
-                     .cross_path = "resources/shaders/views/draw_paths.vert.json" },
+                     .spirv_path = "shaders/views/draw_paths.vert.spv",
+                     .cross_path = "shaders/views/draw_paths.vert.json" },
                    { .type       = gl::ShaderType::eFragment,
-                     .spirv_path = "resources/shaders/views/draw_paths.frag.spv",
-                     .cross_path = "resources/shaders/views/draw_paths.frag.json" }};
+                     .spirv_path = "shaders/views/draw_paths.frag.spv",
+                     .cross_path = "shaders/views/draw_paths.frag.json" }};
 
     // Initialize output texture
     info("target").init<gl::Texture2d4f>({ .size = eig::Array2u(1) });
@@ -59,17 +59,20 @@ namespace met {
                                - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
 
     // Generate view over surface points that are stored in all active scene constraints
-    auto all_surfaces 
+    auto all_surfaces_
       = e_active_constraints
       | vws::transform([&](ConstraintRecord cs) { return e_scene.uplifting_vertex(cs); })
       | vws::transform([](const auto &v) { return v.surfaces(); })
       | vws::join;
-
+    std::vector<SurfaceInfo> all_surfaces;
+    rng::copy(all_surfaces_, std::back_inserter(all_surfaces));
+    
     // Generate view over surface points that are "free variables" in all active scene constraints
     auto active_surfaces
       = e_active_constraints
       | vws::transform([&](ConstraintRecord cs) { return e_scene.uplifting_vertex(cs); })
-      | vws::transform([](const auto &v) { return v.surface(); });
+      | vws::transform([](const auto &v) { return v.surface(); })
+      | view_to<std::vector<SurfaceInfo>>();
 
     // Draw vertex for each vertex at its surface
     for (const auto &si : all_surfaces) {

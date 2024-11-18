@@ -27,10 +27,10 @@ function(compile_glsl_to_spirv glsl_src_fp spirv_dependencies)
   cmake_path(GET glsl_rel_fp PARENT_PATH glsl_rel_dp)
 
   # Path shorthands
-  set(spirv_parse_fp "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/resources/shaders/${glsl_rel_fp}")
-  set(spirv_temp_fp  "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/resources/shaders/${glsl_rel_fp}.temp")
-  set(spirv_bin_fp   "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/resources/shaders/${glsl_rel_fp}.spv")
-  set(spirv_refl_fp  "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/resources/shaders/${glsl_rel_fp}.json")
+  set(spirv_parse_fp "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/shaders/${glsl_rel_fp}")
+  set(spirv_temp_fp  "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/shaders/${glsl_rel_fp}.temp")
+  set(spirv_bin_fp   "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/shaders/${glsl_rel_fp}.spv")
+  set(spirv_refl_fp  "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/shaders/${glsl_rel_fp}.json")
 
   # Add preprocessor stage to handle #include as well as > c98 preprocessing
   # we reuse the local c++ compiler to avoid google_include extensions and
@@ -40,7 +40,7 @@ function(compile_glsl_to_spirv glsl_src_fp spirv_dependencies)
 
     # Beforehand; ensure output/working directory exists
     COMMAND ${CMAKE_COMMAND}
-            -E make_directory "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/resources/shaders/${glsl_rel_dp}"
+            -E make_directory "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/shaders/${glsl_rel_dp}"
 
     # First command; parse includes; we avoid use of GL_ARB_shading_language_include as it
     # and glslangvalidator seem to be... finicky?
@@ -52,7 +52,7 @@ function(compile_glsl_to_spirv glsl_src_fp spirv_dependencies)
     # Second command; nuke shader cache if one currently exists
     COMMAND ${CMAKE_COMMAND} 
             -E remove 
-            -f "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/resources/shaders/shaders.bin"
+            -f "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/shaders/shaders.bin"
 
     # Third command; generate spirv binary using glslangvalidator
     COMMAND ${glslangValidator} 

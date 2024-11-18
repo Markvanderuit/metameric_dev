@@ -42,18 +42,18 @@ namespace met {
     auto &e_cache = info.global("cache").getw<gl::detail::ProgramCache>();
     std::tie(m_coef_cache_key, std::ignore) = e_cache.set(
      {{ .type       = gl::ShaderType::eVertex,
-        .spirv_path = "resources/shaders/pipeline/gen_texture.vert.spv",
-        .cross_path = "resources/shaders/pipeline/gen_texture.vert.json" },
+        .spirv_path = "shaders/pipeline/gen_texture.vert.spv",
+        .cross_path = "shaders/pipeline/gen_texture.vert.json" },
       { .type       = gl::ShaderType::eFragment,
-        .spirv_path = "resources/shaders/pipeline/gen_texture_coef.frag.spv",
-        .cross_path = "resources/shaders/pipeline/gen_texture_coef.frag.json" }});
+        .spirv_path = "shaders/pipeline/gen_texture_coef.frag.spv",
+        .cross_path = "shaders/pipeline/gen_texture_coef.frag.json" }});
     std::tie(m_brdf_cache_key, std::ignore) = e_cache.set(
      {{ .type       = gl::ShaderType::eVertex,
-        .spirv_path = "resources/shaders/pipeline/gen_texture.vert.spv",
-        .cross_path = "resources/shaders/pipeline/gen_texture.vert.json" },
+        .spirv_path = "shaders/pipeline/gen_texture.vert.spv",
+        .cross_path = "shaders/pipeline/gen_texture.vert.json" },
       { .type       = gl::ShaderType::eFragment,
-        .spirv_path = "resources/shaders/pipeline/gen_texture_brdf.frag.spv",
-        .cross_path = "resources/shaders/pipeline/gen_texture_brdf.frag.json" }});
+        .spirv_path = "shaders/pipeline/gen_texture_brdf.frag.spv",
+        .cross_path = "shaders/pipeline/gen_texture_brdf.frag.json" }});
                                 
     // Initialize uniform buffers and writeable, flushable mappings
     std::tie(m_coef_unif, m_coef_unif_map) = gl::Buffer::make_flusheable_object<UnifLayout>();

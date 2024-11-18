@@ -19,7 +19,7 @@ namespace met {
     fs::path scene_path = "";
 
     // Shader cache path
-    fs::path shader_path = "resources/shaders/shaders.bin";
+    fs::path shader_path = "shaders/shaders.bin";
 
     // Window settings
     eig::Array2u app_size  = { 2560, 1080 };

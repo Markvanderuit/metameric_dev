@@ -10,8 +10,8 @@ namespace met::detail {
 
     // Initialize shader object
     m_program = {{ .type = gl::ShaderType::eCompute,
-                   .glsl_path  = "resources/shaders/misc/texture_resample.comp",
-                   .cross_path = "resources/shaders/misc/texture_resample.comp.json", }};
+                   .glsl_path  = "shaders/misc/texture_resample.comp",
+                   .cross_path = "shaders/misc/texture_resample.comp.json", }};
 
     // Initialize uniform buffer and writeable, flushable mapping
     std::tie(m_uniform_buffer, m_uniform_map) = gl::Buffer::make_flusheable_object<UniformBuffer>();

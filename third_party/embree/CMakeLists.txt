@@ -13,18 +13,20 @@ elseif(UNIX)
   # Setup embree/tbb imports
   target_include_directories(embree INTERFACE linux/include)
   set_target_properties(embree 
-    PROPERTIES 
-    IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/linux/lib/libembree4.so.4
+  PROPERTIES 
+  IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/linux/lib/libembree4.so.4
   )
   set_target_properties(tbb 
-    PROPERTIES 
-    IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/linux/lib/libtbb.so.12
+  PROPERTIES 
+  IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/linux/lib/libtbb.so.12
   )
+  target_link_options(tbb      INTERFACE "LINKER:-rpath,./lib/")
+  target_link_options(embree   INTERFACE "LINKER:-rpath,./lib/")
   target_link_libraries(embree INTERFACE tbb)
   
   # Copy files to bin directory; a bit hacky, but runtime dependencies are confusing
   add_file_copy_target(
-    embree_copy ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
+    embree_copy ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/lib
     "${CMAKE_CURRENT_SOURCE_DIR}/linux/lib/libembree4.so.4;${CMAKE_CURRENT_SOURCE_DIR}/linux/lib/libtbb.so.12"
   )
 else()

@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.22)
 
 function(add_folder_copy_target target_name input_dir output_dir)
+  # Specify target with attached commands
   add_custom_target(
     ${target_name}
     
@@ -17,8 +18,6 @@ function(add_folder_copy_target target_name input_dir output_dir)
 endfunction()
 
 function(add_file_copy_target target_name output_dir inputs)
-  message(${inputs})
-
   # Iterate inputs
   foreach(input ${inputs})
     # Build target path

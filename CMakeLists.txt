@@ -188,7 +188,7 @@ add_dependencies(components   shaders)
 # Copy ./resources/misc to bin/resources
 add_folder_copy_target(data_copy 
   ${CMAKE_CURRENT_SOURCE_DIR}/resources/data
-  ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/resources/data
+  ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/data
 )
 
 # Setup editor executable
@@ -209,6 +209,7 @@ target_link_libraries(presentation_videos PRIVATE core render components avcpp::
 target_include_directories(presentation_videos PRIVATE src/app/include)
 
 # Finally, polish import libraries into working
+set(CMAKE_SKIP_RPATH TRUE)
 set_target_properties(metameric_editor PROPERTIES
   BUILD_WITH_INSTALL_RPATH TRUE
   INSTALL_RPATH            "\$ORIGIN"

@@ -33,11 +33,11 @@ namespace met {
 
     // Generate program object
     m_program = {{ .type = gl::ShaderType::eVertex,   
-                   .spirv_path = "resources/shaders/views/draw_cube.vert.spv",
-                   .cross_path = "resources/shaders/views/draw_cube.vert.json" },
+                   .spirv_path = "shaders/views/draw_cube.vert.spv",
+                   .cross_path = "shaders/views/draw_cube.vert.json" },
                  { .type = gl::ShaderType::eFragment, 
-                   .spirv_path = "resources/shaders/views/draw_cube.frag.spv",
-                   .cross_path = "resources/shaders/views/draw_cube.frag.json" }};
+                   .spirv_path = "shaders/views/draw_cube.frag.spv",
+                   .cross_path = "shaders/views/draw_cube.frag.json" }};
   }
 
   void DrawSRGBCubeTask::eval(SchedulerHandle &info) {

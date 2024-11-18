@@ -35,11 +35,11 @@ namespace met {
 
     // Initialize program object
     m_program = {{ .type       = gl::ShaderType::eVertex,   
-                   .spirv_path = "resources/shaders/views/draw_embedding.vert.spv",
-                   .cross_path = "resources/shaders/views/draw_embedding.vert.json" },
+                   .spirv_path = "shaders/views/draw_embedding.vert.spv",
+                   .cross_path = "shaders/views/draw_embedding.vert.json" },
                  { .type       = gl::ShaderType::eFragment, 
-                   .spirv_path = "resources/shaders/views/draw_embedding.frag.spv",
-                   .cross_path = "resources/shaders/views/draw_embedding.frag.json" }};
+                   .spirv_path = "shaders/views/draw_embedding.frag.spv",
+                   .cross_path = "shaders/views/draw_embedding.frag.json" }};
 
     // Initialize dispatch object
     m_array = {{ }};

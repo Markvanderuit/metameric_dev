@@ -117,12 +117,12 @@ namespace met {
     // Initialize program object, if it doesn't yet exist
     std::tie(m_cache_key, std::ignore) = m_cache_handle.getw<gl::detail::ProgramCache>().set({{ 
       .type       = gl::ShaderType::eVertex,
-      .spirv_path = "resources/shaders/render/primitive_render_gbuffer.vert.spv",
-      .cross_path = "resources/shaders/render/primitive_render_gbuffer.vert.json"
+      .spirv_path = "shaders/render/primitive_render_gbuffer.vert.spv",
+      .cross_path = "shaders/render/primitive_render_gbuffer.vert.json"
     }, {
       .type       = gl::ShaderType::eFragment,
-      .spirv_path = "resources/shaders/render/primitive_render_gbuffer.frag.spv",
-      .cross_path = "resources/shaders/render/primitive_render_gbuffer.frag.json"
+      .spirv_path = "shaders/render/primitive_render_gbuffer.frag.spv",
+      .cross_path = "shaders/render/primitive_render_gbuffer.frag.json"
     }});
 
     // Initialize draw object
@@ -202,8 +202,8 @@ namespace met {
     // Initialize program object, if it doesn't yet exist
     std::tie(m_cache_key, std::ignore) = m_cache_handle.getw<gl::detail::ProgramCache>().set({ 
       .type       = gl::ShaderType::eCompute,
-      .spirv_path = "resources/shaders/render/primitive_render_gbuffer_view.comp.spv",
-      .cross_path = "resources/shaders/render/primitive_render_gbuffer_view.comp.json",
+      .spirv_path = "shaders/render/primitive_render_gbuffer_view.comp.spv",
+      .cross_path = "shaders/render/primitive_render_gbuffer_view.comp.json",
       .spec_const = {{ 0u, 16u                                },
                      { 1u, 16u                                },
                      { 2u, static_cast<uint>(info.view_type) }}
@@ -268,8 +268,8 @@ namespace met {
     // Initialize program object, if it doesn't yet exist
     std::tie(m_cache_key, std::ignore) = m_cache_handle.getw<gl::detail::ProgramCache>().set({ 
       .type       = gl::ShaderType::eCompute,
-      .spirv_path = "resources/shaders/render/primitive_render_path.comp.spv",
-      .cross_path = "resources/shaders/render/primitive_render_path.comp.json",
+      .spirv_path = "shaders/render/primitive_render_path.comp.spv",
+      .cross_path = "shaders/render/primitive_render_path.comp.json",
       .spec_const = {{ 0u, 16u                     },
                      { 1u, 16u                     },
                      { 2u, info.max_depth          },

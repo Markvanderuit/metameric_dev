@@ -17,8 +17,8 @@ namespace met {
 
     // Initialize program object
     m_program = {{ .type       = gl::ShaderType::eCompute,
-                   .spirv_path = "resources/shaders/views/draw_mesh_combine.comp.spv",
-                   .cross_path = "resources/shaders/views/draw_mesh_combine.comp.json" }};
+                   .spirv_path = "shaders/views/draw_mesh_combine.comp.spv",
+                   .cross_path = "shaders/views/draw_mesh_combine.comp.json" }};
 
     // Initialize uniform buffers and corresponding mappings
     std::tie(m_unif_buffer, m_unif_buffer_map) = gl::Buffer::make_flusheable_object<UnifLayout>();

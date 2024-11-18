@@ -20,7 +20,7 @@ namespace met {
     fs::path out_path = "";
   
     // Shader cache path
-    fs::path shader_path = "resources/shaders/shaders.bin";
+    fs::path shader_path = "shaders/shaders.bin";
     
     // View settings
     std::string view_name  = "Default view";

@@ -14,11 +14,11 @@ namespace met {
     
     // Generate program object
     m_program = {{ .type = gl::ShaderType::eVertex,   
-                   .spirv_path = "resources/shaders/views/uplifting_viewport/draw_color_system.vert.spv",
-                   .cross_path = "resources/shaders/views/uplifting_viewport/draw_color_system.vert.json" },
+                   .spirv_path = "shaders/views/uplifting_viewport/draw_color_system.vert.spv",
+                   .cross_path = "shaders/views/uplifting_viewport/draw_color_system.vert.json" },
                  { .type = gl::ShaderType::eFragment, 
-                   .spirv_path = "resources/shaders/views/uplifting_viewport/draw_color_system.frag.spv",
-                   .cross_path = "resources/shaders/views/uplifting_viewport/draw_color_system.frag.json" }};
+                   .spirv_path = "shaders/views/uplifting_viewport/draw_color_system.frag.spv",
+                   .cross_path = "shaders/views/uplifting_viewport/draw_color_system.frag.json" }};
    
     // Generate and set mapped uniform buffers
     // Set uniform alpha settings for now
