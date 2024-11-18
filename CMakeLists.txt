@@ -53,6 +53,7 @@ add_subdirectory(third_party/autodiff)
 add_subdirectory(third_party/rapidobj)
 add_subdirectory(third_party/small_gl)
 add_subdirectory(third_party/xatlas)
+add_subdirectory(third_party/embree)
 
 # Include third party libraries
 find_package(Catch2    CONFIG REQUIRED)
@@ -74,26 +75,6 @@ find_package(ZLIB      REQUIRED)
 # Include third party header-only libraries provided through vcpkg
 find_path(STB_INCLUDE_DIRS "stb_c_lexer.h")
 find_path(ZSTR_INCLUDE_DIRS "zstr.hpp")
-
-# # Include Intel Embree, compiled from scratch :(
-# set(BUILD_TESTING                OFF CACHE BOOL " " FORCE) # grumble
-# set(EMBREE_TESTING_INSTALL_TESTS OFF CACHE BOOL " " FORCE) # grumble
-# set(EMBREE_TUTORIAL              OFF CACHE BOOL " " FORCE)
-# set(EMBREE_STATIC_LIB            OFF CACHE BOOL " " FORCE)
-# set(EMBREE_ZIP_MODE              OFF CACHE BOOL " " FORCE)
-# set(EMBREE_STAT_COUNTERS         OFF CACHE BOOL " " FORCE)
-# set(EMBREE_GEOMETRY_QUAD         OFF CACHE BOOL " " FORCE)
-# set(EMBREE_GEOMETRY_GRID         OFF CACHE BOOL " " FORCE)
-# set(EMBREE_GEOMETRY_POINT        OFF CACHE BOOL " " FORCE)
-# set(EMBREE_GEOMETRY_SUBDIVISION  OFF CACHE BOOL " " FORCE)
-# set(EMBREE_GEOMETRY_CURVE        OFF CACHE BOOL " " FORCE)
-# set(EMBREE_GEOMETRY_INSTANCE     ON  CACHE BOOL " " FORCE)
-# set(EMBREE_GEOMETRY_USER         ON  CACHE BOOL " " FORCE)
-# set(EMBREE_IGNORE_INVALID_RAYS   ON  CACHE BOOL " " FORCE)
-# set(EMBREE_RAY_MASK              OFF CACHE BOOL " " FORCE)
-# set(EMBREE_STAT_COUNTERS         OFF CACHE BOOL " " FORCE)
-# add_subdirectory(third_party/embree)
-add_subdirectory(third_party/embree_)
 
 # Specify cmake modules/finds
 include(CTest)
@@ -198,14 +179,6 @@ target_precompile_headers(render REUSE_FROM core)
 add_library_r(components components)
 target_link_libraries(components PUBLIC render ${component_dependencies})
 target_precompile_headers(components REUSE_FROM core)
-
-# Ignore unity builds on scene.cpp/math.cpp
-# as some dependency seems to have an incompatibility for now
-# set_source_files_properties(
-#   ${CMAKE_CURRENT_SOURCE_DIR}/src/core/scene.cpp 
-#   ${CMAKE_CURRENT_SOURCE_DIR}/src/core/math.cpp 
-#   PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON
-# )
 
 # Specify shader/resource targets, link these as dependencies for preprocessing
 add_shader_target(shaders shaders.bin)
