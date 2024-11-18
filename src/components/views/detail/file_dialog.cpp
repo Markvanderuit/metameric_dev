@@ -2,7 +2,6 @@
 #include <metameric/core/utility.hpp>
 #include <metameric/components/views/detail/file_dialog.hpp>
 #include <vector>
-#include <nfd.h>
 #include <tinyfiledialogs.h>
 
 namespace met::detail {
