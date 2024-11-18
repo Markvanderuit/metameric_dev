@@ -1,11 +1,32 @@
 cmake_minimum_required(VERSION 3.22)
 
-if (WIN32)
-  set(CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/windows" PARENT_SCOPE)
-  set(TBB12_LIBRARY "${CMAKE_CURRENT_SOURCE_DIR}/windows/bin/tbb12.dll" PARENT_SCOPE)
+include(dependency)
+
+# Specify import libraries for embree/tbb shared data
+add_library(embree SHARED IMPORTED GLOBAL)
+add_library(tbb    SHARED IMPORTED GLOBAL)
+
+# Per platform, specify embree includes and embree/tbb shared object libraries
+if(WIN32)
+  # ...
 elseif(UNIX)
-  set(CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/linux" PARENT_SCOPE)
-  set(TBB12_LIBRARY "${CMAKE_CURRENT_SOURCE_DIR}/linux/lib/libtbb.so.12" PARENT_SCOPE)
+  # Setup embree/tbb imports
+  target_include_directories(embree INTERFACE linux/include)
+  set_target_properties(embree 
+    PROPERTIES 
+    IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/linux/lib/libembree4.so.4
+  )
+  set_target_properties(tbb 
+    PROPERTIES 
+    IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/linux/lib/libtbb.so.12
+  )
+  target_link_libraries(embree INTERFACE tbb)
+  
+  # Copy files to bin directory; a bit hacky, but runtime dependencies are confusing
+  add_file_copy_target(
+    embree_copy ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
+    "${CMAKE_CURRENT_SOURCE_DIR}/linux/lib/libembree4.so.4;${CMAKE_CURRENT_SOURCE_DIR}/linux/lib/libtbb.so.12"
+  )
 else()
-  message(FATAL_ERROR "No Intel Embree package included for this platform")
+  message(FATAL_ERROR "No Intel Embree binaries included for this platform")
 endif()

@@ -10,8 +10,7 @@
 
 namespace ImGui {
   static bool appl_imgui_init = false;
-  static std::string appl_imgui_ini_path  = "resources/misc/imgui.ini";
-  static std::string appl_imgui_font_path = "resources/misc/atkinson_hyperlegible.ttf";
+  static std::string appl_imgui_ini_path  = "resources/data/imgui.ini";
   static ImVector<ImRect> s_GroupPanelLabelStack;
 
   void Init(const gl::Window &window, bool dark_mode) {

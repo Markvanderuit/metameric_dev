@@ -36,10 +36,11 @@ message(STATUS "Metameric : Wavelength max.     = ${MET_WAVELENGTH_MAX}")
 message(STATUS "Metameric : Wavelength samples  = ${MET_WAVELENGTH_SAMPLES}")
 message(STATUS "Metameric : Wavelength bases    = ${MET_WAVELENGTH_BASES}")
 
-# Specify output directories as /bin and /lib
+# Specify output directories as /bin, /lib, /out
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+set(CMAKE_INSTALL_PREFIX           ${CMAKE_BINARY_DIR}/out)
 
 # Ensure these are available for third parties
 find_package(OpenMP REQUIRED)
@@ -74,30 +75,31 @@ find_package(ZLIB      REQUIRED)
 find_path(STB_INCLUDE_DIRS "stb_c_lexer.h")
 find_path(ZSTR_INCLUDE_DIRS "zstr.hpp")
 
-# Include Intel Embree, compiled from scratch :(
-set(BUILD_TESTING                OFF CACHE BOOL " " FORCE) # grumble
-set(EMBREE_TESTING_INSTALL_TESTS OFF CACHE BOOL " " FORCE) # grumble
-set(EMBREE_TUTORIAL              OFF CACHE BOOL " " FORCE)
-set(EMBREE_STATIC_LIB            OFF CACHE BOOL " " FORCE)
-set(EMBREE_ZIP_MODE              OFF CACHE BOOL " " FORCE)
-set(EMBREE_STAT_COUNTERS         OFF CACHE BOOL " " FORCE)
-set(EMBREE_GEOMETRY_QUAD         OFF CACHE BOOL " " FORCE)
-set(EMBREE_GEOMETRY_GRID         OFF CACHE BOOL " " FORCE)
-set(EMBREE_GEOMETRY_POINT        OFF CACHE BOOL " " FORCE)
-set(EMBREE_GEOMETRY_SUBDIVISION  OFF CACHE BOOL " " FORCE)
-set(EMBREE_GEOMETRY_CURVE        OFF CACHE BOOL " " FORCE)
-set(EMBREE_GEOMETRY_INSTANCE     ON  CACHE BOOL " " FORCE)
-set(EMBREE_GEOMETRY_USER         ON  CACHE BOOL " " FORCE)
-set(EMBREE_IGNORE_INVALID_RAYS   ON  CACHE BOOL " " FORCE)
-set(EMBREE_RAY_MASK              OFF CACHE BOOL " " FORCE)
-set(EMBREE_STAT_COUNTERS         OFF CACHE BOOL " " FORCE)
-add_subdirectory(third_party/embree)
+# # Include Intel Embree, compiled from scratch :(
+# set(BUILD_TESTING                OFF CACHE BOOL " " FORCE) # grumble
+# set(EMBREE_TESTING_INSTALL_TESTS OFF CACHE BOOL " " FORCE) # grumble
+# set(EMBREE_TUTORIAL              OFF CACHE BOOL " " FORCE)
+# set(EMBREE_STATIC_LIB            OFF CACHE BOOL " " FORCE)
+# set(EMBREE_ZIP_MODE              OFF CACHE BOOL " " FORCE)
+# set(EMBREE_STAT_COUNTERS         OFF CACHE BOOL " " FORCE)
+# set(EMBREE_GEOMETRY_QUAD         OFF CACHE BOOL " " FORCE)
+# set(EMBREE_GEOMETRY_GRID         OFF CACHE BOOL " " FORCE)
+# set(EMBREE_GEOMETRY_POINT        OFF CACHE BOOL " " FORCE)
+# set(EMBREE_GEOMETRY_SUBDIVISION  OFF CACHE BOOL " " FORCE)
+# set(EMBREE_GEOMETRY_CURVE        OFF CACHE BOOL " " FORCE)
+# set(EMBREE_GEOMETRY_INSTANCE     ON  CACHE BOOL " " FORCE)
+# set(EMBREE_GEOMETRY_USER         ON  CACHE BOOL " " FORCE)
+# set(EMBREE_IGNORE_INVALID_RAYS   ON  CACHE BOOL " " FORCE)
+# set(EMBREE_RAY_MASK              OFF CACHE BOOL " " FORCE)
+# set(EMBREE_STAT_COUNTERS         OFF CACHE BOOL " " FORCE)
+# add_subdirectory(third_party/embree)
+add_subdirectory(third_party/embree_)
 
 # Specify cmake modules/finds
 include(CTest)
 include(Catch)
 include(spirv)
-include(resource)
+include(dependency)
 
 # Gather all preprocessor values into one list; these are passed to cxx and glsl
 set(preprocessor_defines
@@ -207,31 +209,34 @@ target_precompile_headers(components REUSE_FROM core)
 
 # Specify shader/resource targets, link these as dependencies for preprocessing
 add_shader_target(shaders shaders.bin)
-add_resource_target(resources misc)
-add_dependencies(core       resources)
-add_dependencies(render     shaders)
-add_dependencies(components shaders)
+add_dependencies(render       shaders)
+add_dependencies(components   shaders)
+
+# Copy ./resources/misc to bin/resources
+add_folder_copy_target(data_copy 
+  ${CMAKE_CURRENT_SOURCE_DIR}/resources/data
+  ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/resources/data
+)
 
 # Setup editor executable
 add_executable(metameric_editor src/app/metameric_editor.cpp)
 target_compile_features(metameric_editor PUBLIC cxx_std_23)
 target_link_libraries(metameric_editor PRIVATE core render components)
+add_dependencies(metameric_editor data_copy embree_copy)
 
 # Setup render executable
 find_package(avcpp CONFIG REQUIRED)
-add_executable(ffw_video src/app/ffw_video.cpp)
+add_executable(ffw_video EXCLUDE_FROM_ALL src/app/ffw_video.cpp)
 target_compile_features(ffw_video PUBLIC cxx_std_23)
 target_link_libraries(ffw_video PRIVATE core render components avcpp::FFmpeg avcpp::avcpp)
 target_include_directories(ffw_video PRIVATE src/app/include)
-add_executable(presentation_videos src/app/presentation_videos.cpp)
+add_executable(presentation_videos EXCLUDE_FROM_ALL src/app/presentation_videos.cpp)
 target_compile_features(presentation_videos PUBLIC cxx_std_23)
 target_link_libraries(presentation_videos PRIVATE core render components avcpp::FFmpeg avcpp::avcpp)
 target_include_directories(presentation_videos PRIVATE src/app/include)
 
-# Finally, handle dependency copy if necessary
-if (WIN32)
-  add_custom_command(
-    TARGET metameric_editor POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_RUNTIME_DLLS:metameric_editor> $<TARGET_FILE_DIR:metameric_editor> COMMAND_EXPAND_LISTS
-  )
-endif()
+# Finally, polish import libraries into working
+set_target_properties(metameric_editor PROPERTIES
+  BUILD_WITH_INSTALL_RPATH TRUE
+  INSTALL_RPATH            "\$ORIGIN"
+)

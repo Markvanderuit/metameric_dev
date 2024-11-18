@@ -32,8 +32,6 @@ function(compile_glsl_to_spirv glsl_src_fp spirv_dependencies)
   set(spirv_bin_fp   "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/resources/shaders/${glsl_rel_fp}.spv")
   set(spirv_refl_fp  "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/resources/shaders/${glsl_rel_fp}.json")
 
-  # Ensure enclosing directory exist
-
   # Add preprocessor stage to handle #include as well as > c98 preprocessing
   # we reuse the local c++ compiler to avoid google_include extensions and
   # allow for varargs

@@ -233,7 +233,7 @@ namespace met {
     resources.observers.push("CIE XYZ",            models::cmfs_cie_xyz,        false);
     resources.meshes.push("Rectangle",             models::unit_rect,           false);
 
-    auto basis = io::load_basis("resources/misc/basis_262144.txt");
+    auto basis = io::load_basis("resources/data/basis_262144.txt");
     for (auto col : basis.func.colwise()) {
       auto min_coeff = col.minCoeff(), max_coeff = col.maxCoeff();
       col /= std::max(std::abs(max_coeff), std::abs(min_coeff));
@@ -336,7 +336,7 @@ namespace met {
     // TODO remove this override that forces a reload of basis functions from disk
     // Load spectral basis
     // Normalize if they not already normalized
-    // auto basis = io::load_basis("resources/misc/basis_262144.txt");
+    // auto basis = io::load_basis("resources/data/basis_262144.txt");
     /* for (auto col : basis.func.colwise()) {
       auto min_coeff = col.minCoeff(), max_coeff = col.maxCoeff();
       col /= std::max(std::abs(max_coeff), std::abs(min_coeff));
