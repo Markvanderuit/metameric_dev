@@ -65,8 +65,8 @@ find_package(nlohmann_json CONFIG REQUIRED)
 find_package(NLopt     CONFIG REQUIRED)
 find_package(Qhull     CONFIG REQUIRED)
 find_package(tinyexr   CONFIG REQUIRED)
+find_package(tinyfiledialogs CONFIG REQUIRED)
 find_package(Tracy     CONFIG REQUIRED)
-find_package(nfd       CONFIG REQUIRED)
 find_package(TBB       CONFIG REQUIRED)
 find_package(ZLIB      REQUIRED)
 
@@ -143,7 +143,7 @@ set(component_dependencies
   imgui::imgui
   imguizmo::imguizmo
   implot::implot
-  nfd::nfd
+  tinyfiledialogs::tinyfiledialogs
 )
 if(OpenMP_CXX_FOUND)
   list(APPEND core_dependencies OpenMP::OpenMP_CXX)

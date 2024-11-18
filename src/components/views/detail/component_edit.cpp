@@ -336,15 +336,8 @@ namespace met {
       const auto &scene = info.global("scene").getr<Scene>();
       const auto &value = resource.value();
       
-      ImGui::LabelText("Vertices", "%d", value.verts.size());
-      ImGui::LabelText("Elements", "%d", value.elems.size());
-
-      /* ImGui::Separator();
-
-      if (fs::path path; ImGui::Button("Reload from file...") && detail::load_dialog(path, "obj")) {
-        auto &value = detail::scene_data_by_type<Resource<Mesh>>(scene)[i];
-
-      } */
+      ImGui::LabelText("Vertices", "%zu", value.verts.size());
+      ImGui::LabelText("Elements", "%zu", value.elems.size());
     };
 
     // Default implementation of editing visitor for Mesh resources
@@ -356,13 +349,6 @@ namespace met {
 
       ImGui::LabelText("Width",  "%d", value.size().x());
       ImGui::LabelText("Height", "%d", value.size().y());
-
-      /* ImGui::Separator();
-
-      if (fs::path path; ImGui::Button("Reload from file...") && detail::load_dialog(path, "exr,png,jpg,jpeg,bmp")) {
-        auto &value = detail::scene_data_by_type<Resource<Image>>(scene)[i];
-        
-      } */
     };
   } // namespace detail
 } // namespace met

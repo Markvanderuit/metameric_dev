@@ -26,7 +26,7 @@ namespace met {
       // Path header
       auto path_str = m_path.string();
       if (ImGui::Button("...")) {
-        if (fs::path path; detail::save_dialog(path, { "exr" }))
+        if (fs::path path; detail::save_dialog(path, { "*.exr" }))
           m_path = path;
       }
       ImGui::SameLine();

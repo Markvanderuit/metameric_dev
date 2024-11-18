@@ -57,7 +57,7 @@ namespace met {
         // CSYS editor column
         ImGui::TableSetColumnIndex(1);
         ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-        ImGui::Text(e_scene.csys_name(*uplf).c_str());
+        ImGui::Text("%s", e_scene.csys_name(*uplf).c_str());
 
         // lRGB/sRGB color column
         ImGui::TableSetColumnIndex(2);

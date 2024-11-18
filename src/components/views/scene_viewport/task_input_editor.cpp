@@ -355,7 +355,7 @@ namespace met {
     if (cs_nearest.is_valid()) {
       const auto &e_vert = info.global("scene").getr<Scene>().uplifting_vertex(cs_nearest);
       ImGui::BeginTooltip();
-      ImGui::Text(e_vert.name.c_str());
+      ImGui::Text("%s", e_vert.name.c_str());
       ImGui::EndTooltip();
     }
 
