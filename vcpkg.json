@@ -29,7 +29,6 @@
     "nlopt",
     "qhull",
     "stb",
-    "tbb",
     "tracy",
     "tinyexr",
     "tinyfiledialogs",

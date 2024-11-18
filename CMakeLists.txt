@@ -69,7 +69,6 @@ find_package(Qhull     CONFIG REQUIRED)
 find_package(tinyexr   CONFIG REQUIRED)
 find_package(tinyfiledialogs CONFIG REQUIRED)
 find_package(Tracy     CONFIG REQUIRED)
-find_package(TBB       CONFIG REQUIRED)
 find_package(ZLIB      REQUIRED)
 
 # Include third party header-only libraries provided through vcpkg
@@ -120,7 +119,6 @@ set(core_dependencies
   xatlas
   ZLIB::ZLIB
   embree
-  TBB::tbb TBB::tbbmalloc
 )
 set(component_dependencies
   imgui::imgui
@@ -196,6 +194,13 @@ add_executable(metameric_editor src/app/metameric_editor.cpp)
 target_compile_features(metameric_editor PUBLIC cxx_std_23)
 target_link_libraries(metameric_editor PRIVATE core render components)
 add_dependencies(metameric_editor data_copy embree_copy)
+if(UNIX)
+  set(CMAKE_SKIP_RPATH TRUE)
+  set_target_properties(metameric_editor PROPERTIES
+    BUILD_WITH_INSTALL_RPATH TRUE
+    INSTALL_RPATH            "\$ORIGIN"
+  )
+endif()
 
 # Setup render executable
 find_package(avcpp CONFIG REQUIRED)
@@ -207,10 +212,3 @@ add_executable(presentation_videos EXCLUDE_FROM_ALL src/app/presentation_videos.
 target_compile_features(presentation_videos PUBLIC cxx_std_23)
 target_link_libraries(presentation_videos PRIVATE core render components avcpp::FFmpeg avcpp::avcpp)
 target_include_directories(presentation_videos PRIVATE src/app/include)
-
-# Finally, polish import libraries into working
-set(CMAKE_SKIP_RPATH TRUE)
-set_target_properties(metameric_editor PROPERTIES
-  BUILD_WITH_INSTALL_RPATH TRUE
-  INSTALL_RPATH            "\$ORIGIN"
-)
