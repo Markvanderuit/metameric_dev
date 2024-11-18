@@ -15,8 +15,9 @@ namespace met {
 
   // Application create settings
   struct MetamericEditorInfo {
-    // Direct load scene path
-    fs::path scene_path = "";
+    // Direct load scene path; optionally allowed to fail for a default scene load
+    fs::path scene_path      = "";
+    bool     scene_fail_safe = false;
 
     // Shader cache path
     fs::path shader_path = "shaders/shaders.bin";
@@ -67,7 +68,7 @@ namespace met {
     scheduler.global("scene").set<Scene>({ });
 
     // Load scene if a scene path is provided
-    if (!info.scene_path.empty())
+    if (!info.scene_path.empty() && (info.scene_fail_safe || fs::exists(info.scene_path)))
       scheduler.global("scene").getw<Scene>().load(info.scene_path);
 
     // Load appropriate set of schedule tasks, then start the runtime loop
@@ -83,11 +84,12 @@ namespace met {
 
 // Application entry point
 int main() {
-  /* try { */
-    met::metameric_editor({ /* .scene_path = "path/to/file.json" */ });
-  /* } catch (const std::exception &e) {
+  try {
+    // Supply a default scene; this can fail silently
+    met::metameric_editor({ .scene_path = "data/cornell_box.json", .scene_fail_safe = true });
+  } catch (const std::exception &e) {
     fmt::print(stderr, "{}\n", e.what());
     return EXIT_FAILURE;
-  } */
+  }
   return EXIT_SUCCESS;
 }
