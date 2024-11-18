@@ -92,7 +92,7 @@ namespace met::detail {
     if (m_is_mutated)
       update();
       
-    const float tan = std::tanf(m_fov_y * .5f);
+    const float tan = tanf(m_fov_y * .5f);
     const auto  mat = m_view.inverse(); // camera-to-world
 
     eig::Vector2f s = (screen_pos.array() - .5f) * 2.f;

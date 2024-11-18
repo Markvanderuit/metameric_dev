@@ -37,8 +37,8 @@ namespace met::detail {
     // Bind image/sampler resources, then dispatch shader to perform resample
     m_program.bind("b_uniform", m_uniform_buffer);
     m_program.bind("s_image_r", m_sampler);
-    m_program.bind("s_image_r", info(m_info.input_key.first, m_info.input_key.second).getr<Ty>());
-    m_program.bind("i_image_w", info(m_info.output_key).getw<Ty>());
+    m_program.bind("s_image_r", info(m_info.input_key.first, m_info.input_key.second).template getr<Ty>());
+    m_program.bind("i_image_w", info(m_info.output_key).template getw<Ty>());
     gl::dispatch_compute(m_dispatch);
     
     m_is_mutated = false;
@@ -53,7 +53,7 @@ namespace met::detail {
     m_info.texture_info = texture_info;
 
     // Emplace texture resource using new info object; scheduler replaces pre-existing resource
-    info(m_info.output_key).init<Ty, Ty::InfoType>(m_info.texture_info);
+    info(m_info.output_key).template init<Ty, typename Ty::InfoType>(m_info.texture_info);
 
     // Compute nr. of workgroups as nearest upper divide of n / (16, 16), implying wg size of 256
     eig::Array2u dispatch_n    = m_info.texture_info.size;

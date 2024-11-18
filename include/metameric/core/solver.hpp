@@ -18,8 +18,7 @@ namespace nlopt {
     using mat = Eigen::Matrix<double, N, -1>;
 
     struct Constraint {
-      using Capture = std::function<double (Eigen::Map<const vec>,
-                                            Eigen::Map<vec>)>;
+      using Capture = std::function<double (Eigen::Map<const vec>, Eigen::Map<vec>)>;
     public:
       Capture f;
       double  tol = 0.0;
@@ -76,7 +75,7 @@ namespace nlopt {
     using namespace met;
     using vec = Wrapper<N>::vec;
     return 
-      [A = Af.cast<double>().eval(), b = bf.cast<double>().eval()]
+      [A = Af.template cast<double>().eval(), b = bf.template cast<double>().eval()]
       (eig::Map<const vec> x, eig::Map<vec> g) {
         // shorthands for Ax - b and ||(Ax - b)||
         auto diff = ((A * x).array() - b).matrix().eval();
@@ -97,7 +96,7 @@ namespace nlopt {
     using namespace met;
     using vec = Wrapper<N>::vec;
     return 
-      [A = Af.cast<double>().eval(), b = bf.cast<double>().eval()]
+      [A = Af.template cast<double>().eval(), b = bf.template cast<double>().eval()]
       (eig::Map<const vec> x, eig::Map<vec> g) {
         // shorthand for Ax - b
         auto diff = ((A * x).array() - b).matrix().eval();
@@ -117,7 +116,7 @@ namespace nlopt {
     using namespace met;
     using vec = Wrapper<N>::vec;
     return 
-      [A = Af.cast<double>().eval(), b = bf.cast<double>().eval(), &iter]
+      [A = Af.template cast<double>().eval(), b = bf.template cast<double>().eval(), &iter]
       (eig::Map<const vec> x, eig::Map<vec> g) {
         iter++;
 
@@ -139,7 +138,7 @@ namespace nlopt {
     using namespace met;
     using vec = Wrapper<N>::vec;
     return 
-      [A = Af.cast<double>().eval(), b = bf.cast<double>().eval()]
+      [A = Af.template cast<double>().eval(), b = bf.template cast<double>().eval()]
       (eig::Map<const vec> x, eig::Map<vec> g) {
         // shorthand for Ax - b
         auto diff = ((A * x).array() - b).matrix().eval();
@@ -167,7 +166,7 @@ namespace nlopt {
     using namespace met;
     using vec = Wrapper<N>::vec;
     return 
-      [a = af.cast<double>().eval(), b = static_cast<double>(bf)]
+      [a = af.template cast<double>().eval(), b = static_cast<double>(bf)]
       (eig::Map<const vec> x, eig::Map<vec> g) {
         // g(x) = a
         if (g.data())
@@ -185,7 +184,7 @@ namespace nlopt {
     using vec = Wrapper<N>::vec;
     using mat = Wrapper<N>::mat;
     return 
-      [A = Af.cast<double>().eval(), b = bf.cast<double>().eval()]
+      [A = Af.template cast<double>().eval(), b = bf.template cast<double>().eval()]
       (eig::Map<eig::VectorXd> r, eig::Map<const vec> x, eig::Map<mat> g) {
         // g(x) = a
         if (g.data())

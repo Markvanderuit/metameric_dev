@@ -165,7 +165,7 @@ namespace met {
 
       // Determine rectangle of points around the image plane in world space
       auto image_world = quad | vws::transform([full_trf](const auto &v) { 
-        return eig::screen_to_world_space(v.head<2>().eval(), full_trf);
+        return eig::screen_to_world_space(v.template head<2>().eval(), full_trf);
       }) | view_to<std::vector<eig::Vector3f>>();
       
       // Determine second rectangle of points, offset into camera frustrum
@@ -180,7 +180,7 @@ namespace met {
         if (trf.z() > 1.f)
           return eig::Vector2f(0);
         else
-          return eig::screen_to_window_space(trf.head<2>() * .5f + .5f, viewport_offs, viewport_size);
+          return eig::screen_to_window_space(trf.template head<2>() * .5f + .5f, viewport_offs, viewport_size);
       }) | view_to<std::vector<eig::Vector2f>>();
       auto frust_window = frust_world | vws::transform([&](const auto &v) {
         auto trf = (e_arcball.full() * (eig::Vector4f() << v, 1).finished()).array().eval();
@@ -188,7 +188,7 @@ namespace met {
         if (trf.z() > 1.f)
           return eig::Vector2f(0);
         else
-          return eig::screen_to_window_space(trf.head<2>() * .5f + .5f, viewport_offs, viewport_size);
+          return eig::screen_to_window_space(trf.template head<2>() * .5f + .5f, viewport_offs, viewport_size);
       }) | view_to<std::vector<eig::Vector2f>>();
 
       // Draw frustrum

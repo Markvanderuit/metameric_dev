@@ -47,8 +47,8 @@ namespace met {
       }
 
       // Add new samples to the end of the queue
-      m_colr_samples.append_range(samples | vws::transform(&MismatchSample::colr));
-      m_coef_samples.append_range(samples | vws::transform(&MismatchSample::coef));
+      rng::transform(samples, std::back_inserter(m_colr_samples), &MismatchSample::colr);
+      rng::transform(samples, std::back_inserter(m_coef_samples), &MismatchSample::coef);
 
       // Determine extents of current full point set
       auto maxb = rng::fold_left_first(m_colr_samples, [](auto a, auto b) { return a.max(b).eval(); }).value();

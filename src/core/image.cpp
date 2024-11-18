@@ -333,7 +333,7 @@ namespace met {
     if (input_frmt != ColorFormat::eNone && m_color_frmt != ColorFormat::eNone)
       v.head<3>() = detail::convert_colr_frmt(m_color_frmt, input_frmt, v.head<3>());
 
-    for (auto [src, dst] : vws::zip(src_range, dst_range))
+    for (auto [src, dst] : view_zip(src_range, dst_range))
       detail::convert_fr_float(m_pixel_type, v[src], m_data[dst]);
   }
 
@@ -346,7 +346,7 @@ namespace met {
     auto src_range  = (type_size * (i * frmt_size + dst_range)).eval();
 
     eig::Array4f v = 0.f;
-    for (auto [src, dst] : vws::zip(src_range, dst_range))
+    for (auto [src, dst] : view_zip(src_range, dst_range))
       detail::convert_to_float(m_pixel_type, m_data[src], v[dst]);
 
     if (output_frmt != ColorFormat::eNone && m_color_frmt != ColorFormat::eNone)
@@ -356,7 +356,7 @@ namespace met {
   }
 
   eig::Array4f Image::sample(const eig::Array2f &uv, ColorFormat output_frmt) const {
-    constexpr auto fmod = [](float f) { return std::fmodf(f, 1.f); };
+    constexpr auto fmod = [](float f) { return fmodf(f, 1.f); };
 
     eig::Array2f xy   = (uv.unaryExpr(fmod) * m_size.cast<float>() - 0.5f).cwiseMax(0.f).eval();
     eig::Array2f lerp = xy - xy.floor();
@@ -439,7 +439,7 @@ namespace met {
         eig::Array4f f = 0;
 
         // Gather converted input to float representation
-        for (auto [src, ovl] : vws::zip(src_channels, ovl_channels))
+        for (auto [src, ovl] : view_zip(src_channels, ovl_channels))
           detail::convert_to_float(m_pixel_type, m_data[src], f[ovl]);
 
         // Apply color space conversion on float representation, to the first three channels **only**
@@ -447,7 +447,7 @@ namespace met {
           f.head<3>() = convert_func(f.head<3>());
         
         // Scatter float representation to converted output
-        for (auto [ovl, dst] : vws::zip(ovl_channels, dst_channels))
+        for (auto [ovl, dst] : view_zip(ovl_channels, dst_channels))
           detail::convert_fr_float(output.m_pixel_type, f[ovl], output.m_data[dst]);
       } // for (int i)
     } else {

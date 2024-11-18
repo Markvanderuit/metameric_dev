@@ -1,10 +1,10 @@
 #pragma once
 
 // Extensions to Eigen's existing classes are inserted through header files
-#define EIGEN_ARRAYBASE_PLUGIN  "eigen_arraybase.ext"
-#define EIGEN_MATRIXBASE_PLUGIN "eigen_matrixbase.ext"
-#define EIGEN_ARRAY_PLUGIN      "eigen_array.ext"
-#define EIGEN_MATRIX_PLUGIN     "eigen_matrix.ext"
+#define EIGEN_ARRAYBASE_PLUGIN  "metameric/core/detail/eigen_arraybase.ext"
+#define EIGEN_MATRIXBASE_PLUGIN "metameric/core/detail/eigen_matrixbase.ext"
+#define EIGEN_ARRAY_PLUGIN      "metameric/core/detail/eigen_array.ext"
+#define EIGEN_MATRIX_PLUGIN     "metameric/core/detail/eigen_matrix.ext"
 
 #include <Eigen/Dense>
 #include <Eigen/Geometry>
@@ -66,7 +66,7 @@ namespace Eigen {
         size_t seed = 0;
         for (size_t i = 0; i < mat.size(); ++i) {
           auto elem = *(mat.data() + i);
-          seed ^= std::hash<Ty::Scalar>()(elem) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+          seed ^= std::hash<typename Ty::Scalar>()(elem) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
         }
         return seed;
       }

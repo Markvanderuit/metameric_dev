@@ -63,7 +63,7 @@ namespace met {
     m_patches.clear();
     m_free.resize(capacity().z());
     for (uint i = 0; i < m_free.size(); ++i)
-      m_free[i] = { .layer_i = i, .offs = 0, .size = capacity().head<2>() };
+      m_free[i] = { .layer_i = i, .offs = 0, .size = capacity().template head<2>() };
     m_is_invalitated = true;
   }
 
@@ -94,7 +94,7 @@ namespace met {
     // Define cleared replacements for m_patches, m_free
     std::vector<AtlasBlockLayout> new_patches, new_free(capacity().z());
     for (uint i = 0; i < new_free.size(); ++i)
-      new_free[i] = { .layer_i = i, .offs = 0, .size = capacity().head<2>() };
+      new_free[i] = { .layer_i = i, .offs = 0, .size = capacity().template head<2>() };
 
     if (sizes.empty()) {
       clear();
@@ -107,7 +107,7 @@ namespace met {
     
     // Establish necessary capacity based on existing texture's size, or size of the maximum
     // h/v patch size if capacity is already insufficient
-    auto new_capacity = (eig::Array3u() << capacity().head<2>().max(max_size), 1).finished();
+    auto new_capacity = (eig::Array3u() << capacity().template head<2>().max(max_size), 1).finished();
 
     // Generate work data; copy all input sizes, assign them an index, and sort them by area
     struct Work { uint i; eig::Array2u size; };
@@ -129,10 +129,10 @@ namespace met {
       // Reset remainder data, incorporating potential texture growth
       new_free.resize(new_capacity.z());
       for (uint i = 0; i < new_free.size(); ++i)
-        new_free[i] = { .layer_i = i, .offs = 0, .size = new_capacity.head<2>() };
+        new_free[i] = { .layer_i = i, .offs = 0, .size = new_capacity.template head<2>() };
         
       // Reset work queue
-      work_queue.assign_range(work_data);
+      work_queue = { work_data.begin(), work_data.end() };
     };
 
     // Helper capture to grow the texture's estimated necessary capacity
@@ -157,16 +157,16 @@ namespace met {
     perform_init();
     while (!work_queue.empty()) {
       // Get index, size of next patch
-      auto [i, size] = work_queue.front();
+      Work work = work_queue.front();
       
       // Actual size of a reserved patch includes user-specified padding around it
-      size = size + m_padding * 2;
+      work.size = work.size + m_padding * 2;
 
       // Generate a view over empty spaces where the current work fits
       // If no suitable empty space was found, we grow the estimated capacity and restart
-      auto candidates = vws::filter(new_free, [&](auto s) { return (size <= s.size).all(); });
+      auto candidates = vws::filter(new_free, [&](auto s) -> bool { return (work.size <= s.size).all(); });
       if (candidates.empty()) {
-        perform_grow(size);
+        perform_grow(work.size);
         perform_init();
         continue;
       }
@@ -175,14 +175,14 @@ namespace met {
       auto candidate_it = rng::min_element(candidates, {}, [](auto s) { return s.size.prod(); });
 
       // Split canndidate into parts, and store remainder(s) as empty space for later reservation
-      auto [patch, remainder] = atlas_split(size, *candidate_it);
+      auto [patch, remainder] = atlas_split(work.size, *candidate_it);
       new_free.erase(candidate_it.base());
       new_free.insert(new_free.end(), range_iter(remainder));
 
       // Strip padding from the reserved space, and store it at the matching index
       patch.offs += m_padding;
       patch.size -= m_padding * 2;
-      new_patches[i] = patch;
+      new_patches[work.i] = patch;
 
       work_queue.pop_front();
     } // while (!work_queue.empty())
@@ -212,8 +212,10 @@ namespace met {
     // Update uv0/uv1 values in the patch data
     // these make texture lookups slightly faster
     for (auto &patch : new_patches) {
-      patch.uv0 = patch.offs.cast<float>() / m_texture.size().head<2>().cast<float>();
-      patch.uv1 = patch.size.cast<float>() / m_texture.size().head<2>().cast<float>();
+      patch.uv0 = patch.offs.cast<float>() 
+                / m_texture.size().template head<2>().template cast<float>();
+      patch.uv1 = patch.size.cast<float>() 
+                / m_texture.size().template head<2>().template cast<float>();
     }
     
     // Store new patches
@@ -250,8 +252,10 @@ namespace met {
 
     // Update uv0/uv1 values in the patch data
     for (auto &patch : m_patches) {
-      patch.uv0 = patch.offs.cast<float>() / m_texture.size().head<2>().cast<float>();
-      patch.uv1 = patch.size.cast<float>() / m_texture.size().head<2>().cast<float>();
+      patch.uv0 = patch.offs.cast<float>() 
+                / m_texture.size().template head<2>().template cast<float>();
+      patch.uv1 = patch.size.cast<float>() 
+                / m_texture.size().template head<2>().template cast<float>();
     }
     
     // Copy updated patch layouts to buffer storage

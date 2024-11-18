@@ -218,7 +218,7 @@ struct fmt::formatter<met::IndirectSurfaceConstraint>{
   }
 
   template <typename fmt_context_ty>
-  constexpr auto format(const met::IndirectSurfaceConstraint, fmt_context_ty& ctx) const {
+  constexpr auto format(const met::IndirectSurfaceConstraint &ty, fmt_context_ty& ctx) const {
     std::string s = "indirect surface";
     return fmt::format_to(ctx.out(), "{}", s);
   }

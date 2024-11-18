@@ -47,7 +47,7 @@ namespace met {
     // generally keeps everything running nicely.
     scheduler.task("scene_handler").init<LambdaTask>([](auto &info) {
       met_trace();
-      info.global("scene").getw<Scene>().update();
+      info.global("scene").template getw<Scene>().update();
     });
 
     // Pipeline tasks generate uplifting data and then bake a spectral texture per object

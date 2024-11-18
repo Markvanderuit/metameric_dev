@@ -406,7 +406,8 @@ namespace met {
           ImGui::SetTooltip("Metamers can only be correctly generated inside the volume"); */
 
         // Show optional color patches
-        const auto &e_patches = info.relative("viewport_gen_patches")("patches").getr<std::vector<Colr>>();
+        const auto &e_patches = info.relative("viewport_gen_patches")("patches")
+                                    .template getr<std::vector<Colr>>();
         if (!e_patches.empty()) {
           for (uint i = 0; i < e_patches.size(); ++i) {
             // Wrap around if we are out of line space

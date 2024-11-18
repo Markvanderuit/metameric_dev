@@ -55,7 +55,8 @@ namespace met {
   std::span<T> cnt_span(C &c) {
     auto data = c.data();
     guard(data, {});
-    return { reinterpret_cast<T*>(data), (c.size() * sizeof(C::value_type)) / sizeof(T) };
+    using value_type = typename C::value_type;
+    return { reinterpret_cast<T*>(data), (c.size() * sizeof(value_type)) / sizeof(T) };
   }
 
   // Interpret an object as a span of type T
@@ -92,7 +93,7 @@ namespace met {
     // to the expression's origin if said expression fails
     // Note: can be removed on release builds
   #if defined(NDEBUG) || defined(MET_ENABLE_EXCEPTIONS)
-    constexpr inline
+    inline
     void check_expr(bool expr,
                     const std::string_view &msg = "",
                     const std::source_location sl = std::source_location::current()) {

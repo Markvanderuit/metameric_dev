@@ -83,14 +83,14 @@ namespace met::detail {
       met_trace();
 
       float delta = scale_delta * m_scale_delta_mult;
-      float curv = std::expf(1.f + m_scale * m_scale_delta_curv) * delta;
+      float curv = expf(1.f + m_scale * m_scale_delta_curv) * delta;
 
       float diff;
       if (delta > 0.f) {
         diff = curv;
       } else {
         float prev_scale = std::max(m_scale + curv, 0.0001f);
-        diff = std::expf(1.f + prev_scale * m_scale_delta_curv) * delta;
+        diff = expf(1.f + prev_scale * m_scale_delta_curv) * delta;
       }
 
       m_scale = std::clamp(m_scale + diff, 0.0001f, 100.f);

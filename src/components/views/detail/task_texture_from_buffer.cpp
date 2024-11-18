@@ -8,7 +8,7 @@ namespace met::detail {
     met_trace_full();
 
     // Emplace texture resource using provided info object
-    info(m_info.output_key).init<Ty, Ty::InfoType>(m_info.texture_info);
+    info(m_info.output_key).template init<Ty, typename Ty::InfoType>(m_info.texture_info);
     
     // Compute nr. of workgroups as nearest upper divide of n / (16, 16), implying wg size of 256
     eig::Array2u dispatch_n    = m_info.texture_info.size;
@@ -18,7 +18,7 @@ namespace met::detail {
     struct UniformBuffer {
       alignas(8) eig::Array2u size;
       alignas(4) uint lrgb_to_srgb;
-    } uniform_data { 
+    } uniform_data {
       .size         = dispatch_n, 
       .lrgb_to_srgb = m_info.lrgb_to_srgb 
     };
@@ -44,8 +44,8 @@ namespace met::detail {
   void TextureFromBufferTask<Ty>::eval(SchedulerHandle &info) {
     met_trace_full();
     m_program.bind("b_uniform", m_uniform);
-    m_program.bind("b_buffer",  info(m_info.input_key.first, m_info.input_key.second).getr<gl::Buffer>());
-    m_program.bind("i_image",   info(m_info.output_key).getw<Ty>());
+    m_program.bind("b_buffer",  info(m_info.input_key.first, m_info.input_key.second).template getr<gl::Buffer>());
+    m_program.bind("i_image",   info(m_info.output_key).template getw<Ty>());
     gl::dispatch_compute(m_dispatch);
   }
 

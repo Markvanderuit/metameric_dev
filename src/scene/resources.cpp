@@ -94,7 +94,7 @@ namespace met::detail {
     // Transform mesh data in parallel
     std::vector<Mesh::vert_type> verts(mesh.verts.size());
     std::transform(std::execution::par_unseq, range_iter(mesh.verts), verts.begin(),
-      [&trf](const auto &vt) { return (trf * (eig::Vector4f() << vt, 1).finished()).head<3>().eval(); });
+      [&trf](const auto &vt) { return (trf * (eig::Vector4f() << vt, 1).finished()).template head<3>().eval(); });
     
     // Establish bounding box around mesh's vertices
     eig::Array3f minb = std::reduce(std::execution::par_unseq, range_iter(verts), verts[0],
@@ -279,9 +279,9 @@ namespace met::detail {
 
     // Scale input sizes by appropriate scaling
     rng::transform(inputs_3f, inputs_3f.begin(), 
-      [mul_3f](const auto &v) { return (v.cast<float>() * mul_3f).max(1.f).cast<uint>().eval(); });
+      [mul_3f](const auto &v) { return (v.template cast<float>() * mul_3f).max(1.f).template cast<uint>().eval(); });
     rng::transform(inputs_1f, inputs_1f.begin(), 
-      [mul_1f](const auto &v) { return (v.cast<float>() * mul_1f).max(1.f).cast<uint>().eval(); });
+      [mul_1f](const auto &v) { return (v.template cast<float>() * mul_1f).max(1.f).template cast<uint>().eval(); });
 
     // Rebuild texture atlases with mips
     texture_atlas_3f = {{ .sizes = inputs_3f, .levels = 1 }};
@@ -449,7 +449,7 @@ namespace met::detail {
         aabb.minb = (trf * eig::Vector4f(-.5f, -.5f, 0.f, 1.f)).head<3>().eval();
         aabb.maxb = (trf * eig::Vector4f(0.5f, 0.5f, 0.f, 1.f)).head<3>().eval();
       } else if (emitter.type == Emitter::Type::eSphere) {
-        auto transl = eig::Affine3f(eig::Translation3f({ -.5f, -.5f, -.5f })).matrix().eval();
+        auto transl = eig::Affine3f(eig::Translation3f(eig::Vector3f { -.5f, -.5f, -.5f })).matrix().eval();
         aabb = generate_rotated_aabb((trf.matrix() * transl).matrix().eval());
       }
 

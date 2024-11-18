@@ -43,7 +43,7 @@ namespace met {
       if (n_samples <= 16) {
         UniformSampler sampler(-1.f, 1.f, seed);
         for (int i = 0; i < unit_dirs.size(); ++i)
-          unit_dirs[i] = inv_unit_sphere_cdf<N>(sampler.next_nd<N>());
+          unit_dirs[i] = inv_unit_sphere_cdf<N>(sampler.template next_nd<N>());
       } else {
         UniformSampler sampler(-1.f, 1.f, seed);
         #pragma omp parallel
@@ -51,7 +51,7 @@ namespace met {
           UniformSampler sampler(-1.f, 1.f, seed + static_cast<uint>(omp_get_thread_num()));
           #pragma omp for
           for (int i = 0; i < unit_dirs.size(); ++i)
-            unit_dirs[i] = inv_unit_sphere_cdf<N>(sampler.next_nd<N>());
+            unit_dirs[i] = inv_unit_sphere_cdf<N>(sampler.template next_nd<N>());
         }
       }
 
@@ -306,6 +306,7 @@ namespace met {
         // Run solver and store recovered spectral distribution if it is safe
         auto [coeffs, code] = solve(local_solver);
         guard_continue(!coeffs.array().isNaN().any() && !coeffs.array().isZero());
+
         #pragma omp critical
         {
           output.push_back(coeffs.cast<float>().eval());
