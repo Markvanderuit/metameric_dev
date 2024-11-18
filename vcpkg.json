@@ -30,6 +30,7 @@
     "nlopt",
     "qhull",
     "stb",
+    "tbb",
     "tracy",
     "tinyexr",
     "zlib",

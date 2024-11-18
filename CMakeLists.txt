@@ -49,7 +49,6 @@ find_package(Threads REQUIRED)
 option(gl_enable_exceptions  "" ${MET_ENABLE_EXCEPTIONS})
 option(gl_enable_tracy       "" ${MET_ENABLE_TRACY})
 add_subdirectory(third_party/autodiff)
-add_subdirectory(third_party/embree)
 add_subdirectory(third_party/rapidobj)
 add_subdirectory(third_party/small_gl)
 add_subdirectory(third_party/xatlas)
@@ -68,12 +67,31 @@ find_package(Qhull     CONFIG REQUIRED)
 find_package(tinyexr   CONFIG REQUIRED)
 find_package(Tracy     CONFIG REQUIRED)
 find_package(nfd       CONFIG REQUIRED)
+find_package(TBB       CONFIG REQUIRED)
 find_package(ZLIB      REQUIRED)
-find_package(embree    CONFIG REQUIRED)
 
 # Include third party header-only libraries provided through vcpkg
 find_path(STB_INCLUDE_DIRS "stb_c_lexer.h")
 find_path(ZSTR_INCLUDE_DIRS "zstr.hpp")
+
+# Include Intel Embree, compiled from scratch :(
+set(BUILD_TESTING                OFF CACHE BOOL " " FORCE) # grumble
+set(EMBREE_TESTING_INSTALL_TESTS OFF CACHE BOOL " " FORCE) # grumble
+set(EMBREE_TUTORIAL              OFF CACHE BOOL " " FORCE)
+set(EMBREE_STATIC_LIB            OFF CACHE BOOL " " FORCE)
+set(EMBREE_ZIP_MODE              OFF CACHE BOOL " " FORCE)
+set(EMBREE_STAT_COUNTERS         OFF CACHE BOOL " " FORCE)
+set(EMBREE_GEOMETRY_QUAD         OFF CACHE BOOL " " FORCE)
+set(EMBREE_GEOMETRY_GRID         OFF CACHE BOOL " " FORCE)
+set(EMBREE_GEOMETRY_POINT        OFF CACHE BOOL " " FORCE)
+set(EMBREE_GEOMETRY_SUBDIVISION  OFF CACHE BOOL " " FORCE)
+set(EMBREE_GEOMETRY_CURVE        OFF CACHE BOOL " " FORCE)
+set(EMBREE_GEOMETRY_INSTANCE     ON  CACHE BOOL " " FORCE)
+set(EMBREE_GEOMETRY_USER         ON  CACHE BOOL " " FORCE)
+set(EMBREE_IGNORE_INVALID_RAYS   ON  CACHE BOOL " " FORCE)
+set(EMBREE_RAY_MASK              OFF CACHE BOOL " " FORCE)
+set(EMBREE_STAT_COUNTERS         OFF CACHE BOOL " " FORCE)
+add_subdirectory(third_party/embree)
 
 # Specify cmake modules/finds
 include(CTest)
@@ -107,7 +125,6 @@ set(thrp_includes ${STB_INCLUDE_DIRS} ${ZSTR_INCLUDE_DIRS})
 set(core_dependencies
   autodiff::autodiff
   Eigen3::Eigen
-  embree
   fmt::fmt-header-only
   nlohmann_json::nlohmann_json
   NLopt::nlopt
@@ -119,6 +136,8 @@ set(core_dependencies
   Tracy::TracyClient
   xatlas
   ZLIB::ZLIB
+  embree
+  TBB::tbb TBB::tbbmalloc
 )
 set(component_dependencies
   imgui::imgui
@@ -210,17 +229,9 @@ target_link_libraries(presentation_videos PRIVATE core render components avcpp::
 target_include_directories(presentation_videos PRIVATE src/app/include)
 
 # Finally, handle dependency copy if necessary
-add_custom_command(
-  TARGET metameric_editor POST_BUILD
-  COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_RUNTIME_DLLS:metameric_editor> $<TARGET_FILE_DIR:metameric_editor> COMMAND_EXPAND_LISTS
-)
-
-# Copy tbb12 so embree doesn't break things
 if (WIN32)
   add_custom_command(
     TARGET metameric_editor POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy
-    ${TBB12_LIBRARY}
-    $<TARGET_FILE_DIR:metameric_editor>/tbb12.dll
+    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_RUNTIME_DLLS:metameric_editor> $<TARGET_FILE_DIR:metameric_editor> COMMAND_EXPAND_LISTS
   )
 endif()

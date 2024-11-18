@@ -4,3 +4,6 @@
 [submodule "third_party/small_gl"]
 	path = third_party/small_gl
 	url = https://github.com/Markvanderuit/small_gl.git
+[submodule "third_party/embree"]
+	path = third_party/embree
+	url = https://github.com/RenderKit/embree.git
