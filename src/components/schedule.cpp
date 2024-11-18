@@ -82,7 +82,7 @@ namespace met {
       ImGui::End();
     });
 
-    // Viewport task which takes camera input, renders scene, and shows scene
+    // Viewport task which handles camera input, renders scene, and draws to a viewport
     scheduler.task("viewport").init<SceneViewportTask>();
 
     // Final window/gl task

@@ -15,30 +15,28 @@
 #include <execution>
 
 namespace met {
-  class MeshViewportQueryInputTask : public detail::TaskNode {
+  class PathMeasureToolTask : public detail::TaskNode {
     PixelSensor m_query_sensor;
     uint        m_query_spp = 0;
 
   public:
     bool is_active(SchedulerHandle &info) override {
-      return info.parent()("is_active").getr<bool>();
+      return info("viewport", "is_active").getr<bool>();
     }
 
     void init(SchedulerHandle &info) override {
       met_trace();
-      info("path_query").init<PathQueryPrimitive>({
-        .cache_handle = info.global("cache")
-      });
+      info("path_query").init<PathQueryPrimitive>({ .cache_handle = info.global("cache") });
     } 
 
-    void eval_path_query(SchedulerHandle &info) {
+    void measure(SchedulerHandle &info) {
       met_trace_full();
 
       // Get shared resources
       const auto &e_window  = info.global("window").getr<gl::Window>(); // TODO remove
       const auto &e_scene   = info.global("scene").getr<Scene>();
       const auto &io        = ImGui::GetIO();
-      const auto &e_arcball = info.relative("viewport_input_camera")("arcball").getr<detail::Arcball>();
+      const auto &e_arcball = info("viewport.viewport_input_camera", "arcball").getr<detail::Arcball>();
 
       // Escape for empty scenes
       guard(!e_scene.components.objects.empty());
@@ -101,14 +99,6 @@ namespace met {
         ImGui::ColorEdit3("lrgb", colr_lrgb_dstr.data(), ImGuiColorEditFlags_Float);
         ImGui::ColorEdit3("srgb", colr_srgb_dstr.data(), ImGuiColorEditFlags_Float);
         ImGui::Value("Luminance", colr_luminance);
-        
-        // ImGui::Separator();
-
-        // ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x * 0.45);
-        // ImGui::Value("Minimum", spec_distr.minCoeff());
-        // ImGui::SameLine();
-        // ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x * 0.45);
-        // ImGui::Value("Maximum", spec_distr.maxCoeff());
 
         // Run a spectrum plot for the accumulated radiance
         ImGui::Separator();
@@ -121,13 +111,19 @@ namespace met {
     void eval(SchedulerHandle &info) override {
       met_trace();
       
-      if (ImGui::Begin("Measure tool")) {
+      bool is_open = true;
+      if (ImGui::Begin("Measure tool", &is_open)) {
         uint min_v = 0, max_v = 4096;
         ImGui::SliderScalar("Slider", ImGuiDataType_U32, &m_query_spp, &min_v, &max_v);
       }
       ImGui::End();
       
-      eval_path_query(info);
+      // Handle path queries, if m_query_spp != 0
+      measure(info);
+
+      // Window closed, kill this task
+      if (!is_open)
+        info.task().dstr();
     }
   };
 } // namespace met

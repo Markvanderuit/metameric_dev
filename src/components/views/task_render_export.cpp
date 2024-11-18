@@ -1,7 +1,7 @@
 #include <metameric/core/io.hpp>
 #include <metameric/core/image.hpp>
 #include <metameric/scene/scene.hpp>
-#include <metameric/components/views/task_export.hpp>
+#include <metameric/components/views/task_render_export.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
 #include <metameric/components/views/detail/file_dialog.hpp>
 #include <metameric/components/views/detail/component_edit.hpp>
@@ -9,11 +9,11 @@
 namespace met {
   constexpr static uint export_spp_per_iter = 4u;
 
-  void ExportTask::init(SchedulerHandle &info) {
+  void RenderExportTask::init(SchedulerHandle &info) {
     met_trace();    
   }
     
-  void ExportTask::eval(SchedulerHandle &info) {
+  void RenderExportTask::eval(SchedulerHandle &info) {
     met_trace_full();
 
     // Get shared resources

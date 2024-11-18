@@ -6,7 +6,7 @@
 #include <metameric/components/views/detail/arcball.hpp>
 
 namespace met {
-  class ExportTask : public detail::TaskNode {
+  class RenderExportTask : public detail::TaskNode {
     Settings::RendererType m_render_type = Settings::RendererType::ePath;
     PathRenderPrimitive    m_render;
     Sensor                 m_sensor;

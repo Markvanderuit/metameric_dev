@@ -1,6 +1,5 @@
 #include <metameric/scene/scene.hpp>
 #include <metameric/components/views/task_scene_viewport.hpp>
-#include <metameric/components/views/scene_viewport/task_input_query.hpp>
 #include <metameric/components/views/scene_viewport/task_input_editor.hpp>
 #include <metameric/components/views/scene_viewport/task_render.hpp>
 #include <metameric/components/views/scene_viewport/task_draw_overlay.hpp>
@@ -69,7 +68,6 @@ namespace met {
       .zoom_delta_mult = 0.1f
     });
     info.child_task("viewport_input_editor").init<MeshViewportEditorInputTask>();
-    info.child_task("viewport_input_query").init<MeshViewportQueryInputTask>();
     info.child_task("viewport_render").init<MeshViewportRenderTask>();
     info.child_task("viewport_draw_overlay").init<MeshViewportDrawOverlayTask>();
     info.child_task("viewport_draw_combine").init<MeshViewportDrawCombineTask>();
