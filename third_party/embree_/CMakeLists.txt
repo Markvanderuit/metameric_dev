@@ -1,11 +1,11 @@
 cmake_minimum_required(VERSION 3.22)
 
 if (WIN32)
-  # set(embree_DIR "${CMAKE_CURRENT_SOURCE_DIR}/windows/lib/cmake/embree-4.3.3")
   set(CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/windows" PARENT_SCOPE)
   set(TBB12_LIBRARY "${CMAKE_CURRENT_SOURCE_DIR}/windows/bin/tbb12.dll" PARENT_SCOPE)
 elseif(UNIX)
   set(CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/linux" PARENT_SCOPE)
-  else()
+  set(TBB12_LIBRARY "${CMAKE_CURRENT_SOURCE_DIR}/linux/lib/libtbb.so.12" PARENT_SCOPE)
+else()
   message(FATAL_ERROR "No Intel Embree package included for this platform")
 endif()

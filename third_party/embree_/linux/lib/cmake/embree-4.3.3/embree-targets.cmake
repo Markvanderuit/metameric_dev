@@ -55,8 +55,9 @@ if(_IMPORT_PREFIX STREQUAL "/")
   set(_IMPORT_PREFIX "")
 endif()
 
-# Create imported target embree
+# Create imported target embree/tbb
 add_library(embree SHARED IMPORTED)
+add_library(tbb    SHARED IMPORTED)
 
 set_target_properties(embree PROPERTIES
   INTERFACE_INCLUDE_DIRECTORIES "${_IMPORT_PREFIX}/include"
