@@ -21,7 +21,7 @@ namespace met {
 
   public:
     bool is_active(SchedulerHandle &info) override {
-      return info("viewport", "is_active").getr<bool>();
+      return info.parent().parent()("is_active").getr<bool>(); // that be the viewport
     }
 
     void init(SchedulerHandle &info) override {
@@ -36,7 +36,7 @@ namespace met {
       const auto &e_window  = info.global("window").getr<gl::Window>(); // TODO remove
       const auto &e_scene   = info.global("scene").getr<Scene>();
       const auto &io        = ImGui::GetIO();
-      const auto &e_arcball = info("viewport.viewport_input_camera", "arcball").getr<detail::Arcball>();
+      const auto &e_arcball = info.parent().relative("viewport_input_camera")("arcball").getr<detail::Arcball>();
 
       // Escape for empty scenes
       guard(!e_scene.components.objects.empty());
@@ -112,9 +112,9 @@ namespace met {
       met_trace();
       
       bool is_open = true;
-      if (ImGui::Begin("Measure tool", &is_open)) {
+      if (ImGui::Begin("Path measure tool", &is_open)) {
         uint min_v = 0, max_v = 4096;
-        ImGui::SliderScalar("Slider", ImGuiDataType_U32, &m_query_spp, &min_v, &max_v);
+        ImGui::SliderScalar("Sample count", ImGuiDataType_U32, &m_query_spp, &min_v, &max_v);
       }
       ImGui::End();
       

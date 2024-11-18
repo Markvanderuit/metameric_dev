@@ -263,14 +263,14 @@ namespace met {
     met_trace_full();
 
     // Escape early if query task d.n.e.
-    guard(info.task("path_measure_tool").is_init());
-
+    guard(info.relative("viewport_input_editor").child_task("path_measure_tool").is_init());
+    
     // Get handles, shared resources, modified resources
     const auto &e_scene  = info.global("scene").getr<Scene>();
     const auto &e_target = info.relative("viewport_image")("lrgb_target").getr<gl::Texture2d4f>();
     const auto &e_sensor = info.relative("viewport_render")("sensor").getr<Sensor>();
     const auto &e_render = info.relative("viewport_render")("renderer").getr<detail::IntegrationRenderPrimitive>();
-    const auto &e_query  = info.resource("path_measure_tool", "path_query").getr<PathQueryPrimitive>();
+    const auto &e_query  = info.relative("viewport_input_editor").child("path_measure_tool")("path_query").getr<PathQueryPrimitive>();
     auto &i_target       = info("target").getw<gl::Texture2d4f>(); 
 
     // Prepare output framebuffer

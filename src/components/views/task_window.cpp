@@ -288,7 +288,8 @@ namespace met {
       // View menu follows; show export/settings/measure
       if (ImGui::BeginMenu("View", is_loaded)) {
         if (ImGui::MenuItem("Path measure tool", nullptr, nullptr)) {
-          if (auto handle = info.task("path_measure_tool"); !handle.is_init()) {
+          auto parent = info.task("viewport.viewport_input_editor").mask(info);
+          if (auto handle = parent.child_task("path_measure_tool"); !handle.is_init()) {
             handle.init<PathMeasureToolTask>();
           }
         }
