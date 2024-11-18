@@ -353,9 +353,9 @@ namespace met {
       program.bind("b_buff_blas_info", scene.resources.meshes.gl.blas_info);
       program.bind("b_buff_blas_node", scene.resources.meshes.gl.blas_nodes);
       program.bind("b_buff_blas_prim", scene.resources.meshes.gl.blas_prims);
-      program.bind("b_buff_tlas_info", scene.gl.tlas_info);
-      program.bind("b_buff_tlas_node", scene.gl.tlas_nodes);
-      program.bind("b_buff_tlas_prim", scene.gl.tlas_prims);
+      // program.bind("b_buff_tlas_info", scene.gl.tlas_info);
+      // program.bind("b_buff_tlas_node", scene.gl.tlas_nodes);
+      // program.bind("b_buff_tlas_prim", scene.gl.tlas_prims);
     }
 
     // Dispatch compute shader

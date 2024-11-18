@@ -482,13 +482,19 @@ namespace met::detail {
       [trf](AABB &aabb) {
         aabb.minb = (trf * (eig::Vector4f() << aabb.minb, 1).finished()).head<3>().eval();
         aabb.maxb = (trf * (eig::Vector4f() << aabb.maxb, 1).finished()).head<3>().eval();
+        /* if (std::abs(aabb.maxb.x() - aabb.minb.x()) < 1e-4) aabb.maxb.x() += 1e-3;        
+        if (std::abs(aabb.maxb.y() - aabb.minb.y()) < 1e-4) aabb.maxb.y() += 1e-3;        
+        if (std::abs(aabb.maxb.z() - aabb.minb.z()) < 1e-4) aabb.maxb.z() += 1e-3;      */   
       });
+    
+    fmt::print("{}\n", prim_aabbs | vws::transform(&AABB::minb) | view_to<std::vector<eig::Array3f>>());
+    fmt::print("{}\n", prim_aabbs | vws::transform(&AABB::maxb) | view_to<std::vector<eig::Array3f>>());
 
     // Push transformations to buffer
     m_tlas_info_map->trf = trf;
     tlas_info.flush();
     
-    // Create top-level BVH over AABBS
+    /* // Create top-level BVH over AABBS
     BVH<8> bvh = {{ .aabb = prim_aabbs, .n_leaf_children = 1 }};
 
     // Pack BVH node/prim data tightly
@@ -513,6 +519,6 @@ namespace met::detail {
 
     // Push BVH data to buffer
     tlas_nodes = {{ .data = cnt_span<const std::byte>(nodes_packed) }};
-    tlas_prims = {{ .data = cnt_span<const std::byte>(prims_packed) }};
+    tlas_prims = {{ .data = cnt_span<const std::byte>(prims_packed) }}; */
   }
 } // namespace met::detail
