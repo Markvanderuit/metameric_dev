@@ -115,21 +115,25 @@ namespace met {
       alignas(4) uint lrgb_to_srgb;
     };
 
+    std::string     m_program_key;
     gl::ComputeInfo m_dispatch;
-    gl::Program     m_program;
     gl::Sampler     m_sampler;
     gl::Buffer      m_uniform_buffer;
     UniformBuffer  *m_uniform_map;
 
     void init(SchedulerHandle &info) override {
       met_trace_full();
+    
+      // Initialize program object in cache
+      std::tie(m_program_key, std::ignore) = info.global("cache").getw<gl::detail::ProgramCache>().set({{ 
+        .type       = gl::ShaderType::eCompute,
+        .spirv_path = "shaders/misc/texture_resample.comp.spv",
+        .cross_path = "shaders/misc/texture_resample.comp.json"
+      }});
       
-      // Set up draw components for gamma correction
+      // NN-sampler
       m_sampler = {{ .min_filter = gl::SamplerMinFilter::eNearest, 
                      .mag_filter = gl::SamplerMagFilter::eNearest }};
-      m_program = {{ .type = gl::ShaderType::eCompute, 
-                     .glsl_path  = "shaders/misc/texture_resample.comp", 
-                     .cross_path = "shaders/misc/texture_resample.comp.json" }};
       
       // Initialize uniform buffer and writeable, flushable mapping
       std::tie(m_uniform_buffer, m_uniform_map) = gl::Buffer::make_flusheable_object<UniformBuffer>();
@@ -152,18 +156,20 @@ namespace met {
         if (e_lrgb_target_handle.is_mutated()) {
           eig::Array2u dispatch_n    = e_lrgb_target.size();
           eig::Array2u dispatch_ndiv = ceil_div(dispatch_n, 16u);
-          m_dispatch = { .groups_x = dispatch_ndiv.x(),
-                         .groups_y = dispatch_ndiv.y(),
-                         .bindable_program = &m_program };
+          m_dispatch = { .groups_x = dispatch_ndiv.x(), .groups_y = dispatch_ndiv.y() };
           m_uniform_map->size = dispatch_n;
           m_uniform_buffer.flush();
         }
 
-        // Bind image/sampler resources for coming dispatch
-        m_program.bind("b_uniform", m_uniform_buffer);
-        m_program.bind("s_image_r", m_sampler);
-        m_program.bind("s_image_r", e_lrgb_target);
-        m_program.bind("i_image_w", begin_handle("srgb_target").getw<gl::Texture2d4f>());
+        // Draw relevant program from cache
+        auto &program = info.global("cache").getw<gl::detail::ProgramCache>().at(m_program_key);
+
+        // Bind image/sampler resources and program
+        program.bind();
+        program.bind("b_uniform", m_uniform_buffer);
+        program.bind("s_image_r", m_sampler);
+        program.bind("s_image_r", e_lrgb_target);
+        program.bind("i_image_w", begin_handle("srgb_target").getw<gl::Texture2d4f>());
 
         // Dispatch prepared work
         gl::dispatch_compute(m_dispatch);

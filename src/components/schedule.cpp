@@ -58,10 +58,10 @@ namespace met {
     scheduler.task("scene_components_editor").init<LambdaTask>([](auto &info) {
       met_trace();
       if (ImGui::Begin("Scene components")) {
-        push_editor<detail::Component<Object>>(info,       { .editor_name = "Objects" });
-        push_editor<detail::Component<Emitter>>(info,      { .editor_name = "Emitters" });
-        push_editor<detail::Component<Uplifting>>(info,    { .editor_name = "Uplifting models" });
-        push_editor<detail::Component<View>>(info, { .editor_name = "Views" });
+        push_editor<detail::Component<Uplifting>>(info, { .editor_name = "Upliftings", .default_open = true });
+        push_editor<detail::Component<Object>>(info,    { .editor_name = "Objects"  });
+        push_editor<detail::Component<Emitter>>(info,   { .editor_name = "Emitters" });
+        push_editor<detail::Component<View>>(info,      { .editor_name = "Views" });
       }
       ImGui::End();
     });

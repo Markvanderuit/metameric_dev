@@ -15,10 +15,12 @@ namespace met {
   void MeshViewportDrawCombineTask::init(SchedulerHandle &info) {
     met_trace_full();
 
-    // Initialize program object
-    m_program = {{ .type       = gl::ShaderType::eCompute,
-                   .spirv_path = "shaders/views/draw_mesh_combine.comp.spv",
-                   .cross_path = "shaders/views/draw_mesh_combine.comp.json" }};
+    // Initialize program object in cache
+    std::tie(m_program_key, std::ignore) = info.global("cache").getw<gl::detail::ProgramCache>().set({{ 
+      .type       = gl::ShaderType::eCompute,
+      .spirv_path = "shaders/views/draw_mesh_combine.comp.spv",
+      .cross_path = "shaders/views/draw_mesh_combine.comp.json"
+    }});
 
     // Initialize uniform buffers and corresponding mappings
     std::tie(m_unif_buffer, m_unif_buffer_map) = gl::Buffer::make_flusheable_object<UnifLayout>();
@@ -42,16 +44,19 @@ namespace met {
     m_unif_buffer_map->sample_checkerboard = static_cast<uint>(e_render.is_pixel_checkerboard() && e_render.iter() <= 1);
     m_unif_buffer.flush();
     
+    // Draw relevant program from cache
+    auto &program = info.global("cache").getw<gl::detail::ProgramCache>().at(m_program_key);
+
     // Bind required resources to their corresponding targets
-    m_program.bind("b_buff_unif",  m_unif_buffer);
-    m_program.bind("b_render_4f",  e_render.film());
-    m_program.bind("b_overlay_4f", e_overlay);
-    m_program.bind("b_target_4f",  e_target);
+    program.bind("b_buff_unif",  m_unif_buffer);
+    program.bind("b_render_4f",  e_render.film());
+    program.bind("b_overlay_4f", e_overlay);
+    program.bind("b_target_4f",  e_target);
 
     // Dispatch compute shader to add inputs to viewport target
     gl::sync::memory_barrier(gl::BarrierFlags::eImageAccess | gl::BarrierFlags::eTextureFetch);
     gl::dispatch_compute({ .groups_x         = dispatch_ndiv.x(),
                            .groups_y         = dispatch_ndiv.y(),
-                           .bindable_program = &m_program       });
+                           .bindable_program = &program       });
   }
 } // namespace met

@@ -87,7 +87,7 @@ namespace met {
     //    We use a spherical sampling method; see Uplifting::sample_color_solid
     if (csys_stale) {
       m_boundary_samples = e_uplifting.sample_color_solid(e_scene, 4, n_system_boundary_samples);
-      fmt::print("Uplifting color system boundary, {} points\n", m_boundary_samples.size());
+      fmt::print("Uplifting: sampled {} boundary points\n", m_boundary_samples.size());
     }
 
     // 2. Generate interior spectra, coefficients, and colors.

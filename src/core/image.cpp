@@ -192,8 +192,6 @@ namespace met {
       if (exr_header.pixel_types[0] == TINYEXR_PIXELTYPE_UINT)
         m_pixel_type = PixelType::eUInt;
       
-      fmt::print("num_channels : {}\n", exr_image.num_channels);
-      
       // Allocate image memory
       m_data.resize(m_size.prod() * detail::size_from_format(m_pixel_frmt) 
                                   * detail::size_from_type(m_pixel_type));
@@ -253,10 +251,8 @@ namespace met {
         debug::check_expr(false, "Could not load EXR image, unsupported channel layout");
       }
 
-      fmt::print("Attempted to read: channels = {}, width = {}, height = {}, tiles = {}\n",
+      fmt::print("Image: reading/// channels = {}, width = {}, height = {}, tiles = {}\n",
         exr_image.num_channels, exr_image.width, exr_image.height, exr_image.num_tiles);
-      for (uint i = 0; i < exr_header.num_channels; ++i)
-        fmt::print("\tchannel {}, named {}\n", i, exr_header.channels[i].name);
 
       // Cleanup
       FreeEXRImage(&exr_image);

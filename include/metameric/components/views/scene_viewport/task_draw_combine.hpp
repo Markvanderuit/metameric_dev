@@ -11,9 +11,9 @@ namespace met {
       uint          sample_checkerboard;
     };
 
+    std::string  m_program_key;
     gl::Buffer   m_unif_buffer;
     UnifLayout  *m_unif_buffer_map;
-    gl::Program  m_program;
     
   public:
     bool is_active(SchedulerHandle &info) override;

@@ -16,6 +16,7 @@ namespace met {
     struct ImGuiEditInfo {
       std::string editor_name = "Editor"; // Surrounding editor section name
       bool inside_tree        = true;     // Push imgui components inside a TreeNode section,  or inline directly
+      bool default_open       = false;    // Are component/resource editors expanded by default?
       bool show_add           = true;     // Allow adding of components to lists
       bool show_del           = true;     // Allow deletion of component/resource
       bool show_dupl          = true;     // Allow duplication of component/resource
@@ -158,7 +159,8 @@ namespace met {
     const auto &data  = scene_data_by_type<Ty>(scene)[data_i];
 
     // If requested, spawn a TreeNode.
-    bool section_open = !edit_info.inside_tree || ImGui::TreeNodeEx(data.name.c_str());
+    auto section_flag = edit_info.default_open ? ImGuiTreeNodeFlags_DefaultOpen : ImGuiTreeNodeFlags_None;
+    bool section_open = !edit_info.inside_tree || ImGui::TreeNodeEx(data.name.c_str(), section_flag);
 
     // Is_active button, on same line as tree node if available
     if constexpr (detail::has_active_value<typename Ty::value_type>) {

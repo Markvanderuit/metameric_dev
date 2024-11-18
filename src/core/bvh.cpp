@@ -51,7 +51,7 @@ namespace met {
   static std::optional<RTCDevice> rtc_device;
 
   void emb_error_callback(void *user_p, enum RTCError err, const char *str) {
-    fmt::print("Embree caught an error\nExpand this!\n");
+    fmt::print("Embree caught an error\nExpand this!\nPanic!\n");
   }
 
   RTCDevice get_rtc_device() {

@@ -23,7 +23,7 @@ namespace met {
     fs::path shader_path = "shaders/shaders.bin";
 
     // Window settings
-    eig::Array2u app_size  = { 2560, 1080 };
+    eig::Array2u app_size  = { 1800, 1024 };
     std::string  app_title = "Metameric Editor";
   };
 
@@ -52,7 +52,7 @@ namespace met {
     // Enable OpenGL debug messages, if requested
     if constexpr (met_enable_debug) {
       gl::debug::enable_messages(gl::DebugMessageSeverity::eLow, gl::DebugMessageTypeFlags::eAll);
-      gl::debug::insert_message("OpenGL debug messages are active!", gl::DebugMessageSeverity::eLow);
+      gl::debug::insert_message("OpenGL messages enabled", gl::DebugMessageSeverity::eLow);
     }
 
     // Initialize program cache as resource ownedd by the scheduler;

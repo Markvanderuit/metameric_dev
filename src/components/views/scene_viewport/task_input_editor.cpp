@@ -154,7 +154,7 @@ namespace met {
       cstr.powr_j = { };
       return;
     }
-    fmt::print("Found {} paths through query\n", paths.size());
+    fmt::print("Query: sampled {} light paths\n", paths.size());
 
     // Collect handle to relevant uplifting task
     // const auto &e_uplf_task = uplf_handles[cs.uplifting_i].realize<GenUpliftingDataTask>();
@@ -244,7 +244,7 @@ namespace met {
 
     // Copy tbb over to single vector block
     // std::vector<SeparationRecord> paths_finalized(range_iter(tbb_paths));
-    fmt::print("Separated into {} path permutations\n", paths_finalized.size());
+    fmt::print("Query: separated into {} permutations\n", paths_finalized.size());
 
     // Make space in constraint available, up to maximum power
     // and set everything to zero for now

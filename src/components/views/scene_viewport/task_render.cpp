@@ -47,19 +47,21 @@ namespace met {
         case Settings::RendererType::ePath:
           render_handle.init<PathRenderPrimitive>({ .spp_per_iter        = render_spp_per_iter,
                                                     .pixel_checkerboard  = true,
-                                                    .enable_alpha        = true,
+                                                    .enable_alpha        = false,
                                                     .cache_handle        = info.global("cache") });
           break;
         case Settings::RendererType::eDirect:
           render_handle.init<PathRenderPrimitive>({ .spp_per_iter        = render_spp_per_iter,
                                                     .max_depth           = 2u,
                                                     .pixel_checkerboard  = true,
+                                                    .enable_alpha        = false,
                                                     .cache_handle        = info.global("cache") });
           break;
         case Settings::RendererType::eDebug:
           render_handle.init<PathRenderPrimitive>({ .spp_per_iter        = render_spp_per_iter,
                                                     .max_depth           = 2u,
                                                     .pixel_checkerboard  = true,
+                                                    .enable_alpha        = false,
                                                     .enable_debug        = true,
                                                     .cache_handle        = info.global("cache") });
           break;

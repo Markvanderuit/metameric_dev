@@ -482,14 +482,8 @@ namespace met::detail {
       [trf](AABB &aabb) {
         aabb.minb = (trf * (eig::Vector4f() << aabb.minb, 1).finished()).head<3>().eval();
         aabb.maxb = (trf * (eig::Vector4f() << aabb.maxb, 1).finished()).head<3>().eval();
-        /* if (std::abs(aabb.maxb.x() - aabb.minb.x()) < 1e-4) aabb.maxb.x() += 1e-3;        
-        if (std::abs(aabb.maxb.y() - aabb.minb.y()) < 1e-4) aabb.maxb.y() += 1e-3;        
-        if (std::abs(aabb.maxb.z() - aabb.minb.z()) < 1e-4) aabb.maxb.z() += 1e-3;      */   
       });
     
-    fmt::print("{}\n", prim_aabbs | vws::transform(&AABB::minb) | view_to<std::vector<eig::Array3f>>());
-    fmt::print("{}\n", prim_aabbs | vws::transform(&AABB::maxb) | view_to<std::vector<eig::Array3f>>());
-
     // Push transformations to buffer
     m_tlas_info_map->trf = trf;
     tlas_info.flush();

@@ -56,7 +56,7 @@ namespace met::detail {
 
   public:
     const char * what() const noexcept override {
-      _what = fmt::format("met::detail::Exception thrown\n{}", get());
+      _what = fmt::format("Metameric Exception thrown\n{}", get());
       return _what.c_str();
     }
   };

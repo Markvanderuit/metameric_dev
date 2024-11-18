@@ -113,7 +113,6 @@ namespace met {
     
     // Given existence of the specified task, erase specified resource
     if (auto it = m_rsrc_registry.find(info.task_key); it != m_rsrc_registry.end()) {
-      fmt::print("rem_rsrc_impl {} - {}\n", info.task_key, info.rsrc_key);
       it->second.erase(info.rsrc_key);
     }
   }
