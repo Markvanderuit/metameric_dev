@@ -194,13 +194,6 @@ add_executable(metameric_editor src/app/metameric_editor.cpp)
 target_compile_features(metameric_editor PUBLIC cxx_std_23)
 target_link_libraries(metameric_editor PRIVATE core render components)
 add_dependencies(metameric_editor data_copy embree_copy)
-if(UNIX)
-  set(CMAKE_SKIP_RPATH TRUE)
-  set_target_properties(metameric_editor PROPERTIES
-    BUILD_WITH_INSTALL_RPATH TRUE
-    INSTALL_RPATH            "\$ORIGIN"
-  )
-endif()
 
 # Setup render executable
 find_package(avcpp CONFIG REQUIRED)

@@ -47,7 +47,6 @@ namespace met {
       .title = info.app_title, 
       .flags = window_flags
     }).getw<gl::Window>();
-    // window.set_swap_interval(0);
 
     // Enable OpenGL debug messages, if requested
     if constexpr (met_enable_debug) {
@@ -84,12 +83,12 @@ namespace met {
 
 // Application entry point
 int main() {
-  // try {
+  try {
     // Supply a default scene; this can fail silently
     met::metameric_editor({ .scene_path = "data/cornell_box.json", .scene_fail_safe = true });
-  // } catch (const std::exception &e) {
-  //   fmt::print(stderr, "{}\n", e.what());
-  //   return EXIT_FAILURE;
-  // }
+  } catch (const std::exception &e) {
+    fmt::print(stderr, "{}\n", e.what());
+    return EXIT_FAILURE;
+  }
   return EXIT_SUCCESS;
 }

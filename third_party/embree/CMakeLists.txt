@@ -20,8 +20,6 @@ if(WIN32)
     IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/windows/bin/tbb12.dll
     IMPORTED_IMPLIB   ${CMAKE_CURRENT_SOURCE_DIR}/windows/lib/tbb12.lib
   )
-  # target_link_options(tbb      INTERFACE "LINKER:-rpath,./lib/")
-  # target_link_options(embree   INTERFACE "LINKER:-rpath,./lib/")
   target_link_libraries(embree INTERFACE tbb)
 
   # Copy files to bin directory; a bit hacky, but runtime dependencies are confusing
@@ -29,9 +27,6 @@ if(WIN32)
     embree_copy ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
     "${CMAKE_CURRENT_SOURCE_DIR}/windows/bin/embree4.dll;${CMAKE_CURRENT_SOURCE_DIR}/windows/bin/tbb12.dll"
   )
-
-  # set(CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/windows" PARENT_SCOPE)
-  # set(TBB12_LIBRARY "${CMAKE_CURRENT_SOURCE_DIR}/windows/bin/tbb12.dll" PARENT_SCOPE)
 elseif(UNIX)
   # Setup embree/tbb imports
   target_include_directories(embree INTERFACE linux/include)
@@ -47,7 +42,7 @@ elseif(UNIX)
   target_link_options(embree   INTERFACE "LINKER:-rpath,./lib/")
   target_link_libraries(embree INTERFACE tbb)
   
-  # Copy files to bin directory; a bit hacky, but runtime dependencies are confusing
+  # Copy files to bin/lib directory; a bit hacky, but runtime dependencies are confusing
   add_file_copy_target(
     embree_copy ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/lib
     "${CMAKE_CURRENT_SOURCE_DIR}/linux/lib/libembree4.so.4;${CMAKE_CURRENT_SOURCE_DIR}/linux/lib/libtbb.so.12"
