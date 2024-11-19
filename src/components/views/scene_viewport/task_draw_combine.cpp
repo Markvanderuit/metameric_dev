@@ -8,25 +8,25 @@
 #include <small_gl/dispatch.hpp>
 
 namespace met {
-  bool MeshViewportDrawCombineTask::is_active(SchedulerHandle &info) {
+  bool ViewportDrawCombineTask::is_active(SchedulerHandle &info) {
     return info.parent()("is_active").getr<bool>();
   }
   
-  void MeshViewportDrawCombineTask::init(SchedulerHandle &info) {
+  void ViewportDrawCombineTask::init(SchedulerHandle &info) {
     met_trace_full();
 
     // Initialize program object in cache
     std::tie(m_program_key, std::ignore) = info.global("cache").getw<gl::detail::ProgramCache>().set({{ 
       .type       = gl::ShaderType::eCompute,
-      .spirv_path = "shaders/views/draw_mesh_combine.comp.spv",
-      .cross_path = "shaders/views/draw_mesh_combine.comp.json"
+      .spirv_path = "shaders/views/scene_viewport/draw_combine.comp.spv",
+      .cross_path = "shaders/views/scene_viewport/draw_combine.comp.json"
     }});
 
     // Initialize uniform buffers and corresponding mappings
     std::tie(m_unif_buffer, m_unif_buffer_map) = gl::Buffer::make_flusheable_object<UnifLayout>();
   }
     
-  void MeshViewportDrawCombineTask::eval(SchedulerHandle &info) {
+  void ViewportDrawCombineTask::eval(SchedulerHandle &info) {
     met_trace_full();
 
     // Get shared resources 

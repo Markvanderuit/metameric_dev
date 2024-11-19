@@ -37,17 +37,16 @@ namespace met {
     auto render_handle     = info("renderer");
     auto sensor_handle     = info("sensor");
     const auto &e_scene    = info.global("scene").getr<Scene>();
-    const auto &e_view_i   = info.parent()("view_settings_i").getr<uint>();
-    const auto &e_view     = e_scene.components.views[e_view_i].value;
-    const auto &e_settings = e_scene.components.settings.value;
+    const auto &e_settings = e_scene.components.settings;
 
     // (Re-)initialize renderer
-    if (is_first_eval() || e_scene.components.settings.state.renderer_type) {
-      switch (e_settings.renderer_type) {
+    if (is_first_eval() || e_settings.state.renderer_type) {
+      switch (e_settings->renderer_type) {
         case Settings::RendererType::ePath:
           render_handle.init<PathRenderPrimitive>({ .spp_per_iter        = render_spp_per_iter,
                                                     .pixel_checkerboard  = true,
                                                     .enable_alpha        = false,
+                                                    .enable_debug        = false,
                                                     .cache_handle        = info.global("cache") });
           break;
         case Settings::RendererType::eDirect:
@@ -55,6 +54,7 @@ namespace met {
                                                     .max_depth           = 2u,
                                                     .pixel_checkerboard  = true,
                                                     .enable_alpha        = false,
+                                                    .enable_debug        = false,
                                                     .cache_handle        = info.global("cache") });
           break;
         case Settings::RendererType::eDebug:
@@ -82,7 +82,7 @@ namespace met {
     // Test if renderer is allowed to render
     guard(info("active").getr<bool>());
     
-    // Push sensor changes, reset render component...
+    // Push sensor changes
     if (reset) {
       // Get shared resources
       const auto &e_target = target_handle.getr<gl::Texture2d4f>();
@@ -90,7 +90,7 @@ namespace met {
 
       // Push new sensor data
       auto &i_sensor     = sensor_handle.getw<Sensor>();
-      i_sensor.film_size = (e_target.size().cast<float>() * e_settings.view_scale).cast<uint>().eval();
+      i_sensor.film_size = (e_target.size().cast<float>() * e_settings->view_scale).cast<uint>().eval();
       i_sensor.proj_trf  = e_camera.proj().matrix();
       i_sensor.view_trf  = e_camera.view().matrix();
       i_sensor.flush();

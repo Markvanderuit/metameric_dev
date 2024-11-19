@@ -101,7 +101,7 @@ namespace met {
     }
   } // namespace detail
 
-  RayRecord MeshViewportEditorInputTask::eval_ray_query(SchedulerHandle &info, const Ray &ray) {
+  RayRecord ViewportEditorInputTask::eval_ray_query(SchedulerHandle &info, const Ray &ray) {
     met_trace_full();
 
     // Prepare sensor buffer
@@ -114,7 +114,7 @@ namespace met {
     return m_ray_prim.data();
   }
 
-  std::span<const PathRecord> MeshViewportEditorInputTask::eval_path_query(SchedulerHandle &info, uint spp) {
+  std::span<const PathRecord> ViewportEditorInputTask::eval_path_query(SchedulerHandle &info, uint spp) {
     met_trace_full();
 
     // Get handles, shared resources, modified resources
@@ -140,7 +140,7 @@ namespace met {
     return m_path_prim.data();
   }
 
-  void MeshViewportEditorInputTask::build_indirect_constraint(SchedulerHandle &info, const ConstraintRecord &cs, NLinearConstraint &cstr) {
+  void ViewportEditorInputTask::build_indirect_constraint(SchedulerHandle &info, const ConstraintRecord &cs, NLinearConstraint &cstr) {
     met_trace_full();
 
     // Get handles, shared resources, modified resources
@@ -265,12 +265,12 @@ namespace met {
     cstr.colr_j = csys(constraint_refl);
   }
 
-  bool MeshViewportEditorInputTask::is_active(SchedulerHandle &info) {
+  bool ViewportEditorInputTask::is_active(SchedulerHandle &info) {
     met_trace();
     return info.parent()("is_active").getr<bool>();
   }
 
-  void MeshViewportEditorInputTask::init(SchedulerHandle &info) {
+  void ViewportEditorInputTask::init(SchedulerHandle &info) {
     met_trace();
 
     // List of surface constraints that need drawing or are selected
@@ -284,7 +284,7 @@ namespace met {
     m_path_prim = {{ .cache_handle = info.global("cache") }};
   }
 
-  void MeshViewportEditorInputTask::eval(SchedulerHandle &info) {
+  void ViewportEditorInputTask::eval(SchedulerHandle &info) {
     met_trace();
 
     // Get handles, shared resources, modified resources

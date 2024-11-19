@@ -17,6 +17,31 @@ namespace met::detail {
     met_trace();
     update();
   }
+
+  Arcball::Arcball(ArcballInfo info, const View &view)
+  : m_is_mutated(true),
+    m_near_z(info.near_z),
+    m_far_z(info.far_z),
+    m_aspect(info.aspect),
+    m_up(info.e_up),
+    m_zoom_delta_mult(info.zoom_delta_mult),
+    m_ball_delta_mult(info.ball_delta_mult),
+    m_move_delta_mult(info.move_delta_mult) {
+    met_trace();
+
+    eig::Affine3f trf = eig::Affine3f::Identity();
+    trf *= eig::AngleAxisf(view.camera_trf.rotation.x(), eig::Vector3f::UnitY());
+    trf *= eig::AngleAxisf(view.camera_trf.rotation.y(), eig::Vector3f::UnitX());
+    trf *= eig::AngleAxisf(view.camera_trf.rotation.z(), eig::Vector3f::UnitZ());
+    auto dir = (trf * eig::Vector3f(0, 0, 1)).normalized().eval();
+
+    m_fov_y  = view.camera_fov_y * std::numbers::pi_v<float> / 180.f;
+    m_zoom   = 1.f;
+    m_eye    = -dir; 
+    m_center = view.camera_trf.position + dir;
+    
+    update();
+  }
   
   void Arcball::update() const {
     met_trace();

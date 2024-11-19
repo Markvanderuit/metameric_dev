@@ -3,6 +3,7 @@
 #include <metameric/core/math.hpp>
 #include <metameric/core/record.hpp>
 #include <metameric/core/utility.hpp>
+#include <metameric/scene/view.hpp>
 #include <numbers>
 
 namespace met::detail {
@@ -52,7 +53,11 @@ namespace met::detail {
   public: // Public members
     using InfoType = ArcballInfo;
 
+    // Initialize arcball from settings
     Arcball(ArcballInfo info = { });
+
+    // Initialize arcball from settings and view; view overrides placement, fov, etc.
+    Arcball(ArcballInfo info, const View &view);
 
     // Data accessors 
     const eig::Affine3f & view() const { 
