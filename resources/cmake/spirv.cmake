@@ -50,15 +50,12 @@ function(compile_glsl_to_spirv glsl_src_fp spirv_dependencies)
             ${spirv_parse_fp}
     
     # Second command; nuke shader cache if one currently exists
-    COMMAND ${CMAKE_COMMAND} 
-            -E remove 
-            -f "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/shaders/shaders.bin"
+    COMMAND ${CMAKE_COMMAND} -E rm -f "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/shaders/shaders.bin"
 
     # Third command; generate spirv binary using glslangvalidator
     COMMAND ${glslangValidator} 
             ${spirv_parse_fp}       # input glsl
             -o ${spirv_bin_fp}      # output binary
-            # -Os                     # minimize size
             --client opengl100      # create binary under OpenGL semantics
             --target-env spirv1.5   # execution environment is spirv 1.5
             ${preprocessor_defines} # forward -D... arguments
@@ -68,6 +65,9 @@ function(compile_glsl_to_spirv glsl_src_fp spirv_dependencies)
             ${spirv_bin_fp} 
             --output ${spirv_refl_fp} 
             --reflect
+
+    # Fifth command; remove parsed glsl file
+    COMMAND ${CMAKE_COMMAND} -E rm -f ${spirv_parse_fp}
 
     DEPENDS ${glsl_src_fp} ${glsl_includes} stb_include_app
     VERBATIM
