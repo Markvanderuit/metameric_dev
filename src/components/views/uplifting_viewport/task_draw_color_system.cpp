@@ -14,11 +14,11 @@ namespace met {
     
     // Generate program object
     m_program = {{ .type = gl::ShaderType::eVertex,   
-                   .spirv_path = "resources/shaders/views/uplifting_viewport/draw_color_system.vert.spv",
-                   .cross_path = "resources/shaders/views/uplifting_viewport/draw_color_system.vert.json" },
+                   .spirv_path = "shaders/views/uplifting_viewport/draw_color_system.vert.spv",
+                   .cross_path = "shaders/views/uplifting_viewport/draw_color_system.vert.json" },
                  { .type = gl::ShaderType::eFragment, 
-                   .spirv_path = "resources/shaders/views/uplifting_viewport/draw_color_system.frag.spv",
-                   .cross_path = "resources/shaders/views/uplifting_viewport/draw_color_system.frag.json" }};
+                   .spirv_path = "shaders/views/uplifting_viewport/draw_color_system.frag.spv",
+                   .cross_path = "shaders/views/uplifting_viewport/draw_color_system.frag.json" }};
    
     // Generate and set mapped uniform buffers
     // Set uniform alpha settings for now
@@ -30,7 +30,7 @@ namespace met {
     met_trace_full();
 
     // Get handle to the accompanying data generating task
-    auto gen_task_name = std::format("gen_upliftings.gen_uplifting_{}", m_uplifting_i);
+    auto gen_task_name = fmt::format("gen_upliftings.gen_uplifting_{}", m_uplifting_i);
     auto gen_task_info = info.task(gen_task_name).mask(info);
 
     // Get shared resources
@@ -50,7 +50,7 @@ namespace met {
     // Bind relevant resources
     m_program.bind();
     m_program.bind("b_buff_settings", m_unif_settings);
-    m_program.bind("b_buff_sensor",   m_sensor.buffer());
+    m_program.bind("b_buff_sensor_info",   m_sensor.buffer());
 
     // Dispatch draw object
     gl::dispatch_draw(e_draw);

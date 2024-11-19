@@ -131,8 +131,7 @@ namespace met {
     bool operator==(const DirectSurfaceConstraint &o) const;
   };
   static_assert(is_linear_constraint<DirectSurfaceConstraint>);
-
-
+  
   // Constraint imposing specific color reproduction under a known illuminant,
   // accounting for nonlinear interreflections as well as linear constraints. 
   // The interreflection system is based on measured light transport data from a scene surface.
@@ -169,36 +168,58 @@ namespace met {
   void to_json(json &js, const IndirectSurfaceConstraint &c);
 } // namespace met
 
-namespace std {
-  template <>
-  struct std::formatter<met::DirectColorConstraint> : std::formatter<string_view> {
-    auto format(const met::DirectColorConstraint& ty, std::format_context& ctx) const {
-      std::string s = "direct";
-      return std::formatter<std::string_view>::format(s, ctx);
-    }
-  };
+template<>
+struct fmt::formatter<met::DirectColorConstraint>{
+  template <typename context_ty>
+  constexpr auto parse(context_ty& ctx) { 
+    return ctx.begin(); 
+  }
 
-  template <>
-  struct std::formatter<met::MeasurementConstraint> : std::formatter<string_view> {
-    auto format(const met::MeasurementConstraint& ty, std::format_context& ctx) const {
-      std::string s = "measurement";
-      return std::formatter<std::string_view>::format(s, ctx);
-    }
-  };
+  template <typename fmt_context_ty>
+  constexpr auto format(const met::DirectColorConstraint& ty, fmt_context_ty& ctx) const {
+    std::string s = "direct";
+    return fmt::format_to(ctx.out(), "{}", s);
+  }
+};
 
-  template <>
-  struct std::formatter<met::DirectSurfaceConstraint> : std::formatter<string_view> {
-    auto format(const met::DirectSurfaceConstraint& ty, std::format_context& ctx) const {
-      std::string s = "direct surface";
-      return std::formatter<std::string_view>::format(s, ctx);
-    }
-  };
+template<>
+struct fmt::formatter<met::MeasurementConstraint>{
+  template <typename context_ty>
+  constexpr auto parse(context_ty& ctx) { 
+    return ctx.begin(); 
+  }
 
-  template <>
-  struct std::formatter<met::IndirectSurfaceConstraint> : std::formatter<string_view> {
-    auto format(const met::IndirectSurfaceConstraint& ty, std::format_context& ctx) const {
-      std::string s = "indirect surface";
-      return std::formatter<std::string_view>::format(s, ctx);
-    }
-  };
-} // namespace std
+  template <typename fmt_context_ty>
+  constexpr auto format(const met::MeasurementConstraint& ty, fmt_context_ty& ctx) const {
+    std::string s = "measurement";
+    return fmt::format_to(ctx.out(), "{}", s);
+  }
+};
+
+template<>
+struct fmt::formatter<met::DirectSurfaceConstraint>{
+  template <typename context_ty>
+  constexpr auto parse(context_ty& ctx) { 
+    return ctx.begin(); 
+  }
+
+  template <typename fmt_context_ty>
+  constexpr auto format(const met::DirectSurfaceConstraint& ty, fmt_context_ty& ctx) const {
+    std::string s = "direct surface";
+    return fmt::format_to(ctx.out(), "{}", s);
+  }
+};
+
+template<>
+struct fmt::formatter<met::IndirectSurfaceConstraint>{
+  template <typename context_ty>
+  constexpr auto parse(context_ty& ctx) { 
+    return ctx.begin(); 
+  }
+
+  template <typename fmt_context_ty>
+  constexpr auto format(const met::IndirectSurfaceConstraint &ty, fmt_context_ty& ctx) const {
+    std::string s = "indirect surface";
+    return fmt::format_to(ctx.out(), "{}", s);
+  }
+};

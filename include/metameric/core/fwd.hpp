@@ -4,10 +4,8 @@
 #include <metameric/core/spectrum.hpp>
 
 namespace met {
-  // Major components
+  // Scene and its internal components
   struct Scene;
-
-  // Scene components
   struct Emitter;
   struct Object;
   struct Settings;
@@ -15,8 +13,9 @@ namespace met {
   struct View;
 
   // Scene resources
-  struct BVH;
   struct Image;
+  template <uint K>
+  struct BVH;
   template <typename Vt, typename El>
   struct MeshBase;
   template <typename Vt> 
@@ -43,4 +42,17 @@ namespace met {
   template <typename E = PCGEngine> requires (std::uniform_random_bit_generator<E>)
   class UniformSampler;
   class Distribution;
+
+  namespace detail {
+    // Define maximum supported components for some types
+    // These aren't up to device limits, but mostly exist so some 
+    // sizes can be hardcoded shader-side in uniform buffers and
+    // can be crammed into shared memory in some places
+    constexpr static uint met_max_meshes      = MET_SUPPORTED_MESHES;
+    constexpr static uint met_max_objects     = MET_SUPPORTED_OBJECTS;
+    constexpr static uint met_max_emitters    = MET_SUPPORTED_EMITTERS;
+    constexpr static uint met_max_upliftings  = MET_SUPPORTED_UPLIFTINGS;
+    constexpr static uint met_max_constraints = MET_SUPPORTED_CONSTRAINTS;
+    constexpr static uint met_max_textures    = MET_SUPPORTED_TEXTURES;
+  } // namespace detail
 } // namespace met

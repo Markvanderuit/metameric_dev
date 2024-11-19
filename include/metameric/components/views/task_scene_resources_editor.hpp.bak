@@ -1,13 +1,12 @@
 #pragma once
 
 #include <metameric/core/scheduler.hpp>
-#include <metameric/core/scene.hpp>
+#include <metameric/scene/scene.hpp>
 #include <metameric/core/moments.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
 #include <metameric/components/views/detail/file_dialog.hpp>
 #include <metameric/components/pipeline/task_gen_uplifting_data.hpp>
 #include <small_gl/window.hpp>
-#include <format>
 
 namespace met {
   class SceneResourcesEditorTask : public detail::TaskNode {
@@ -119,7 +118,7 @@ namespace met {
         // Get external resources
         const auto &e_scene = info.global("scene").getr<Scene>();
 
-        if (ImGui::CollapsingHeader(std::format("Meshes ({})", e_scene.resources.meshes.size()).c_str())) {
+        if (ImGui::CollapsingHeader(fmt::format("Meshes ({})", e_scene.resources.meshes.size()).c_str())) {
           for (const auto &mesh : e_scene.resources.meshes) {
             if (ImGui::TreeNodeEx(mesh.name.c_str(), ImGuiTreeNodeFlags_Leaf)) {
               if (ImGui::IsItemHovered()) {
@@ -140,7 +139,7 @@ namespace met {
           }
         }
 
-        if (ImGui::CollapsingHeader(std::format("Images ({})", e_scene.resources.images.size()).c_str())) {
+        if (ImGui::CollapsingHeader(fmt::format("Images ({})", e_scene.resources.images.size()).c_str())) {
           for (uint i = 0; i < e_scene.resources.images.size(); ++i) {
             const auto &image = e_scene.resources.images[i];
             if (ImGui::TreeNodeEx(image.name.c_str(), ImGuiTreeNodeFlags_Leaf)) {
@@ -171,7 +170,7 @@ namespace met {
           } // for (i)
         } // if (header)
 
-        if (ImGui::CollapsingHeader(std::format("Illuminant functions ({})", e_scene.resources.illuminants.size()).c_str())) {
+        if (ImGui::CollapsingHeader(fmt::format("Illuminant functions ({})", e_scene.resources.illuminants.size()).c_str())) {
           for (const auto &func : e_scene.resources.illuminants) {
             if (ImGui::TreeNodeEx(func.name.c_str(), ImGuiTreeNodeFlags_Leaf)) {
               ImGui::SameLine(ImGui::GetContentRegionMax().x - 16.f);
@@ -185,7 +184,7 @@ namespace met {
           }
         }
 
-        if (ImGui::CollapsingHeader(std::format("Observer functions ({})", e_scene.resources.observers.size()).c_str())) {
+        if (ImGui::CollapsingHeader(fmt::format("Observer functions ({})", e_scene.resources.observers.size()).c_str())) {
           for (const auto &func : e_scene.resources.observers) {
             if (ImGui::CollapsingHeader(func.name.c_str())) {
               // ...
@@ -193,7 +192,7 @@ namespace met {
           }
         }
 
-        if (ImGui::CollapsingHeader(std::format("Basis functions ({})", e_scene.resources.bases.size()).c_str())) {
+        if (ImGui::CollapsingHeader(fmt::format("Basis functions ({})", e_scene.resources.bases.size()).c_str())) {
           for (const auto &func : e_scene.resources.bases) {
             if (ImGui::CollapsingHeader(func.name.c_str())) {
               // ...

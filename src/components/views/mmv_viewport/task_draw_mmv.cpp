@@ -1,5 +1,5 @@
 #include <metameric/core/ranges.hpp>
-#include <metameric/core/scene.hpp>
+#include <metameric/scene/scene.hpp>
 #include <metameric/components/views/scene_viewport/task_input_editor.hpp>
 #include <metameric/components/views/mmv_viewport/task_draw_mmv.hpp>
 #include <metameric/components/views/detail/arcball.hpp>
@@ -74,7 +74,7 @@ namespace met {
 
     // Bind relevant resources
     m_program.bind();
-    m_program.bind("b_buff_sensor",   m_sensor.buffer());
+    m_program.bind("b_buff_sensor_info",   m_sensor.buffer());
     m_program.bind("b_buff_settings", m_unif_buffer);
 
     // Prepare draw state
@@ -111,11 +111,11 @@ namespace met {
     
     // Generate program object
     m_program = {{ .type       = gl::ShaderType::eVertex,   
-                   .spirv_path = "resources/shaders/views/mmv_viewport/draw_mmv_hull.vert.spv",
-                   .cross_path = "resources/shaders/views/mmv_viewport/draw_mmv_hull.vert.json" },
+                   .spirv_path = "shaders/views/mmv_viewport/draw_mmv_hull.vert.spv",
+                   .cross_path = "shaders/views/mmv_viewport/draw_mmv_hull.vert.json" },
                  { .type       = gl::ShaderType::eFragment, 
-                   .spirv_path = "resources/shaders/views/mmv_viewport/draw_mmv_hull.frag.spv",
-                   .cross_path = "resources/shaders/views/mmv_viewport/draw_mmv_hull.frag.json" }};
+                   .spirv_path = "shaders/views/mmv_viewport/draw_mmv_hull.frag.spv",
+                   .cross_path = "shaders/views/mmv_viewport/draw_mmv_hull.frag.json" }};
     
     // Generate and set mapped uniform buffer
     std::tie(m_unif_buffer, m_unif_buffer_map) = gl::Buffer::make_flusheable_object<UnifLayout>();

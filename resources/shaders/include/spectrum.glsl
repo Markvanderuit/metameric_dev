@@ -16,4 +16,8 @@ const float wavelength_samples_inv = 1.f / float(wavelength_samples);
 // Define derived variables for better aligned operations
 const uint wavelength_samples_al = uint(pow(2, ceil(log2(float(wavelength_samples)))));
 
+// Wavelengths in the renderer are actually [0, 1], not e.g. [400, 700]
+uint index_at_wavelength(float wvl) {
+  return min(uint(wvl * wavelength_samples), wavelength_samples - 1);
+}
 #endif // SPECTRUM_CONSTANTS_GLSL_GUARD

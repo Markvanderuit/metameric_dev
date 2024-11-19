@@ -14,5 +14,4 @@ namespace met {
   MaskedSchedulerHandle TaskHandle::mask(SchedulerHandle &handle) const {
     return MaskedSchedulerHandle(handle, key());
   }
-
 } // namespace met

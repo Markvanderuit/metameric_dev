@@ -46,20 +46,20 @@ namespace met {
   Colr lrgb_to_srgb(Colr c) { rng::transform(c, c.begin(), lrgb_to_srgb_f); return c; }
 
   void accumulate_spectrum(Spec &s, const eig::Array4f &wvls, const eig::Array4f &values) {
-    for (auto [wvl, value] : vws::zip(wvls, values))
+    for (auto [wvl, value] : view_zip(wvls, values))
       accumulate_spectrum(s, wvl, value);
   }
 
   Spec accumulate_spectrum(const eig::Array4f &wvls, const eig::Array4f &values) {
     Spec s = 0.f;
-    for (auto [wvl, value] : vws::zip(wvls, values))
+    for (auto [wvl, value] : view_zip(wvls, values))
       accumulate_spectrum(s, wvl, value);
     return s;
   }
 
   Colr integrate_cmfs(const CMFS &cmfs, eig::Array4f wvls, eig::Array4f values) {
     Colr c = 0.f;
-    for (auto [wvl, value] : vws::zip(wvls, values))
+    for (auto [wvl, value] : view_zip(wvls, values))
       c += sample_cmfs(cmfs, wvl) * value;
     return c;
   }
@@ -127,7 +127,7 @@ namespace met {
     if (as_rgb)
       csys = (models::xyz_to_srgb_transform * csys.matrix().transpose()).transpose();
     return powers | vws::transform([&csys](const Spec &pwr) { 
-      return (csys.array().colwise() * pwr).eval(); }) | rng::to<std::vector<CMFS>>();
+      return (csys.array().colwise() * pwr).eval(); }) | view_to<std::vector<CMFS>>();
   }
 
   Colr IndirectColrSystem::apply(const Spec &s, bool as_rgb) const {

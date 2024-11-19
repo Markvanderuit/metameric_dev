@@ -33,6 +33,7 @@ namespace met {
     m_padding(info.padding),
     m_levels(info.levels) {
     met_trace();
+    std::tie(m_buffer, m_buffer_map) = gl::Buffer::make_flusheable_object<AtlasBufferLayout>();
     resize(info.sizes);
   }
   
@@ -62,7 +63,7 @@ namespace met {
     m_patches.clear();
     m_free.resize(capacity().z());
     for (uint i = 0; i < m_free.size(); ++i)
-      m_free[i] = { .layer_i = i, .offs = 0, .size = capacity().head<2>() };
+      m_free[i] = { .layer_i = i, .offs = 0, .size = capacity().template head<2>() };
     m_is_invalitated = true;
   }
 
@@ -83,13 +84,6 @@ namespace met {
   eig::Array3u TextureAtlas<T, D>::capacity() const { 
     return m_texture.is_init() ? m_texture.size() : 0;
   }
-
-  template <typename T, uint D>
-  void TextureAtlas<T, D>::reserve_buffer(size_t size) {
-    met_trace_full();
-    guard(!m_buffer.is_init() || m_buffer.size() < size * sizeof(PatchLayout));
-    std::tie(m_buffer, m_buffer_map) = gl::Buffer::make_flusheable_span<PatchLayout>(size);
-  }
   
   template <typename T, uint D>
   void TextureAtlas<T, D>::resize(std::span<eig::Array2u> sizes) {
@@ -98,9 +92,9 @@ namespace met {
     m_is_invalitated = false;
 
     // Define cleared replacements for m_patches, m_free
-    std::vector<PatchLayout> new_patches, new_free(capacity().z());
+    std::vector<AtlasBlockLayout> new_patches, new_free(capacity().z());
     for (uint i = 0; i < new_free.size(); ++i)
-      new_free[i] = { .layer_i = i, .offs = 0, .size = capacity().head<2>() };
+      new_free[i] = { .layer_i = i, .offs = 0, .size = capacity().template head<2>() };
 
     if (sizes.empty()) {
       clear();
@@ -113,7 +107,7 @@ namespace met {
     
     // Establish necessary capacity based on existing texture's size, or size of the maximum
     // h/v patch size if capacity is already insufficient
-    auto new_capacity = (eig::Array3u() << capacity().head<2>().max(max_size), 1).finished();
+    auto new_capacity = (eig::Array3u() << capacity().template head<2>().max(max_size), 1).finished();
 
     // Generate work data; copy all input sizes, assign them an index, and sort them by area
     struct Work { uint i; eig::Array2u size; };
@@ -135,10 +129,10 @@ namespace met {
       // Reset remainder data, incorporating potential texture growth
       new_free.resize(new_capacity.z());
       for (uint i = 0; i < new_free.size(); ++i)
-        new_free[i] = { .layer_i = i, .offs = 0, .size = new_capacity.head<2>() };
+        new_free[i] = { .layer_i = i, .offs = 0, .size = new_capacity.template head<2>() };
         
       // Reset work queue
-      work_queue.assign_range(work_data);
+      work_queue = { work_data.begin(), work_data.end() };
     };
 
     // Helper capture to grow the texture's estimated necessary capacity
@@ -163,16 +157,16 @@ namespace met {
     perform_init();
     while (!work_queue.empty()) {
       // Get index, size of next patch
-      auto [i, size] = work_queue.front();
+      Work work = work_queue.front();
       
       // Actual size of a reserved patch includes user-specified padding around it
-      size = size + m_padding * 2;
+      work.size = work.size + m_padding * 2;
 
       // Generate a view over empty spaces where the current work fits
       // If no suitable empty space was found, we grow the estimated capacity and restart
-      auto candidates = vws::filter(new_free, [&](auto s) { return (size <= s.size).all(); });
+      auto candidates = vws::filter(new_free, [&](auto s) -> bool { return (work.size <= s.size).all(); });
       if (candidates.empty()) {
-        perform_grow(size);
+        perform_grow(work.size);
         perform_init();
         continue;
       }
@@ -181,14 +175,14 @@ namespace met {
       auto candidate_it = rng::min_element(candidates, {}, [](auto s) { return s.size.prod(); });
 
       // Split canndidate into parts, and store remainder(s) as empty space for later reservation
-      auto [patch, remainder] = atlas_split(size, *candidate_it);
+      auto [patch, remainder] = atlas_split(work.size, *candidate_it);
       new_free.erase(candidate_it.base());
       new_free.insert(new_free.end(), range_iter(remainder));
 
       // Strip padding from the reserved space, and store it at the matching index
       patch.offs += m_padding;
       patch.size -= m_padding * 2;
-      new_patches[i] = patch;
+      new_patches[work.i] = patch;
 
       work_queue.pop_front();
     } // while (!work_queue.empty())
@@ -196,7 +190,7 @@ namespace met {
     // Tightly pack capacity for the current required space
     auto view = new_patches | vws::transform([&](const auto &s) { return s.offs + s.size + m_padding; });
     auto maxm = rng::fold_left(view, eig::Array2u(0), [](auto a, auto b) { return a.cwiseMax(b).eval();  });
-    auto maxl = 1 + rng::max(new_patches, {}, &PatchLayout::layer_i).layer_i;
+    auto maxl = 1 + rng::max(new_patches, {}, &AtlasBlockLayout::layer_i).layer_i;
     new_capacity = { maxm.x(), maxm.y(), maxl };
 
     // Ensure the underlying storage is suitable for the current set of patches
@@ -207,8 +201,8 @@ namespace met {
     if (new_patches.size() >= m_patches.size()) {
       auto overlap_eq = rng::equal(std::span(new_patches).subspan(0, m_patches.size()), 
                                    std::span(m_patches).subspan(0,   m_patches.size()), 
-      [](const PatchLayout &a, const PatchLayout &b) {
-        return a.layer_i == b.layer_i  && a.offs.isApprox(b.offs) && a.size.isApprox(b.size);
+      [](const AtlasBlockLayout &a, const AtlasBlockLayout &b) {
+        return a.layer_i == b.layer_i && a.offs.isApprox(b.offs) && a.size.isApprox(b.size);
       });
       if (!overlap_eq) {
         m_is_invalitated = true;
@@ -218,22 +212,20 @@ namespace met {
     // Update uv0/uv1 values in the patch data
     // these make texture lookups slightly faster
     for (auto &patch : new_patches) {
-      patch.uv0 = patch.offs.cast<float>() / m_texture.size().head<2>().cast<float>();
-      patch.uv1 = patch.size.cast<float>() / m_texture.size().head<2>().cast<float>();
+      patch.uv0 = patch.offs.cast<float>() 
+                / m_texture.size().template head<2>().template cast<float>();
+      patch.uv1 = patch.size.cast<float>() 
+                / m_texture.size().template head<2>().template cast<float>();
     }
-
-    // Ensure the underlying buffer data is properly sized up to a minimum
-    if (!m_buffer.is_init() || m_buffer.size() < new_patches.size() * sizeof(PatchLayout))
-      std::tie(m_buffer, m_buffer_map) 
-        = gl::Buffer::make_flusheable_span<PatchLayout>(new_patches.size());
     
     // Store new patches
     m_patches = new_patches;
     m_free    = new_free;
 
     // Copy patch layouts to buffer storage
-    rng::copy(new_patches, m_buffer_map.begin());
-    m_buffer.flush(new_patches.size() * sizeof(PatchLayout));
+    m_buffer_map->size = new_patches.size();
+    rng::copy(new_patches, m_buffer_map->data.begin());
+    m_buffer.flush();
   }
 
   template <typename T, uint D>
@@ -244,13 +236,13 @@ namespace met {
     // Tightly pack capacity for the current required space
     auto view = m_patches | vws::transform([&](const auto &s) { return s.offs + s.size + m_padding; });
     auto maxm = rng::fold_left(view, eig::Array2u(0), [](auto a, auto b) { return a.cwiseMax(b).eval();  });
-    auto maxl = 1 + rng::max(m_patches, {}, &PatchLayout::layer_i).layer_i;
+    auto maxl = 1 + rng::max(m_patches, {}, &AtlasBlockLayout::layer_i).layer_i;
     eig::Array3u new_capacity = { maxm.x(), maxm.y(), maxl };
     
     dstr_views();
 
     // Allocate the new underlying texture
-    Texture texture = {{ .size = new_capacity, .levels = m_levels }};
+    TextureArray texture = {{ .size = new_capacity, .levels = m_levels }};
 
     // Copy over the new_texture's overlap from m_texture, then swap objects
     m_texture.copy_to(texture, 0, texture.size());
@@ -260,13 +252,16 @@ namespace met {
 
     // Update uv0/uv1 values in the patch data
     for (auto &patch : m_patches) {
-      patch.uv0 = patch.offs.cast<float>() / m_texture.size().head<2>().cast<float>();
-      patch.uv1 = patch.size.cast<float>() / m_texture.size().head<2>().cast<float>();
+      patch.uv0 = patch.offs.cast<float>() 
+                / m_texture.size().template head<2>().template cast<float>();
+      patch.uv1 = patch.size.cast<float>() 
+                / m_texture.size().template head<2>().template cast<float>();
     }
     
     // Copy updated patch layouts to buffer storage
-    rng::copy(m_patches, m_buffer_map.begin());
-    m_buffer.flush(m_patches.size() * sizeof(PatchLayout));
+    m_buffer_map->size = m_patches.size();
+    rng::copy(m_patches, m_buffer_map->data.begin());
+    m_buffer.flush();
   }
 
   /* Explicit template instantiations */

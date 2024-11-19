@@ -9,29 +9,31 @@
 
 namespace met {
   struct BuildNode {
-    virtual float sah() const = 0;
+    virtual float sah()     const = 0;
+    virtual bool  is_leaf() const = 0;
   };
 
   template <uint K>
   struct BuildNodeInner : public BuildNode {
-    std::array<BVH::AABB,   K> child_aabbs;
+    std::array<bool,        K> child_types;
     std::array<BuildNode *, K> child_nodes;
+    std::array<AABB,        K> child_aabbs;
     
   public:
     BuildNodeInner() {
+      child_types.fill(false);
       child_nodes.fill(nullptr);
     }
 
-    float sah() const override {
-      return 0.f;
-    }
+    float sah()     const override { return 0.f;   }
+    bool  is_leaf() const override { return false; }
   };
 
   template <uint K>
   struct BuildNodeLeaf : public BuildNode {
-    std::array<BVH::AABB, K> child_aabbs;
+    std::array<AABB, K>      child_aabbs;
+    size_t                   n_prims;
     const RTCBuildPrimitive *prim_p;
-    size_t n_prims;
 
   public:
     BuildNodeLeaf(const RTCBuildPrimitive *prim_p, size_t n_prims) 
@@ -41,16 +43,15 @@ namespace met {
         std::memcpy(&child_aabbs[i], &prim_p[i], sizeof(RTCBuildPrimitive));
     }
 
-    float sah() const override {
-      return 1.0f;
-    }
+    float sah()     const override { return 1.f;  }
+    bool  is_leaf() const override { return true; }
   };
 
   // Singleton rtc device; should be fine for now
   static std::optional<RTCDevice> rtc_device;
 
   void emb_error_callback(void *user_p, enum RTCError err, const char *str) {
-    fmt::print("Embree caught an error\nExpand this!\n");
+    fmt::print("Embree caught an error\nExpand this!\nPanic!\n");
   }
 
   RTCDevice get_rtc_device() {
@@ -75,27 +76,32 @@ namespace met {
   
   template <uint K>
   void bvh_set_children(void *node_p, void **child_p, uint n_children, void *user_p) {
-    auto &node = *static_cast<BuildNodeInner<K> *>(node_p);
-    for (size_t i = 0; i < n_children; ++i)
-      node.child_nodes[i] = static_cast<BuildNode *>(child_p[i]);
+    auto node = static_cast<BuildNodeInner<K> *>(node_p);
+    node->child_types.fill(false);
+    for (size_t i = 0; i < n_children; ++i) {
+      auto child = static_cast<BuildNode *>(child_p[i]);
+      node->child_nodes[i] = child;
+      node->child_types[i] = child->is_leaf();
+    }
   }
   
   template <uint K>
   void bvh_set_bounds(void *node_p, const RTCBounds **bounds, uint n_children, void *user_p) {
-    static_assert(sizeof(BVH::AABB) == sizeof(RTCBounds));
-    auto &node = *static_cast<BuildNodeInner<K> *>(node_p);
-    for (size_t i = 0; i < n_children; ++i)
-      std::memcpy(&node.child_aabbs[i], bounds[i], sizeof(RTCBounds));
+    static_assert(sizeof(AABB) == sizeof(RTCBounds));
+    
+    auto node = static_cast<BuildNodeInner<K> *>(node_p);
+    for (size_t i = 0; i < n_children; ++i) {
+      std::memcpy(&(node->child_aabbs[i]), bounds[i], sizeof(RTCBounds));
+    }
   }
   
   struct BVHCreateInternalInfo {
     std::span<const RTCBuildPrimitive> data; // Range of bounding boxes to build BVH over
-    uint n_node_children;                    // Maximum fan-out of BVH on each node
-    uint n_leaf_children;                    // Maximum nr of primitives on each leaf
+    uint n_leaf_children;                    // Maximum nr of primitives in each leaf
   };
   
   template <uint K>
-  BVH create_bvh_internal(BVHCreateInternalInfo info) {
+  BVH<K> create_bvh_internal(BVHCreateInternalInfo info) {
     met_trace();
 
     // Create modifiable copy of primitives; embree may re-order these freely
@@ -133,7 +139,7 @@ namespace met {
     auto root_p = static_cast<BuildNode *>(rtcBuildBVH(&args));
         
     // Prepare external BVH format and resize its blocks
-    BVH bvh;
+    BVH<K> bvh;
     bvh.nodes.reserve(prims.size() * 2 / K);
     bvh.prims.reserve(prims.size());
 
@@ -146,37 +152,41 @@ namespace met {
       work_queue.pop_front();
 
       // Generate base node data; nodes/leaves overlap
-      BVH::Node node;
+      typename BVH<K>::Node node;
 
       // Dependent on node type, do...
       if (auto node_p = dynamic_cast<BuildNodeInner<K> *>(next_p)) {
-        // Get view over all non-nulled children
+        // Get coipy of non-nulled child data
         auto nodes = node_p->child_nodes
                    | vws::filter([](auto ptr) { return ptr != nullptr; })
-                   | rng::to<std::vector>();
+                   | view_to<std::vector<BuildNode *>>();
         
         // Store AABBs of children, currently uncompressed
         node.child_aabb = node_p->child_aabbs;
+        node.child_mask = node_p->child_types;
 
-        // Store child node offset and count
-        node.offs_data  = static_cast<uint>(bvh.nodes.size() + work_queue.size() + 1);
-        node.size_data  = static_cast<uint>(nodes.size());
+        // Store child range
+        node.type   = false;
+        node.offset = static_cast<uint>(bvh.nodes.size() + work_queue.size() + 1);
+        node.size   = static_cast<uint>(nodes.size());
 
         // Push child pointers on back of queue for continued traversal
         rng::copy(nodes, std::back_inserter(work_queue));
       } else if (auto leaf_p = dynamic_cast<BuildNodeLeaf<K> *>(next_p)) {
-        // Get view over all contained primitive indices
+        // Get copy of all contained primitive indices
         auto prims = std::span(leaf_p->prim_p, leaf_p->n_prims)
                    | vws::transform(&RTCBuildPrimitive::primID)
-                   | rng::to<std::vector>();
+                   | view_to<std::vector<uint>>();
         
         // Store AABBs of children, currently uncompressed
+        // Child data remains unspecified
         node.child_aabb = leaf_p->child_aabbs;
+        node.child_mask.fill(true);
 
-        // Store leaf offset and count
-        // and set flag bit to indicate that node is indeed a leaf
-        node.offs_data = static_cast<uint>(bvh.prims.size()) | 0x80000000u;
-        node.size_data = static_cast<uint>(prims.size());
+        // Store child range
+        node.type   = true;
+        node.offset = static_cast<uint>(bvh.prims.size());
+        node.size   = static_cast<uint>(prims.size());
         
         // Store processed primitives in BVH
         rng::copy(prims, std::back_inserter(bvh.prims));
@@ -192,15 +202,8 @@ namespace met {
     return bvh;
   }
 
-  // Wrapper function to do templated generation with a runtime constant
-  template <uint... Ks>
-  BVH create_bvh_internal_varargs(BVHCreateInternalInfo info) {
-    using FTy = BVH(*)(BVHCreateInternalInfo);
-    constexpr FTy f[] = { create_bvh_internal<Ks>... };
-    return f[0](info);
-  }
-
-  BVH::BVH(CreateMeshInfo info) {
+  template <uint K>
+  BVH<K>::BVH(CreateMeshInfo info) {
     met_trace();
 
     // Build BVH primitive structs; use indexed iterator over mesh 
@@ -226,13 +229,11 @@ namespace met {
       prims[i] = prim;
     } // for (int i)
 
-    // return create_bvh_internal_varargs<2, 4, 8>({
-    *this = create_bvh_internal_varargs<8>({
-      .data = prims, .n_node_children = info.n_node_children, .n_leaf_children = info.n_leaf_children
-    });
+    *this = create_bvh_internal<K>({ .data = prims, .n_leaf_children = info.n_leaf_children });
   }
   
-  BVH::BVH(CreateAABBInfo info) {
+  template <uint K>
+  BVH<K>::BVH(CreateAABBInfo info) {
     met_trace();
 
     // Build BVH primitive structs; use indexed iterator over mesh 
@@ -249,8 +250,12 @@ namespace met {
       prims[i] = prim;
     } // for (int i)
 
-    *this = create_bvh_internal_varargs<8>({
-      .data = prims, .n_node_children = info.n_node_children, .n_leaf_children = info.n_leaf_children
-    });
+    *this = create_bvh_internal<K>({ .data = prims, .n_leaf_children = info.n_leaf_children });
   }
+
+  /* Explicit template instantiations follow for supported BVH fanouts */
+
+  template class BVH<2>;
+  template class BVH<4>;
+  template class BVH<8>;
 } // namespace met

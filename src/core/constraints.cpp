@@ -1,7 +1,4 @@
-#include <metameric/core/ranges.hpp>
 #include <metameric/core/constraints.hpp>
-#include <metameric/core/components.hpp>
-#include <metameric/core/scene.hpp>
 #include <metameric/core/ranges.hpp>
 #include <metameric/core/utility.hpp>
 #include <nlohmann/json.hpp>
@@ -168,7 +165,7 @@ namespace met {
   SpectrumSample MeasurementConstraint::realize(const Scene &scene, const Uplifting &uplifting) const { 
     auto basis = scene.resources.bases[uplifting.basis_i].value();
     SpectrumCoeffsInfo spec_info = { .spec = measure, .basis = basis };
-    return generate_spectrum(spec_info); // fit basis to reproduce measure
+    return solve_spectrum(spec_info); // fit basis to reproduce measure
     // return { measure, Basis::vec_type(0) }; 
   }
 
@@ -185,7 +182,7 @@ namespace met {
       spec_info.linear_constraints.push_back({ scene.csys(c.cmfs_j, c.illm_j), c.colr_j });
 
     // Generate a metamer satisfying the system+signal constraint set and return as pair
-    return generate_spectrum(spec_info);
+    return solve_spectrum(spec_info);
   }
 
   SpectrumSample DirectSurfaceConstraint::realize(const Scene &scene, const Uplifting &uplifting) const {
@@ -204,7 +201,7 @@ namespace met {
       spec_info.linear_constraints.push_back({ scene.csys(c.cmfs_j, c.illm_j), c.colr_j });
 
     // Generate a metamer satisfying the system+signal constraint set and return as pair
-    return generate_spectrum(spec_info);
+    return solve_spectrum(spec_info);
   }
 
   SpectrumSample IndirectSurfaceConstraint::realize(const Scene &scene, const Uplifting &uplifting) const {
@@ -231,7 +228,7 @@ namespace met {
       };
 
       // Generate a metamer satisfying the system+signal constraint set and return as pair
-      return generate_spectrum(spec_info);
+      return solve_spectrum(spec_info);
     } else { */ 
       // We attempt to fill in a default spectrum, which is necessary to establish the initial system
       // Gather all relevant color system spectra and corresponding color signals
@@ -243,7 +240,7 @@ namespace met {
       };
 
       // Generate a metamer satisfying the system+signal constraint set and return as pair
-      return generate_spectrum(spec_info);
+      return solve_spectrum(spec_info);
     // }
   }
 
@@ -251,10 +248,10 @@ namespace met {
     met_trace();
     
     // Filter out inactive constraints
-    auto direct_cstr = cstr_j | vws::filter(&LinearConstraint::is_active) | rng::to<std::vector>();
+    auto direct_cstr = cstr_j | vws::filter(&LinearConstraint::is_active) | view_to<std::vector<LinearConstraint>>();
 
     // Assemble info object for generating boundary spectra
-    DirectMismatchingOCSInfo info = {
+    DirectMismatchSolidInfo info = {
       .basis     = scene.resources.bases[uplifting.basis_i].value(),
       .seed      = seed,
       .n_samples = samples
@@ -278,17 +275,17 @@ namespace met {
       std::back_inserter(info.linear_constraints),
       [&](const auto &c) { return std::pair { scene.csys(c.cmfs_j, c.illm_j), c.colr_j }; });
 
-    return generate_mismatching_ocs(info);
+    return solve_mismatch_solid(info);
   }
 
   std::vector<MismatchSample> DirectSurfaceConstraint::realize_mismatch(const Scene &scene, const Uplifting &uplifting, uint seed, uint samples) const {
     met_trace();
     
     // Filter out inactive constraints
-    auto direct_cstr = cstr_j | vws::filter(&LinearConstraint::is_active) | rng::to<std::vector>();
+    auto direct_cstr = cstr_j | vws::filter(&LinearConstraint::is_active) |  view_to<std::vector<LinearConstraint>>();
 
     // Assemble info object for generating boundary spectra
-    DirectMismatchingOCSInfo info = {
+    DirectMismatchSolidInfo info = {
       .basis     = scene.resources.bases[uplifting.basis_i].value(),
       .seed      = seed,
       .n_samples = samples
@@ -312,34 +309,27 @@ namespace met {
       std::back_inserter(info.linear_constraints),
       [&](const auto &c) { return std::pair { scene.csys(c.cmfs_j, c.illm_j), c.colr_j }; });
 
-    return generate_mismatching_ocs(info);
+    return solve_mismatch_solid(info);
   }
 
   std::vector<MismatchSample> IndirectSurfaceConstraint::realize_mismatch(const Scene &scene, const Uplifting &uplifting, uint seed, uint samples) const {
     met_trace();
 
     // Filter out inactive constraints
-    auto indrct_cstr = cstr_j | vws::filter(&NLinearConstraint::is_active) | rng::to<std::vector>();
+    auto indrct_cstr = cstr_j | vws::filter(&NLinearConstraint::is_active) |  view_to<std::vector<NLinearConstraint>>();
 
     // Assemble info object for generating boundary spectra
-    IndirectMismatchingOCSInfo info = {
+    IndirectMismatchSolidInfo info = {
       .basis     = scene.resources.bases[uplifting.basis_i].value(),
       .seed      = seed,
       .n_samples = samples
     };
-
-    // Base roundtrip objective
-    // if (is_base_active)
-    //   info.linear_objectives.push_back(scene.csys(uplifting.csys_i));
 
     // Specify indirect color systems forming objective
     info.nlinear_objectives.push_back({
       .cmfs   = scene.resources.observers[indrct_cstr.back().cmfs_j].value(),
       .powers = indrct_cstr.back().powr_j
     });
-    // rng::transform(indrct_cstr | vws::reverse | vws::take(1), 
-    //   std::back_inserter(info.nlinear_objectives),
-    //   [&](const auto &c) { return IndirectColrSystem { .cmfs = scene.resources.observers[c.cmfs_j].value(), .powers = c.powr_j }; });
 
     // Base roundtrip constraint
     if (is_base_active)
@@ -348,9 +338,11 @@ namespace met {
     // Specify direct/indirect color constraints; all but the last constraint (the "free variable") are specified
     rng::transform(indrct_cstr | vws::take(indrct_cstr.size() - 1), 
       std::back_inserter(info.nlinear_constraints),
-      [&](const auto &c) { return std::pair { IndirectColrSystem { scene.resources.observers[c.cmfs_j].value(), c.powr_j }, c.colr_j }; });
+      [&](const auto &c) { 
+        return std::pair { IndirectColrSystem { scene.resources.observers[c.cmfs_j].value(), c.powr_j }, c.colr_j }; 
+      });
 
     // Output color values
-    return generate_mismatching_ocs(info);
+    return solve_mismatch_solid(info);
   }
 } // namespace met

@@ -30,14 +30,14 @@ namespace met {
     if (e_proj_data.meshing_type == ProjectMeshingType::eConvexHull) {
       const uint dispatch_ndiv = ceil_div(dispatch_n, 256u / (generalized_weights / 4));
       m_program = {{ .type = gl::ShaderType::eCompute,
-                     .spirv_path = "resources/shaders/pipeline/gen_color_mapping_generalized.comp.spv",
-                     .cross_path = "resources/shaders/pipeline/gen_color_mapping_generalized.comp.json" }};
+                     .spirv_path = "shaders/pipeline/gen_color_mapping_generalized.comp.spv",
+                     .cross_path = "shaders/pipeline/gen_color_mapping_generalized.comp.json" }};
       m_dispatch = { .groups_x = dispatch_ndiv, .bindable_program = &m_program };
     } else if (e_proj_data.meshing_type == ProjectMeshingType::eDelaunay) {
       const uint dispatch_ndiv = ceil_div(dispatch_n, 256u);
       m_program = {{ .type = gl::ShaderType::eCompute,
-                     .spirv_path = "resources/shaders/pipeline/gen_color_mapping_delaunay.comp.spv",
-                     .cross_path = "resources/shaders/pipeline/gen_color_mapping_delaunay.comp.json" }};
+                     .spirv_path = "shaders/pipeline/gen_color_mapping_delaunay.comp.spv",
+                     .cross_path = "shaders/pipeline/gen_color_mapping_delaunay.comp.json" }};
       m_dispatch = { .groups_x = dispatch_ndiv, .bindable_program = &m_program };
     }
 

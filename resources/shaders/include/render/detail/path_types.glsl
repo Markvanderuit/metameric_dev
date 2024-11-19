@@ -1,7 +1,7 @@
 #ifndef RENDER_DETAIL_PATH_TYPES_GLSL_GUARD
 #define RENDER_DETAIL_PATH_TYPES_GLSL_GUARD
 
-#define path_max_depth 6
+#define path_max_depth 5
 
 // Helper struct to cache path vertex information
 struct PathVertex {

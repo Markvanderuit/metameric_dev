@@ -33,18 +33,18 @@ namespace met {
 
     // Generate program object
     m_program = {{ .type = gl::ShaderType::eVertex,   
-                   .spirv_path = "resources/shaders/views/draw_cube.vert.spv",
-                   .cross_path = "resources/shaders/views/draw_cube.vert.json" },
+                   .spirv_path = "shaders/views/draw_cube.vert.spv",
+                   .cross_path = "shaders/views/draw_cube.vert.json" },
                  { .type = gl::ShaderType::eFragment, 
-                   .spirv_path = "resources/shaders/views/draw_cube.frag.spv",
-                   .cross_path = "resources/shaders/views/draw_cube.frag.json" }};
+                   .spirv_path = "shaders/views/draw_cube.frag.spv",
+                   .cross_path = "shaders/views/draw_cube.frag.json" }};
   }
 
   void DrawSRGBCubeTask::eval(SchedulerHandle &info) {
     met_trace_full();
 
     // Get handle to the accompanying data generating task
-    auto gen_task_name = std::format("gen_upliftings.gen_uplifting_{}", m_uplifting_i);
+    auto gen_task_name = fmt::format("gen_upliftings.gen_uplifting_{}", m_uplifting_i);
     auto gen_task_info = info.task(gen_task_name).mask(info);
 
     // Get shared resources
@@ -62,7 +62,7 @@ namespace met {
 
     // Bind relevant resources
     m_program.bind();
-    m_program.bind("b_buff_sensor", m_sensor.buffer());
+    m_program.bind("b_buff_sensor_info", m_sensor.buffer());
 
     // Dispatch draw object
     gl::dispatch_draw(gl::DrawInfo {

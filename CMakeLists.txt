@@ -9,8 +9,7 @@ project(Metameric LANGUAGES CXX)
 
 # Build options
 option(MET_ENABLE_EXCEPTIONS "Enable exceptions on release" ON)
-option(MET_ENABLE_TRACY      "Enable Tracy support"         ON)
-option(MET_ENABLE_TESTS      "Build tests"                  ON)
+option(MET_ENABLE_TRACY      "Enable Tracy support"        OFF)
 
 # Spectral layout; inserted in code/shaders as preprocessor defines
 set(MET_WAVELENGTH_MIN     380) # Minimum wavelength of spectral range
@@ -19,12 +18,12 @@ set(MET_WAVELENGTH_SAMPLES  64) # Nr. of bins used in discrete spectral represen
 set(MET_WAVELENGTH_BASES    12) # Maximum nr. of bases used in generative functions
 
 # Some object limits for renderer; inserted in code/shaders as preprocessor defines
-set(MET_SUPPORTED_MESHES        48) # Maximum supported scene meshes
-set(MET_SUPPORTED_OBJECTS       48) # Maximum supported scene objects
-set(MET_SUPPORTED_EMITTERS      48) # Maximum supported scene emitters
+set(MET_SUPPORTED_MESHES        32) # Maximum supported scene meshes
+set(MET_SUPPORTED_OBJECTS       32) # Maximum supported scene objects
+set(MET_SUPPORTED_EMITTERS      32) # Maximum supported scene emitters
 set(MET_SUPPORTED_UPLIFTINGS     8) # Maximum supported uplifting structures; multiple objects can share an uplifting
 set(MET_SUPPORTED_CONSTRAINTS 1024) # Maximum supported boundary spectra + constraint spectra
-set(MET_SUPPORTED_TEXTURES     256) # Maximum supported scene textures
+set(MET_SUPPORTED_TEXTURES     128) # Maximum supported scene textures
 
 # TODO remove; inserted in code/shaders as preprocessor defines
 set(MET_MOMENT_COEFFICIENTS 12) # Nr. of coeffs used for moment-based spectral representation
@@ -32,16 +31,16 @@ set(MET_MOMENT_COEFFICIENTS 12) # Nr. of coeffs used for moment-based spectral r
 # Print configuration info
 message(STATUS "Metameric : Enabling exceptions = ${MET_ENABLE_EXCEPTIONS}")
 message(STATUS "Metameric : Enabling Tracy      = ${MET_ENABLE_TRACY}")
-message(STATUS "Metameric : Building tests      = ${MET_ENABLE_TESTS}")
 message(STATUS "Metameric : Wavelength min.     = ${MET_WAVELENGTH_MIN}")
 message(STATUS "Metameric : Wavelength max.     = ${MET_WAVELENGTH_MAX}")
 message(STATUS "Metameric : Wavelength samples  = ${MET_WAVELENGTH_SAMPLES}")
 message(STATUS "Metameric : Wavelength bases    = ${MET_WAVELENGTH_BASES}")
 
-# Specify output directories as /bin and /lib
+# Specify output directories as /bin, /lib, /out
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+set(CMAKE_INSTALL_PREFIX           ${CMAKE_BINARY_DIR}/out)
 
 # Ensure these are available for third parties
 find_package(OpenMP REQUIRED)
@@ -51,10 +50,10 @@ find_package(Threads REQUIRED)
 option(gl_enable_exceptions  "" ${MET_ENABLE_EXCEPTIONS})
 option(gl_enable_tracy       "" ${MET_ENABLE_TRACY})
 add_subdirectory(third_party/autodiff)
-add_subdirectory(third_party/embree)
 add_subdirectory(third_party/rapidobj)
 add_subdirectory(third_party/small_gl)
 add_subdirectory(third_party/xatlas)
+add_subdirectory(third_party/embree)
 
 # Include third party libraries
 find_package(Catch2    CONFIG REQUIRED)
@@ -68,10 +67,9 @@ find_package(nlohmann_json CONFIG REQUIRED)
 find_package(NLopt     CONFIG REQUIRED)
 find_package(Qhull     CONFIG REQUIRED)
 find_package(tinyexr   CONFIG REQUIRED)
+find_package(tinyfiledialogs CONFIG REQUIRED)
 find_package(Tracy     CONFIG REQUIRED)
-find_package(unofficial-nativefiledialog CONFIG REQUIRED)
 find_package(ZLIB      REQUIRED)
-find_package(embree    CONFIG REQUIRED)
 
 # Include third party header-only libraries provided through vcpkg
 find_path(STB_INCLUDE_DIRS "stb_c_lexer.h")
@@ -81,7 +79,7 @@ find_path(ZSTR_INCLUDE_DIRS "zstr.hpp")
 include(CTest)
 include(Catch)
 include(spirv)
-include(resource)
+include(dependency)
 
 # Gather all preprocessor values into one list; these are passed to cxx and glsl
 set(preprocessor_defines
@@ -109,7 +107,6 @@ set(thrp_includes ${STB_INCLUDE_DIRS} ${ZSTR_INCLUDE_DIRS})
 set(core_dependencies
   autodiff::autodiff
   Eigen3::Eigen
-  embree
   fmt::fmt-header-only
   nlohmann_json::nlohmann_json
   NLopt::nlopt
@@ -121,12 +118,13 @@ set(core_dependencies
   Tracy::TracyClient
   xatlas
   ZLIB::ZLIB
+  embree
 )
 set(component_dependencies
   imgui::imgui
   imguizmo::imguizmo
   implot::implot
-  unofficial::nativefiledialog::nfd
+  tinyfiledialogs::tinyfiledialogs
 )
 if(OpenMP_CXX_FOUND)
   list(APPEND core_dependencies OpenMP::OpenMP_CXX)
@@ -154,20 +152,10 @@ function(add_library_r target dir)
   target_compile_features(${target} PUBLIC cxx_std_23)
   target_compile_definitions(${target} PUBLIC _USE_MATH_DEFINES ${preprocessor_defines})
 
-  # Specify unity build, batching 8 files per object
-  # set_target_properties(${target} PROPERTIES 
-  #   UNITY_BUILD ON 
-  #   UNITY_BUILD_MODE BATCH 
-  #   UNITY_BUILD_BATCH_SIZE 4
-  # )
-
-  # Enable /bigobj (or the closest thing for gcc)
-  # Src: https://stackoverflow.com/questions/69903253/cmake-bigobj-no-such-file-or-directory
+  # Enable /bigobj to make MSVC stop complaining about its restricted object sizes
   if (MSVC)
     target_compile_options(${target} PRIVATE /bigobj)
-  else ()
-    target_compile_options(${target} PRIVATE -Wa,-mbig-obj)
-  endif ()
+  endif()
 endfunction()
 
 # Set up core library
@@ -175,9 +163,14 @@ add_library_r(core core)
 target_link_libraries(core PUBLIC ${core_dependencies})
 add_library_pch(core)
 
+# Set up scene library
+add_library_r(scene scene)
+target_link_libraries(scene PUBLIC core)
+target_precompile_headers(scene REUSE_FROM core)
+
 # Set up render library
 add_library_r(render render)
-target_link_libraries(render PUBLIC core)
+target_link_libraries(render PUBLIC scene)
 target_precompile_headers(render REUSE_FROM core)
 
 # Set up components library
@@ -185,50 +178,30 @@ add_library_r(components components)
 target_link_libraries(components PUBLIC render ${component_dependencies})
 target_precompile_headers(components REUSE_FROM core)
 
-# Ignore unity builds on scene.cpp/math.cpp
-# as some dependency seems to have an incompatibility for now
-# set_source_files_properties(
-#   ${CMAKE_CURRENT_SOURCE_DIR}/src/core/scene.cpp 
-#   ${CMAKE_CURRENT_SOURCE_DIR}/src/core/math.cpp 
-#   PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON
-# )
-
 # Specify shader/resource targets, link these as dependencies for preprocessing
 add_shader_target(shaders shaders.bin)
-add_resource_target(resources misc)
-add_dependencies(core       resources)
-add_dependencies(render     shaders)
-add_dependencies(components shaders)
+add_dependencies(render       shaders)
+add_dependencies(components   shaders)
+
+# Copy ./resources/misc to bin/resources
+add_folder_copy_target(data_copy 
+  ${CMAKE_CURRENT_SOURCE_DIR}/resources/data
+  ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/data
+)
 
 # Setup editor executable
 add_executable(metameric_editor src/app/metameric_editor.cpp)
 target_compile_features(metameric_editor PUBLIC cxx_std_23)
 target_link_libraries(metameric_editor PRIVATE core render components)
+add_dependencies(metameric_editor data_copy embree_copy)
 
-# Optionally setup Catch2 tests
-if (MET_ENABLE_TESTS)
-  # Find all test files
-  file(GLOB_RECURSE srcs ${CMAKE_CURRENT_SOURCE_DIR}/tests/*.cpp)
-
-  # Setup test executable
-  add_executable(metameric_tests ${srcs})
-  target_link_libraries(metameric_tests PRIVATE Catch2::Catch2WithMain core)
-  target_compile_features(metameric_tests PUBLIC cxx_std_23)
-  catch_discover_tests(metameric_tests WORKING_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
-endif()
-
-# Finally, handle dependency copy if necessary
-add_custom_command(
-  TARGET metameric_editor POST_BUILD
-  COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_RUNTIME_DLLS:metameric_editor> $<TARGET_FILE_DIR:metameric_editor> COMMAND_EXPAND_LISTS
-)
-
-# Copy tbb12 so embree doesn't break things
-if (WIN32)
-  add_custom_command(
-    TARGET metameric_editor POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy
-    ${TBB12_LIBRARY}
-    $<TARGET_FILE_DIR:metameric_editor>/tbb12.dll
-  )
-endif()
+# Setup render executable
+find_package(avcpp CONFIG REQUIRED)
+add_executable(ffw_video EXCLUDE_FROM_ALL src/app/ffw_video.cpp)
+target_compile_features(ffw_video PUBLIC cxx_std_23)
+target_link_libraries(ffw_video PRIVATE core render components avcpp::FFmpeg avcpp::avcpp)
+target_include_directories(ffw_video PRIVATE src/app/include)
+add_executable(presentation_videos EXCLUDE_FROM_ALL src/app/presentation_videos.cpp)
+target_compile_features(presentation_videos PUBLIC cxx_std_23)
+target_link_libraries(presentation_videos PRIVATE core render components avcpp::FFmpeg avcpp::avcpp)
+target_include_directories(presentation_videos PRIVATE src/app/include)

@@ -131,13 +131,13 @@ namespace met {
   // Convert a value in sRGB to linear sRGB
   constexpr inline
   float srgb_to_lrgb_f(float f) {
-    return f <= 0.04045f ? f / 12.92f : std::powf((f + 0.055f) / 1.055f, 2.4f);
+    return f <= 0.04045f ? f / 12.92f : std::pow<float>((f + 0.055f) / 1.055f, 2.4f);
   }
 
   // Convert a value in linear sRGB to sRGB
   constexpr inline
   float lrgb_to_srgb_f(float f) {
-    return f <= 0.003130f ? f * 12.92f : std::powf(f, 1.0f / 2.4f) * 1.055f - 0.055f;
+    return f <= 0.003130f ? f * 12.92f : std::pow<float>(f, 1.0f / 2.4f) * 1.055f - 0.055f;
   }
 
   // sRGB/linear sRGB/XYZ conversion shorthands

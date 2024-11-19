@@ -1,7 +1,7 @@
 #pragma once
 
 #include <metameric/core/scheduler.hpp>
-#include <metameric/core/scene.hpp>
+#include <metameric/scene/scene.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/render/sensor.hpp>
 #include <metameric/render/primitives_query.hpp>

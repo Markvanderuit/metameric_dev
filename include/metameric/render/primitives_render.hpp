@@ -1,7 +1,7 @@
 #pragma once
 
 #include <metameric/core/scheduler.hpp>
-#include <metameric/core/scene.hpp>
+#include <metameric/scene/scene.hpp>
 #include <metameric/render/detail/primitives.hpp>
 #include <small_gl/texture.hpp>
 #include <small_gl/sampler.hpp>
@@ -41,29 +41,11 @@ namespace met {
     // Render pixels each other frame, alternating between checkerboards
     bool pixel_checkerboard = false;
 
+    // Render output to image with an alpha component,
+    // allowing images without a background
+    bool enable_alpha = false;
+
     // Query a value (e.g. albedo), integrate it, and return
-    bool enable_debug = false;
-
-    // Program cache; enforced given the shader's long compile time
-    ResourceHandle cache_handle;
-  };
-
-  // Helper struct for creation of RGBPathRenderPrimitive
-  struct RGBPathRenderPrimitiveInfo {
-    // Number of samples per pixel when a renderer primitive is invoked
-    uint spp_per_iter = 1;
-
-    // Renderer primitives will accumulate up to this number. Afterwards
-    // the target is left unmodified. If set to 0, no limit is imposed.
-    uint spp_max = std::numeric_limits<uint>::max();
-
-    // Maximum path length
-    uint max_depth = PathRecord::path_max_depth;
-
-    // Render pixels each other frame, alternating between checkerboards
-    bool pixel_checkerboard = false;
-    
-    // Query a value (e.g. albedo) and return
     bool enable_debug = false;
 
     // Program cache; enforced given the shader's long compile time
@@ -129,40 +111,11 @@ namespace met {
     gl::ComputeInfo m_dispatch;
     gl::Sampler     m_sampler; // linear sampler
 
-
   public:
     using InfoType = PathRenderPrimitiveInfo;
     
     PathRenderPrimitive() = default;
     PathRenderPrimitive(InfoType info);
-
-    void reset(const Sensor &sensor, const Scene &scene) override;
-    const gl::Texture2d4f &render(const Sensor &sensor, const Scene &scene) override;
-  };
-  	
-  // Rendering primitive; implementation of a unidirectional spectral path
-  // tracer with next-event-estimation and four-wavelength sampling.
-  class RGBPathRenderPrimitive : public detail::IntegrationRenderPrimitive {
-    using texture_type = gl::Texture1d<float, 3, gl::TextureType::eImageArray>;
-
-    // Handle to program cache, and key for relevant program
-    ResourceHandle  m_cache_handle;
-    std::string     m_cache_key; 
-
-    // Internal GL objects
-    gl::ComputeInfo m_dispatch;
-    gl::Sampler     m_sampler; // linear sampler
-
-  private: // Helpers for gl-side RGB value overrides for illuminants
-    gl::Buffer              m_illm_colr_buffer;
-    std::span<eig::Array4f> m_illm_colr_buffer_map;
-    texture_type            m_illm_colr_texture;
-
-  public:
-    using InfoType = RGBPathRenderPrimitiveInfo;
-    
-    RGBPathRenderPrimitive() = default;
-    RGBPathRenderPrimitive(InfoType info);
 
     void reset(const Sensor &sensor, const Scene &scene) override;
     const gl::Texture2d4f &render(const Sensor &sensor, const Scene &scene) override;

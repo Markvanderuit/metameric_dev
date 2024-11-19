@@ -138,7 +138,7 @@ namespace met {
 
     std::vector<eig::Array3d> input(data.size());
     std::transform(std::execution::par_unseq, range_iter(data), input.begin(),
-      [](const auto &v) { return v.cast<double>().eval(); }); 
+      [](const auto &v) { return v.template cast<double>().eval(); }); 
 
     // Query qhull for a convex hull structure
     auto qhull = orgQhull::Qhull("", 3, input.size(), cnt_span<const double>(input).data(), "Qt Qx C-0");
@@ -188,7 +188,7 @@ namespace met {
 
     std::vector<eig::Array3d> input(data.size());
     std::transform(std::execution::par_unseq, range_iter(data), input.begin(),
-      [](const auto &v) { return v.cast<double>().eval(); }); 
+      [](const auto &v) { return v.template cast<double>().eval(); }); 
     
     auto qhull = orgQhull::Qhull("", 3, input.size(), cnt_span<const double>(input).data(), "d Qbb Qt");
     qhull.setErrorStream(&std::cout);
@@ -235,7 +235,7 @@ namespace met {
 
     // Reset all normal data to 0
     mesh.norms.clear();
-    mesh.norms.resize(mesh.verts.size(), MeshTy::norm_type(0));
+    mesh.norms.resize(mesh.verts.size(), typename MeshTy::norm_type(0));
 
     // Generate unnormalized face vectors and add to output normals
     for (const auto &el : mesh.elems) {
@@ -264,11 +264,11 @@ namespace met {
     
     // First, set up all mesh attribute streams that need remapping
     std::vector<meshopt_Stream> attribs;
-    attribs.push_back({ mesh.verts.data(), sizeof(eig::Array3f), sizeof(MeshTy::vert_type) });
+    attribs.push_back({ mesh.verts.data(), sizeof(eig::Array3f), sizeof(typename MeshTy::vert_type) });
     if (mesh.has_norms())
-      attribs.push_back({ mesh.norms.data(), sizeof(eig::Array3f), sizeof(MeshTy::norm_type) });
+      attribs.push_back({ mesh.norms.data(), sizeof(eig::Array3f), sizeof(typename MeshTy::norm_type) });
     if (mesh.has_txuvs())
-      attribs.push_back({ mesh.txuvs.data(), sizeof(eig::Array2f), sizeof(MeshTy::txuv_type) });
+      attribs.push_back({ mesh.txuvs.data(), sizeof(eig::Array2f), sizeof(typename MeshTy::txuv_type) });
 
     // Generate remap buffer
     size_t n_verts = meshopt_generateVertexRemapMulti(
@@ -279,11 +279,14 @@ namespace met {
 
     // Given remap buffer, remap all data in the mesh in-place
     meshopt_remapIndexBuffer(cnt_span<uint>(mesh.elems).data(), src.data(), src.size(), dst.data());
-    meshopt_remapVertexBuffer(mesh.verts.data(), mesh.verts.data(), mesh.verts.size(), sizeof(MeshTy::vert_type), dst.data());
+    meshopt_remapVertexBuffer(mesh.verts.data(), mesh.verts.data(), mesh.verts.size(), 
+      sizeof(typename MeshTy::vert_type), dst.data());
     if (mesh.has_norms())
-      meshopt_remapVertexBuffer(mesh.norms.data(), mesh.norms.data(), mesh.norms.size(), sizeof(MeshTy::norm_type), dst.data());
+      meshopt_remapVertexBuffer(mesh.norms.data(), mesh.norms.data(), mesh.norms.size(), 
+        sizeof(typename MeshTy::norm_type), dst.data());
     if (mesh.has_txuvs())
-      meshopt_remapVertexBuffer(mesh.txuvs.data(), mesh.txuvs.data(), mesh.txuvs.size(), sizeof(MeshTy::txuv_type), dst.data());
+      meshopt_remapVertexBuffer(mesh.txuvs.data(), mesh.txuvs.data(), mesh.txuvs.size(), 
+        sizeof(typename MeshTy::txuv_type), dst.data());
       
     // Shrink-to-fit mesh data if possible
     detail::shrink_mesh_to_fit(mesh, n_verts);
@@ -307,11 +310,14 @@ namespace met {
 
     // Given remap buffer, remap all data in the mesh in-place
     meshopt_remapIndexBuffer(cnt_span<uint>(mesh.elems).data(), src.data(), src.size(), dst.data());
-    meshopt_remapVertexBuffer(mesh.verts.data(), mesh.verts.data(), mesh.verts.size(), sizeof(MeshTy::vert_type), dst.data());
+    meshopt_remapVertexBuffer(mesh.verts.data(), mesh.verts.data(), mesh.verts.size(), 
+      sizeof(typename MeshTy::vert_type), dst.data());
     if (mesh.has_norms())
-      meshopt_remapVertexBuffer(mesh.norms.data(), mesh.norms.data(), mesh.norms.size(), sizeof(MeshTy::norm_type), dst.data());
+      meshopt_remapVertexBuffer(mesh.norms.data(), mesh.norms.data(), mesh.norms.size(), 
+        sizeof(typename MeshTy::norm_type), dst.data());
     if (mesh.has_txuvs())
-      meshopt_remapVertexBuffer(mesh.txuvs.data(), mesh.txuvs.data(), mesh.txuvs.size(), sizeof(MeshTy::txuv_type), dst.data());
+      meshopt_remapVertexBuffer(mesh.txuvs.data(), mesh.txuvs.data(), mesh.txuvs.size(), 
+        sizeof(typename MeshTy::txuv_type), dst.data());
 
     // Shrink-to-fit mesh data if possible
     detail::shrink_mesh_to_fit(mesh, n_verts);
@@ -336,9 +342,10 @@ namespace met {
     auto src = cnt_span<uint>(mesh.elems);
 
     // Run meshoptimizer's simplify in-place
+    using vert_type = typename MeshTy::vert_type;
     size_t n_elems = meshopt_simplify(
       src.data(), src.data(), src.size(), 
-      mesh.verts[0].data(), mesh.verts.size(), sizeof(MeshTy::vert_type),
+      mesh.verts[0].data(), mesh.verts.size(), sizeof(vert_type),
       target_elems * 3, target_error, 0, nullptr) / 3;
 
     // Compact resulting mesh
@@ -356,9 +363,10 @@ namespace met {
     auto src = cnt_span<uint>(mesh.elems);
     
     // Run meshoptimizer's simplifySloppy in-place
+    using vert_type = typename MeshTy::vert_type;
     size_t n_elems = meshopt_simplifySloppy(
       src.data(), src.data(), src.size(), 
-      mesh.verts[0].data(), mesh.verts.size(), sizeof(MeshTy::vert_type),
+      mesh.verts[0].data(), mesh.verts.size(), sizeof(vert_type),
       target_elems * 3, target_error, nullptr) / 3;
 
     // Compact resulting mesh
@@ -379,18 +387,18 @@ namespace met {
     // Add mesh vertex data
     mesh_decl.vertexCount          = mesh.verts.size();
     mesh_decl.vertexPositionData   = reinterpret_cast<float *>(mesh.verts.data());
-    mesh_decl.vertexPositionStride = sizeof(MeshTy::vert_type);
+    mesh_decl.vertexPositionStride = sizeof(typename MeshTy::vert_type);
 
     // Add mesh normal data
     if (mesh.has_norms()) {
       mesh_decl.vertexNormalData   = reinterpret_cast<float *>(mesh.norms.data());
-      mesh_decl.vertexNormalStride = sizeof(MeshTy::norm_type);
+      mesh_decl.vertexNormalStride = sizeof(typename MeshTy::norm_type);
     }
 
     // Add mesh texcoord data
     if (mesh.has_txuvs()) {
       mesh_decl.vertexUvData   = reinterpret_cast<float *>(mesh.txuvs.data());
-      mesh_decl.vertexUvStride = sizeof(MeshTy::txuv_type);
+      mesh_decl.vertexUvStride = sizeof(typename MeshTy::txuv_type);
     }
 
     // Add mesh element data
@@ -400,13 +408,13 @@ namespace met {
 
     // Forward mesh data to atlas
     auto err = xatlas::AddMesh(atlas, mesh_decl, 1);
-    debug::check_expr(!err, std::format("xatlas::Addmesh(...) returned error code {}", static_cast<uint>(err)));   
+    debug::check_expr(!err, fmt::format("xatlas::Addmesh(...) returned error code {}", static_cast<uint>(err)));   
 
     // Finally, generate atlas
     xatlas::Generate(atlas, {}, {
       .bilinear   = true,
-      .blockAlign = true
-      // .padding    = 4,   // pixel padding, outside of bilinear padding
+      .blockAlign = true,
+      .padding    = 4,   // pixel padding, outside of bilinear padding
       // .texelsPerUnit = 1024.f,
       // .resolution = 1024 // Estimated texture size
     });
@@ -465,20 +473,50 @@ namespace met {
                                     mesh.verts[0],
                                     [](auto a, auto b) { return a.cwiseMax(b).eval(); });
     
-    // Generate transformation to move vertices to a [0, 1] bbox
+    // Generate transformation to place vertices in a unit cube
     auto scale = (maxb - minb).eval();
     scale = (scale.array().abs() > 0.00001f).select(1.f / scale, eig::Array3f(1));
-    auto trf = (eig::Scaling((scale).matrix().eval()) 
-             *  eig::Translation3f(-minb)).matrix();
-    
-    // Apply transformation to each point
-    std::for_each(std::execution::par_unseq, range_iter(mesh.verts), [&](auto &v) {
-      v = (trf * (eig::Vector4f() << v, 1).finished()).head<3>().eval();
-    });
+    auto trf = (eig::Scaling((scale).matrix().eval()) * eig::Translation3f(-minb)).matrix().eval();
+
+    // Apply transformation to verts
+    std::for_each(std::execution::par_unseq, range_iter(mesh.verts), 
+      [&](auto &v) { v = ((v - minb) * scale).eval(); });
+
+    // Apply transformation to normals
+    if (mesh.has_norms())
+      std::for_each(std::execution::par_unseq, range_iter(mesh.norms), 
+        [&](auto &n) { n = (n * scale).matrix().normalized().eval(); });
 
     return trf.inverse().eval();
   }
+  
+  // Adjust a mesh so there are no triangles with 0-size UVs
+  template <typename MeshTy>
+  void fix_degenerate_uvs(MeshTy &mesh) {
+    met_trace();
+    guard(mesh.has_txuvs());
 
+    // Parallel iterate all triangle uv data 
+    #pragma omp parallel for
+    for (int i = 0; i < mesh.elems.size(); ++i) {
+      const auto &el = mesh.elems[i];
+      eig::Array2f &a = mesh.txuvs[el[0]], 
+                   &b = mesh.txuvs[el[1]], 
+                   &c = mesh.txuvs[el[2]];
+
+      // If a triangle uv set is exactly identical, randomly shuffle vertex uv data
+      // a tiny bit
+      if (a.isApprox(b) || b.isApprox(c) || c.isApprox(a)) {
+        UniformSampler sampler = i;
+        #pragma omp critical
+        {
+          a += (sampler.next_1d() * 2.f - 1.f) * 1e-3;
+          b += (sampler.next_1d() * 2.f - 1.f) * 1e-3;
+          b += (sampler.next_1d() * 2.f - 1.f) * 1e-3;
+        }
+      }
+    }
+  }
 
   /* Explicit template instantiations */
   
@@ -505,6 +543,8 @@ namespace met {
     void optimize_mesh<OutputMesh>(OutputMesh &);                                                     \
     template                                                                                          \
     void renormalize_mesh<OutputMesh>(OutputMesh &);                                                  \
+    template                                                                                          \
+    void fix_degenerate_uvs<OutputMesh>(OutputMesh &);                                                \
     template                                                                                          \
     std::vector<typename OutputMesh::txuv_type> parameterize_mesh<OutputMesh>(OutputMesh &);          \
     template                                                                                          \

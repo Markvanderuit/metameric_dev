@@ -1,37 +1,43 @@
 #ifndef RENDER_EMITTER_SPHERE_GLSL_GUARD
 #define RENDER_EMITTER_SPHERE_GLSL_GUARD
 
-PositionSample sample_emitter_sphere(in EmitterInfo em, in SurfaceInfo si, in vec2 sample_2d) {
-  PositionSample ps;
-
+EmitterSample sample_emitter_sphere(in EmitterInfo em, in SurfaceInfo si, in vec4 wvls, in vec2 sample_2d) {
   // Sample position on hemisphere facing surface, point may not be nearest
-  Frame frm = get_frame(normalize(si.p - em.center));
-  ps.p = em.center 
-       + em.sphere_r * to_world(frm, square_to_unif_hemisphere(sample_2d));
+  Frame frm = get_frame(normalize(si.p - em.trf[3].xyz));
+  vec3  p   = em.trf[3].xyz 
+            + (.5f * length(em.trf[0].xyz)) 
+            * to_world(frm, square_to_unif_hemisphere(sample_2d));
 
-  // Generate direction to point
-  ps.d = ps.p - si.p;
-  ps.t = length(ps.d);
-  ps.d /= ps.t;
+  // Return value
+  EmitterSample es;
+
+  // Generate ray from surface towards position
+  es.ray = ray_towards_point(si, p);
   
-  ps.n   = normalize(ps.p - em.center);
-  ps.pdf = (2.f * em.srfc_area_inv) * sdot(ps.t) / abs(dot(ps.d, ps.n));
-  ps.is_delta = em.sphere_r == 0.f;
+  // Set pdf to zero if we are approaching from a back-face
+  vec3  n  = normalize(p - em.trf[3].xyz);
+  float dp = dot(-es.ray.d, n);
+  if (dp < 0) {
+    es.pdf = 0;
+    return es;
+  }
+  
+  es.L        = scene_illuminant(em.illuminant_i, wvls) * em.illuminant_scale;
+  es.pdf      = 2.f * M_PI_INV * sdot(es.ray.t) / (sdot(em.trf[0].xyz) * dp);
+  es.is_delta = false;
 
-  return ps;
+  return es;
 }
 
-vec4 eval_emitter_sphere(in EmitterInfo em, in PositionSample ps, in vec4 wvls) {
+vec4 eval_emitter_sphere(in EmitterInfo em, in SurfaceInfo si, in vec4 wvls) {
   // If normal is not inclined along the ray, return nothing
-  if (dot(ps.d, ps.n) >= 0)
+  if (cos_theta(si.wi) <= 0)
     return vec4(0);
-
-  vec4 v = scene_illuminant(em.illuminant_i, wvls);
-  return v * em.illuminant_scale;
+  return scene_illuminant(em.illuminant_i, wvls) * em.illuminant_scale;
 }
 
-float pdf_emitter_sphere(in EmitterInfo em, in PositionSample ps) {
-  return (2.f * em.srfc_area_inv) * sdot(ps.t) / abs(dot(ps.d, ps.n));
+float pdf_emitter_sphere(in EmitterInfo em, in SurfaceInfo si) {
+  return 2.f * M_PI_INV * sdot(si.t) / (sdot(em.trf[0].xyz) * cos_theta(si.wi));
 }
 
 #endif // RENDER_EMITTER_SPHERE_GLSL_GUARD

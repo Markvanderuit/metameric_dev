@@ -5,7 +5,7 @@
 #include <metameric/core/record.hpp>
 #include <metameric/core/convex.hpp>
 #include <metameric/core/ranges.hpp>
-#include <metameric/core/scene.hpp>
+#include <metameric/scene/scene.hpp>
 #include <metameric/core/detail/scheduler_subtasks.hpp>
 #include <small_gl/array.hpp>
 #include <small_gl/buffer.hpp>
@@ -13,6 +13,7 @@
 #include <unordered_set>
 
 namespace met {
+  // Nr of points for mismatch volume generation, total and per iteration
   constexpr static uint mmv_uplift_samples_max  = 256u;
   constexpr static uint mmv_uplift_samples_iter = 16u;
 
@@ -46,8 +47,8 @@ namespace met {
       }
 
       // Add new samples to the end of the queue
-      m_colr_samples.append_range(samples | vws::elements<0>);
-      m_coef_samples.append_range(samples | vws::elements<2>);
+      rng::transform(samples, std::back_inserter(m_colr_samples), &MismatchSample::colr);
+      rng::transform(samples, std::back_inserter(m_coef_samples), &MismatchSample::coef);
 
       // Determine extents of current full point set
       auto maxb = rng::fold_left_first(m_colr_samples, [](auto a, auto b) { return a.max(b).eval(); }).value();
@@ -57,7 +58,7 @@ namespace met {
       // because QHull can throw a fit on small inputs
       // if (m_colr_samples.size() >= 6 && (maxb - minb).minCoeff() > .005f) {
       if (m_colr_samples.size() >= 6 && (maxb - minb).minCoeff() > .0005f) {
-        chull = {{ .data = m_colr_samples | rng::to<std::vector>() }};
+        chull = {{ .data = m_colr_samples | view_to<std::vector<Colr>>() }};
       } else {
         chull = { };
       }
@@ -94,7 +95,7 @@ namespace met {
         // nonlinear solver runs. Find the best enclosing simplex, and then mix the
         // attached coefficients to generate a spectrum at said position
         auto [bary, elem] = chull.find_enclosing_elem(vert.get_mismatch_position());
-        auto coeffs       = elem | index_into_view(m_coef_samples) | rng::to<std::vector>();
+        auto coeffs       = elem | index_into_view(m_coef_samples) | view_to<std::vector<Basis::vec_type>>();
 
         // Linear combination reconstructs coefficients for this metamer
         auto coef =(bary[0] * coeffs[0] + bary[1] * coeffs[1]
@@ -158,16 +159,17 @@ namespace met {
     // per-pixel coefficients on a parameterized texture over the object surface.
     using SpecCoefLayout = eig::Array<float, wavelength_bases, 4>;
 
-    // Packed spectrum representation; four spectra interleaved per tetrahedron
-    // ensure we can access all four spectra as one texture sample during rendering
-    using SpecPackLayout  = eig::Array<float, wavelength_samples, 4>;
+    // Helper builders; one per constraint, which iteratively refine constraints
+    // by generating surrounding mismatch volumes (tends to be easier)
+    std::vector<MetamerConstraintBuilder> m_mmv_builders;
 
-    std::vector<MetamerConstraintBuilder> m_mismatch_builders;
+    // Index of associated uplifting
+    uint m_uplifting_i;
 
-    // Miscellaneous data
-    uint                         m_uplifting_i;
-    std::vector<Spec>            m_csys_boundary_spectra;
-    std::vector<Basis::vec_type> m_csys_boundary_coeffs;
+    // Construction data; color positions, corresponding spectra, derived coefficients
+    std::vector<MismatchSample> m_boundary_samples;
+    std::vector<MismatchSample> m_interior_samples;
+    std::vector<MismatchSample> m_tessellation_samples;
 
     // Delaunay tesselation connecting colors/spectra on both
     // the boundary and interally in the color space, as well
@@ -178,25 +180,8 @@ namespace met {
     MeshDataLayout           *m_tesselation_data_map;
     std::span<SpecCoefLayout> m_tesselation_coef_map;
 
-    // Color positions, corresponding assigned spectra, and derived coefficients
-    // in the delaunay tesselation
-    std::vector<Colr>            m_tesselation_points;
-    std::vector<Spec>            m_tesselation_spectra;
-    std::vector<Basis::vec_type> m_tesselation_coeffs;
-
-    // Buffer and accompanying mapping, store per-tetrahedron spectra
-    // in an interleaved format. This data is copied to upliftings.gl
-    // for fast sampled access during rendering
-    gl::Buffer                m_buffer_spec_pack;
-    std::span<SpecPackLayout> m_buffer_spec_pack_map;
-
-    // Buffers for mesh data, if a accompanying viewer exists
-    gl::Array  m_buffer_viewer_array;
-    gl::Buffer m_buffer_viewer_verts;
-    gl::Buffer m_buffer_viewer_elems;
-
   public:
-    GenUpliftingDataTask(uint uplifting_i);
+    GenUpliftingDataTask(uint uplifting_i) : m_uplifting_i(uplifting_i) { }
 
     bool is_active(SchedulerHandle &) override;
     void init(SchedulerHandle &)      override;
@@ -221,8 +206,8 @@ namespace met {
 
       // Add subtasks of type GenUpliftingDataTask
       m_subtasks.init(info, e_scene.components.upliftings.size(), 
-        [](uint i)         { return fmt::format("gen_uplifting_{}", i); },
-        [](auto &, uint i) { return GenUpliftingDataTask(i);            });
+        [](uint i)          { return fmt::format("gen_uplifting_{}", i); },
+        [&](auto &, uint i) { return GenUpliftingDataTask(i); });
     }
 
     void eval(SchedulerHandle &info) override {

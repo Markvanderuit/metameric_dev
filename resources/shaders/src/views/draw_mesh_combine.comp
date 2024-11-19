@@ -19,6 +19,13 @@ layout(binding = 1) uniform sampler2D b_overlay_4f;
 // Image unit, output declaration
 layout(binding = 0, rgba32f) uniform writeonly image2D b_target_4f;
 
+vec4 sample_render_output(in vec2 xy) {
+  vec4 value = texture(b_render_4f, xy);
+  if (bool(buff_unif.sample_checkerboard))
+    value *= 2.f;
+  return value;
+}
+
 void main() {
   // 2D/1D image/buffer coordinates
   const uvec2 i = gl_GlobalInvocationID.xy;
@@ -26,17 +33,12 @@ void main() {
   guard(all(lessThan(i, buff_unif.viewport_size)));
 
   // Sample render output
-  vec4 value;
-  if (bool(buff_unif.sample_checkerboard)) {
-    value = 2 * texture(b_render_4f, xy);
-  } else {
-    value = texture(b_render_4f, xy);
-  }
+  vec4 value = sample_render_output(xy);
 
-  // Sample overlay render and mix with result
+  // Sample overlay and mix with result
   vec4 overlay = texture(b_overlay_4f, xy);
   value = mix(value, vec4(overlay.xyz, 1), overlay.a);
   
-  // Store mixed result
+  // Store result
   imageStore(b_target_4f, ivec2(i), value + overlay);
 }

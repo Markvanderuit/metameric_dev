@@ -1,10 +1,11 @@
-#include <metameric/core/scene.hpp>
+#include <metameric/scene/scene.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/components/schedule.hpp>
 #include <metameric/components/misc/task_lambda.hpp>
 #include <metameric/components/views/task_window.hpp>
-#include <metameric/components/views/task_export.hpp>
+#include <metameric/components/views/task_render_export.hpp>
 #include <metameric/components/views/task_settings_editor.hpp>
+#include <metameric/components/views/task_measure_tool.hpp>
 #include <metameric/components/views/detail/file_dialog.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
 #include <small_gl/buffer.hpp>
@@ -37,7 +38,7 @@ namespace met {
       met_trace_full();
       
       // Open a file picker
-      if (fs::path path; detail::load_dialog(path, "json")) {
+      if (fs::path path; detail::load_dialog(path, { "*.json" })) {
         // Initialize existing project
         info.global("scene").getw<Scene>().load(path);
 
@@ -54,7 +55,7 @@ namespace met {
 
     bool handle_save_as(SchedulerHandle &info) {
       met_trace_full();
-      if (fs::path path; detail::save_dialog(path, "json")) {
+      if (fs::path path; detail::save_dialog(path, { "*.json" })) {
         info.global("scene").getw<Scene>().save(path);
         return true;
       }
@@ -156,24 +157,16 @@ namespace met {
 
     // Set up the menu bar at the top of the window's viewport
     if (ImGui::BeginMainMenuBar()) {
-      /* File menu follows */
-      
+      // File menu follows; new/open/close/import/exit
       if (ImGui::BeginMenu("File")) {
-        /* Main section follows */
-
         if (ImGui::MenuItem("New..."))                              { detail::handle_new(info);    }
         if (ImGui::MenuItem("Open..."))                             { detail::handle_open(info);   }
         if (ImGui::MenuItem("Close", nullptr, nullptr, is_loaded))  { handle_close_safe(info);     }
 
-        ImGui::Separator();
-
-        /* Debug section follows */
-
-        if (ImGui::MenuItem("Reload (schedule)", nullptr, nullptr, is_loaded)) { detail::handle_reload_schedule(info); }
+        // Debug method to force reload editor
+        // if (ImGui::MenuItem("Reload schedule", nullptr, nullptr, is_loaded)) { detail::handle_reload_schedule(info); }
 
         ImGui::Separator(); 
-
-        /* Save section follows */
 
         if (ImGui::MenuItem("Save", nullptr, nullptr, is_savable))      { detail::handle_save(info);    }
         if (ImGui::MenuItem("Save as...", nullptr, nullptr, is_loaded)) { detail::handle_save_as(info); }
@@ -182,68 +175,136 @@ namespace met {
 
         if (ImGui::BeginMenu("Import", is_loaded)) {
           if (ImGui::MenuItem("Wavefront (.obj)")) {
-            if (fs::path path; detail::load_dialog(path, "obj")) {
+            if (fs::path path; detail::load_dialog(path, { "*.obj" })) {
               auto &e_scene = info.global("scene").getw<Scene>();
               e_scene.import_scene(io::load_obj(path));
             }
           }
 
           if (ImGui::MenuItem("Image (.exr, .png, .jpg, ...)")) {
-            if (fs::path path; detail::load_dialog(path, "exr,png,jpg,jpeg,bmp")) {
+            if (fs::path path; detail::load_dialog(path, { "*.exr", "*.png", "*.jpg", "*.jpeg", "*.bmp" })) {
               auto &e_scene = info.global("scene").getw<Scene>();
               e_scene.resources.images.emplace(path.filename().string(), {{ .path = path  }});
             }
           }
           
-          if (ImGui::MenuItem("Spectral functions")) {
-            
+          if (ImGui::MenuItem("Illuminant spectrum", nullptr, nullptr, false)) {
+            if (fs::path path; detail::load_dialog(path, { })) {
+              auto &e_scene = info.global("scene").getw<Scene>();
+              e_scene.resources.illuminants.emplace("New illuminant", io::load_spec(path));
+            }
           }
 
-          if (ImGui::MenuItem("Observer functions")) {
-            
+          if (ImGui::MenuItem("Observer functions", nullptr, nullptr, false)) {
+            if (fs::path path; detail::load_dialog(path, { })) {
+              auto &e_scene = info.global("scene").getw<Scene>();
+              e_scene.resources.observers.emplace("New observer", io::load_cmfs(path));
+            }
           }
 
-          if (ImGui::MenuItem("Basis functions")) {
-            
+          if (ImGui::MenuItem("Basis functions", nullptr, nullptr, false)) {
+            if (fs::path path; detail::load_dialog(path, { })) {
+              auto &e_scene = info.global("scene").getw<Scene>();
+              e_scene.resources.bases.emplace("New basis", io::load_basis(path));
+            }
           }
 
           ImGui::EndMenu();
         }
 
-
         ImGui::Separator(); 
-
-        /* Miscellaneous section follows */
 
         if (ImGui::MenuItem("Exit")) {  handle_exit_safe(info); }
 
         ImGui::EndMenu();
       }
 
-      /* Edit menu follows */
-
+      // Edit menu follows; undo/redo
       if (ImGui::BeginMenu("Edit", is_loaded)) {
         const bool is_undo = e_scene.mod_i >= 0;
-        const bool is_redo = e_scene.mod_i < int(e_scene.mods.size()) - 1;
-
-        if (ImGui::MenuItem("Undo", nullptr, nullptr, is_undo)) { 
+        const bool is_redo = e_scene.mod_i < (int(e_scene.mods.size()) - 1);
+        
+        std::string undo_msg = is_undo
+          ? fmt::format("Undo ({})", e_scene.mods[e_scene.mod_i - 1].name) : "Undo";
+        std::string redo_msg = is_redo
+          ? fmt::format("Redo ({})", e_scene.mods[e_scene.mod_i + 1].name) : "Redo";
+        
+        if (ImGui::MenuItem(undo_msg.c_str(), nullptr, nullptr, is_undo)) { 
           info.global("scene").getw<Scene>().undo_mod(); 
         }
-        if (ImGui::MenuItem("Redo", nullptr, nullptr, is_redo)) { 
+        if (ImGui::MenuItem(redo_msg.c_str(), nullptr, nullptr, is_redo)) { 
           info.global("scene").getw<Scene>().redo_mod(); 
         }
 
+        ImGui::EndMenu();
+      }
+      
+      // Add menu follows; create objects/emitters/upliftings/other components
+      if (ImGui::BeginMenu("Add", is_loaded)) {
+        if (ImGui::MenuItem("Emitter", nullptr, nullptr)) {
+          using comp_type = typename detail::Component<Emitter>;
+          info.global("scene").getw<Scene>().touch({
+            .name = "Add emitter",
+            .redo = [](auto &scene) {
+              scene_data_by_type<comp_type>(scene).push("New emitter", { }); },
+            .undo = [](auto &scene) {
+              scene_data_by_type<comp_type>(scene).erase(scene_data_by_type<comp_type>(scene).size() - 1); }
+          });
+        }
+        if (ImGui::MenuItem("Object", nullptr, nullptr)) {
+          using comp_type = typename detail::Component<Object>;
+          info.global("scene").getw<Scene>().touch({
+            .name = "Add object",
+            .redo = [](auto &scene) {
+              scene_data_by_type<comp_type>(scene).push("New object", { }); },
+            .undo = [](auto &scene) {
+              scene_data_by_type<comp_type>(scene).erase(scene_data_by_type<comp_type>(scene).size() - 1); }
+          });
+        }
+        if (ImGui::MenuItem("Uplifting", nullptr, nullptr)) {
+          using comp_type = typename detail::Component<Uplifting>;
+          info.global("scene").getw<Scene>().touch({
+            .name = "Add uplifting",
+            .redo = [](auto &scene) {
+              scene_data_by_type<comp_type>(scene).push("New uplifting", { }); },
+            .undo = [](auto &scene) {
+              scene_data_by_type<comp_type>(scene).erase(scene_data_by_type<comp_type>(scene).size() - 1); }
+          });
+        }
+        if (ImGui::MenuItem("View", nullptr, nullptr)) {
+          using comp_type = typename detail::Component<View>;
+          info.global("scene").getw<Scene>().touch({
+            .name = "Add view",
+            .redo = [](auto &scene) {
+              scene_data_by_type<comp_type>(scene).push("New view", { }); },
+            .undo = [](auto &scene) {
+              scene_data_by_type<comp_type>(scene).erase(scene_data_by_type<comp_type>(scene).size() - 1); }
+          });
+        }
+
+        ImGui::EndMenu();
+      }
+
+      // View menu follows; show export/settings/measure
+      if (ImGui::BeginMenu("View", is_loaded)) {
+        if (ImGui::MenuItem("Path measure tool", nullptr, nullptr)) {
+          auto parent = info.task("viewport.viewport_input_editor").mask(info);
+          if (auto handle = parent.child_task("path_measure_tool"); !handle.is_init()) {
+            handle.init<PathMeasureToolTask>();
+          }
+        }
+
+        if (ImGui::MenuItem("Render to file", nullptr, nullptr)) {
+          if (auto handle = info.child_task("render_export"); !handle.is_init()) {
+            handle.init<RenderExportTask>();
+          }
+        }
+        
         ImGui::Separator();
 
         if (ImGui::MenuItem("Settings", nullptr, nullptr)) {
           if (auto handle = info.child_task("settings_editor"); !handle.is_init()) {
             handle.init<SettingsEditorTask>();
-          }
-        }
-
-        if (ImGui::MenuItem("Render to file...", nullptr, nullptr)) {
-          if (auto handle = info.child_task("export_view"); !handle.is_init()) {
-            handle.init<ExportTask>();
           }
         }
 
@@ -254,7 +315,7 @@ namespace met {
     }
     
     // Create an explicit dock space over the entire window's viewport, excluding the menu bar
-    ImGui::DockSpaceOverViewport(ImGui::GetMainViewport(), ImGuiDockNodeFlags_PassthruCentralNode);
+    ImGui::DockSpaceOverViewport(0, ImGui::GetMainViewport(), ImGuiDockNodeFlags_PassthruCentralNode);
 
     // Spawn close modal
     if (m_open_close_modal)  { 

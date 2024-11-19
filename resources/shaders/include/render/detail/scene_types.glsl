@@ -1,8 +1,6 @@
 #ifndef RENDER_DETAIL_SCENE_TYPES_GLSL_GUARD
 #define RENDER_DETAIL_SCENE_TYPES_GLSL_GUARD
 
-#include <spectrum.glsl>
-
 // Define metameric's scene layout
 const uint met_max_meshes      = MET_SUPPORTED_MESHES;
 const uint met_max_objects     = MET_SUPPORTED_OBJECTS;
@@ -12,12 +10,10 @@ const uint met_max_constraints = MET_SUPPORTED_CONSTRAINTS;
 const uint met_max_textures    = MET_SUPPORTED_TEXTURES;
 
 // Info object to gather Scene::Object data
+// Material data is unpacked when necessary; see record.glsl
 struct ObjectInfo {
   // Transform and inverse transform data
-  mat4 trf;                
-  mat4 trf_inv; 
-  mat4 trf_mesh;     // Multiplied by mesh packing transform    
-  mat4 trf_mesh_inv; // Multiplied by mesh packing transform
+  mat4 trf;
 
   // Should the object be interacted with?
   bool is_active;       
@@ -26,92 +22,74 @@ struct ObjectInfo {
   uint mesh_i;              
   uint uplifting_i;
 
-  // Material data        // TODO expand
-  bool is_albedo_sampled; // Use sampler or direct value?
-  uint albedo_i;          // Sampler index
-  vec3 albedo_v;          // Direct value
+  // Material data
+  uint  brdf_type;   // Type of brdf; 0 = null, 1 = diffuse, 2 = mirror, 3 = ggx
+  uvec2 albedo_data;
+  uint  metallic_data;
+  uint  roughness_data;
 };
 
-// Info object for referred mesh.bvh data
-struct MeshInfo {
-  mat4 trf;
-  
-  uint verts_offs;
-  uint verts_size;
-
-  uint prims_offs;
-  uint prims_size;
-  
-  uint nodes_offs;
-  uint nodes_size;
-};
-
-// Info object for referred texture data
+// Info object for referred patch from texture atlas
 struct TextureInfo {
-  bool  is_3f; // Is in the atlas_3f texture sampler, else atlas_1f?
-  uint  layer; // layer in texture array in which the texture is located
-  uvec2 offs;  // offset in pixels to layer's region storing this texture
-  uvec2 size;  // size in pixels of layer's region storing this
-  vec2  uv0;   // Minimum uv value, at region's pixel offset
-  vec2  uv1;   // Maximum uv value, at region's pixel offset + size
+  bool is_3f; // Is the patch in the atlas_3f texture sampler, or in atlas_1f?
+  uint layer; // layer in texture array in which the texture is located
+  vec2 uv0;   // Minimum uv value, at region's pixel offset
+  vec2 uv1;   // Maximum uv value, at region's pixel offset + size
 };
 
-// Texture atlas access info for the barycentric weights atlas
-struct BarycentricInfo {
-  uint  layer;  // layer in texture array in which a barycentric weight patch is located
-  uvec2 offs;   // offset in pixels to texture's region storing this patch
-  uvec2 size;   // size in pixels of texture's region storing this patch
-  vec2  uv0;    // Minimum uv value, at region's offset
-  vec2  uv1;    // Maximum uv value, at region's offset + size
+// Info object for referred patch from texture atlas
+struct AtlasInfo {
+  uint  layer; // layer in texture array in which a texture patch is located
+  uvec2 offs;  // Offset to patch pixel region
+  uvec2 size;  // Size of patch pixel region
+  vec2  uv0;   // Minimum uv value, at region's offset
+  vec2  uv1;   // Maximum uv value, at region's offset + size
 };
-
-// Atlas access info
-struct AtlasLayout {
-  uint  layer;  // layer in texture array in which the patch is located
-  uvec2 offs;   // offset in pixels to texture's region storing this patch
-  uvec2 size;   // size in pixels of texture's region storing this patch
-  vec2  uv0;    // Minimum uv value, at region's offset
-  vec2  uv1;    // Maximum uv value, at region's offset + size
-};
-
-#define EmitterTypeConstant  0
-#define EmitterTypePoint     1
-#define EmitterTypeSphere    2
-#define EmitterTypeRectangle 3
 
 // Info object to gather Scene::Emitter data
 // Given the lack of unions, emitters store additional data
+// Illuminant data is unpacked when necessary; see record.glsl
 struct EmitterInfo {
-  // Transform and inverse transform data
+  #define EmitterTypeConstant  0
+  #define EmitterTypePoint     1
+  #define EmitterTypeSphere    2
+  #define EmitterTypeRectangle 3
+
+  // Transform data; sphere/rect position are extracted
   mat4 trf;                
-  mat4 trf_inv; 
 
   // Shape data
-  uint type;      // Type of emitter; constant, point, area
+  uint type;      // Type of emitter; constant, point, sphere, rect
   bool is_active; // Should the emitter be interacted with?
 
   // Spectral data
   uint  illuminant_i;     // Index of spd
   float illuminant_scale; // Scalar multiplier applied to values  
-
-  // Precomputed data
-  vec3  center;
-  float srfc_area_inv;
-  vec3  rect_n;       // Specific to rectangle area emitters
-  float sphere_r;     // Specific to sphere area emitters
 };
 
-#define BRDFTypeNull    0
-#define BRDFTypeDiffuse 1
-#define BRDFTypePBR     2
 
+// Info object to gather brdf data locally
 struct BRDFInfo {
-  uint type;       // Type of BRDF: null, diffuse for now
-  vec4 r;          // Surface albedo for four wavelengths
-  float roughness; // Supplemental values for pbr shader
-  float metallic;  // Supplemental values for pbr shader
+  #define BRDFTypeNull       0
+  #define BRDFTypeDiffuse    1
+  #define BRDFTypeMicrofacet 2
+
+  uint  type;     // Type of BRDF: null, diffuse, principled for now
+  vec4  r;        // Underlying surface albedo for four wavelengths
+  float alpha;    // Supplemental values for principled brdf
+  float metallic; // Supplemental values for principled brdf
+  vec4  F0;       // Supplemental values for principled brdf
 };
 
-#include <render/detail/packing.glsl>
+// Info object for referred BLAS data
+struct BLASInfo {
+  uint prims_offs; // Offset into indices for bvh prim data
+  uint nodes_offs; // Offset into indices for bvh node data
+};
+
+// Info object for the TLAS
+struct TLASInfo {
+  mat4 trf; // Transform to project ray from TLAS to world
+};
 
 #endif // RENDER_DETAIL_SCENE_TYPES_GLSL_GUARD

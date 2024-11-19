@@ -45,10 +45,10 @@ namespace met {
         auto illums = emitters
                     | vws::transform([ ](const auto &comp) { return comp.value.illuminant_i; })
                     | vws::transform([&](uint i) { return *scene.resources.illuminants[i];   })
-                    | rng::to<std::vector>();
+                    | view_to<std::vector<Spec>>();
         auto scales = emitters
                     | vws::transform([](const auto &comp) { return comp.value.illuminant_scale; })
-                    | rng::to<std::vector>();
+                    | view_to<std::vector<float>>();
     
         // Generate average over scaled distributions
         m_wavelength_distr = 1.f;
@@ -117,12 +117,12 @@ namespace met {
     // Initialize program object, if it doesn't yet exist
     std::tie(m_cache_key, std::ignore) = m_cache_handle.getw<gl::detail::ProgramCache>().set({{ 
       .type       = gl::ShaderType::eVertex,
-      .spirv_path = "resources/shaders/render/primitive_render_gbuffer.vert.spv",
-      .cross_path = "resources/shaders/render/primitive_render_gbuffer.vert.json"
+      .spirv_path = "shaders/render/primitive_render_gbuffer.vert.spv",
+      .cross_path = "shaders/render/primitive_render_gbuffer.vert.json"
     }, {
       .type       = gl::ShaderType::eFragment,
-      .spirv_path = "resources/shaders/render/primitive_render_gbuffer.frag.spv",
-      .cross_path = "resources/shaders/render/primitive_render_gbuffer.frag.json"
+      .spirv_path = "shaders/render/primitive_render_gbuffer.frag.spv",
+      .cross_path = "shaders/render/primitive_render_gbuffer.frag.json"
     }});
 
     // Initialize draw object
@@ -159,13 +159,14 @@ namespace met {
 
     // Assemble appropriate draw commands for each object in the scene
     // by taking the relevant draw command from its mesh data
-    m_draw.bindable_array = &scene.resources.meshes.gl.array;
-    m_draw.commands = scene.components.objects.data()
-                    | vws::transform(&detail::Component<Object>::value)
-                    | vws::filter(&Object::is_active)
-                    | vws::transform(&Object::mesh_i)
-                    | index_into_view(scene.resources.meshes.gl.draw_commands)
-                    | rng::to<std::vector>();
+    auto commands = scene.components.objects.data()
+                  | vws::transform(&detail::Component<Object>::value)
+                  | vws::filter(&Object::is_active)
+                  | vws::transform(&Object::mesh_i)
+                  | index_into_view(scene.resources.meshes.gl.mesh_draw);
+    m_draw.commands.clear();
+    rng::copy(commands, std::back_inserter(m_draw.commands));
+    m_draw.bindable_array = &scene.resources.meshes.gl.mesh_array;
     
     // Specify draw states
     gl::state::set_viewport(sensor.film_size);    
@@ -182,8 +183,8 @@ namespace met {
 
     // Prepare program state
     program.bind();
-    program.bind("b_buff_sensor",  sensor.buffer());
-    program.bind("b_buff_objects", scene.components.objects.gl.object_info);
+    program.bind("b_buff_sensor_info",  sensor.buffer());
+    program.bind("b_buff_object_info", scene.components.objects.gl.object_info);
 
     // Dispatch draw call with appropriate barriers
     gl::sync::memory_barrier(gl::BarrierFlags::eFramebuffer        | gl::BarrierFlags::eTextureFetch  |
@@ -201,8 +202,8 @@ namespace met {
     // Initialize program object, if it doesn't yet exist
     std::tie(m_cache_key, std::ignore) = m_cache_handle.getw<gl::detail::ProgramCache>().set({ 
       .type       = gl::ShaderType::eCompute,
-      .spirv_path = "resources/shaders/render/primitive_render_gbuffer_view.comp.spv",
-      .cross_path = "resources/shaders/render/primitive_render_gbuffer_view.comp.json",
+      .spirv_path = "shaders/render/primitive_render_gbuffer_view.comp.spv",
+      .cross_path = "shaders/render/primitive_render_gbuffer_view.comp.json",
       .spec_const = {{ 0u, 16u                                },
                      { 1u, 16u                                },
                      { 2u, static_cast<uint>(info.view_type) }}
@@ -247,8 +248,8 @@ namespace met {
     program.bind();
     program.bind("b_gbuffer",       gbuffer);
     program.bind("b_film",          m_film);
-    program.bind("b_buff_sensor",   sensor.buffer());
-    program.bind("b_buff_objects",  scene.components.objects.gl.object_info);
+    program.bind("b_buff_sensor_info",   sensor.buffer());
+    program.bind("b_buff_object_info",  scene.components.objects.gl.object_info);
 
     // Let primary handle rest
     return render(sensor, scene);
@@ -267,11 +268,12 @@ namespace met {
     // Initialize program object, if it doesn't yet exist
     std::tie(m_cache_key, std::ignore) = m_cache_handle.getw<gl::detail::ProgramCache>().set({ 
       .type       = gl::ShaderType::eCompute,
-      .spirv_path = "resources/shaders/render/primitive_render_path.comp.spv",
-      .cross_path = "resources/shaders/render/primitive_render_path.comp.json",
+      .spirv_path = "shaders/render/primitive_render_path.comp.spv",
+      .cross_path = "shaders/render/primitive_render_path.comp.json",
       .spec_const = {{ 0u, 16u                     },
                      { 1u, 16u                     },
                      { 2u, info.max_depth          },
+                     { 3u, info.enable_alpha       },
                      { 4u, uint(info.enable_debug) }}
     });
 
@@ -327,151 +329,33 @@ namespace met {
     // Bind required resources to their corresponding targets
     program.bind();
     program.bind("b_film",                m_film);
-    program.bind("b_buff_sensor",         sensor.buffer());
+    program.bind("b_buff_sensor_info",    sensor.buffer());
     program.bind("b_buff_sampler_state",  get_sampler_state());
-    program.bind("b_buff_objects",        scene.components.objects.gl.object_info);
-    program.bind("b_buff_emitters",       scene.components.emitters.gl.emitter_info);
+    program.bind("b_buff_object_info",    scene.components.objects.gl.object_info);
+    program.bind("b_buff_emitter_info",   scene.components.emitters.gl.emitter_info);
     program.bind("b_buff_envmap_info",    scene.components.emitters.gl.emitter_envm_info);
-    program.bind("b_buff_coeffs",         scene.components.upliftings.gl.texture_coefficients.buffer());
+    program.bind("b_buff_coef_info",      scene.components.upliftings.gl.texture_coef.buffer());
+    program.bind("b_buff_brdf_info",      scene.components.upliftings.gl.texture_brdf.buffer());
     program.bind("b_buff_wvls_distr",     get_wavelength_distr());
     program.bind("b_buff_emitters_distr", scene.components.emitters.gl.emitter_distr_buffer);
+    program.bind("b_illm_1f",             scene.resources.illuminants.gl.spec_texture);
+    program.bind("b_illm_1f",             m_sampler);
     program.bind("b_bsis_1f",             scene.components.upliftings.gl.texture_basis);
     program.bind("b_bsis_1f",             m_sampler);
-    program.bind("b_coef_4f",             scene.components.upliftings.gl.texture_coefficients.texture()); 
+    program.bind("b_brdf_2f",             scene.components.upliftings.gl.texture_brdf.texture()); 
+    program.bind("b_brdf_2f",             m_sampler);
+    program.bind("b_coef_4f",             scene.components.upliftings.gl.texture_coef.texture()); 
     program.bind("b_coef_4f",             m_sampler);
     program.bind("b_cmfs_3f",             scene.resources.observers.gl.cmfs_texture);
     program.bind("b_cmfs_3f",             m_sampler);
-    program.bind("b_illm_1f",             scene.resources.illuminants.gl.spec_texture);
-    program.bind("b_illm_1f",             m_sampler);
     
     if (!scene.resources.meshes.empty()) {
-      program.bind("b_buff_meshes",    scene.resources.meshes.gl.mesh_info);
-      program.bind("b_buff_bvhs_node", scene.resources.meshes.gl.bvh_nodes);
-      program.bind("b_buff_bvhs_prim", scene.resources.meshes.gl.bvh_prims);
-    }
-
-    // Dispatch compute shader
-    gl::sync::memory_barrier( gl::BarrierFlags::eImageAccess   | gl::BarrierFlags::eTextureFetch  |
-                              gl::BarrierFlags::eUniformBuffer | gl::BarrierFlags::eStorageBuffer | 
-                              gl::BarrierFlags::eBufferUpdate                                     );
-    gl::dispatch_compute(m_dispatch);
-
-    // Advance sampler state for next render() call
-    advance_sampler_state();
-
-    return m_film;
-  }
-
-  RGBPathRenderPrimitive::RGBPathRenderPrimitive(RGBPathRenderPrimitiveInfo info)
-  : detail::IntegrationRenderPrimitive(),
-    m_cache_handle(info.cache_handle) {
-    met_trace_full();
-
-    // Initialize program object, if it doesn't yet exist
-    std::tie(m_cache_key, std::ignore) = m_cache_handle.getw<gl::detail::ProgramCache>().set({ 
-      .type       = gl::ShaderType::eCompute,
-      .spirv_path = "resources/shaders/render/primitive_render_path_rgb.comp.spv",
-      .cross_path = "resources/shaders/render/primitive_render_path_rgb.comp.json",
-      .spec_const = {{ 0u, 16u                     },
-                     { 1u, 16u                     },
-                     { 2u, info.max_depth          },
-                     { 4u, uint(info.enable_debug) }}
-    });
-
-    // Assign sampler configuration
-    m_iter               = 0;
-    m_spp_curr           = 0;
-    m_spp_max            = info.spp_max;
-    m_spp_per_iter       = info.spp_per_iter;
-    m_pixel_curr         = 0;
-    m_pixel_checkerboard = info.pixel_checkerboard;
-
-    // RGB value override space
-    auto n_layers = std::min<uint>(gl::state::get_variable_int(gl::VariableName::eMaxArrayTextureLayers), detail::met_max_constraints);
-    m_illm_colr_texture    = {{ .size = { 1, n_layers } }};
-    std::tie(m_illm_colr_buffer, m_illm_colr_buffer_map) = gl::Buffer::make_flusheable_span<eig::Array4f>(n_layers);
-
-    // Linear texture sampler
-    m_sampler = {{ .min_filter = gl::SamplerMinFilter::eLinear, .mag_filter = gl::SamplerMagFilter::eLinear }};
-  }
-
-  void RGBPathRenderPrimitive::reset(const Sensor &sensor, const Scene &scene) {
-    met_trace_full();
-    IntegrationRenderPrimitive::reset(sensor, scene);
-
-    // Rebuild target texture if necessary
-    if (!m_film.is_init() || !m_film.size().isApprox(sensor.film_size)) {
-      m_film = {{ .size = sensor.film_size.max(1).eval() }};
-
-      // Set dispatch size
-      if (m_pixel_checkerboard) {
-        auto dispatch_ndiv  = ceil_div((m_film.size() / eig::Array2u(2, 1)).eval(), 16u);
-        m_dispatch.groups_x = dispatch_ndiv.x();
-        m_dispatch.groups_y = dispatch_ndiv.y();
-      } else {
-        auto dispatch_ndiv  = ceil_div(m_film.size(), 16u);
-        m_dispatch.groups_x = dispatch_ndiv.x();
-        m_dispatch.groups_y = dispatch_ndiv.y();
-      }
-    }
-
-    // Set film to black
-    m_film.clear();
-     
-    // Push illuminant values if changed
-    if (const auto &illm = scene.resources.illuminants; true /* illm.is_mutated() */) {
-      for (uint i = 0; i < illm.size(); ++i) {
-        const auto &[value, state] = illm[i];
-        // guard_continue(state);
-        ColrSystem csys = { .cmfs = models::cmfs_cie_xyz, .illuminant = value };
-        m_illm_colr_buffer_map[i] = (eig::Array4f() << csys(Spec(1), true), 1).finished();
-      }
-      m_illm_colr_buffer.flush();
-      m_illm_colr_texture.set(m_illm_colr_buffer);
-    }
-  }
-
-  const gl::Texture2d4f &RGBPathRenderPrimitive::render(const Sensor &sensor, const Scene &scene) {
-    met_trace_full();
-    
-    // If the film object is stale, run a reset()
-    if (!m_film.is_init() || !m_film.size().isApprox(sensor.film_size))
-      reset(sensor, scene);
-
-    // Return early if sample count has reached specified maximum
-    guard(has_next_sample_state(), m_film);
-
-    // Draw relevant program from cache
-    auto &program = m_cache_handle.getw<gl::detail::ProgramCache>().at(m_cache_key);
-
-    // Bind required resources to their corresponding targets
-    program.bind();
-    program.bind("b_film",                m_film);
-    program.bind("b_buff_sensor",         sensor.buffer());
-    program.bind("b_buff_sampler_state",  get_sampler_state());
-    program.bind("b_buff_objects",        scene.components.objects.gl.object_info);
-    program.bind("b_buff_emitters",       scene.components.emitters.gl.emitter_info);
-    program.bind("b_buff_envmap_info",    scene.components.emitters.gl.emitter_envm_info);
-    program.bind("b_buff_wvls_distr",     get_wavelength_distr());
-    program.bind("b_buff_emitters_distr", scene.components.emitters.gl.emitter_distr_buffer);
-    program.bind("b_illm_3f",             m_illm_colr_texture);
-    program.bind("b_illm_3f",             m_sampler);
-    
-    if (!scene.resources.images.empty()) {
-      program.bind("b_buff_textures", scene.resources.images.gl.texture_info);
-      if (scene.resources.images.gl.texture_atlas_1f.texture().is_init()) {
-        program.bind("b_txtr_1f", m_sampler);
-        program.bind("b_txtr_1f", scene.resources.images.gl.texture_atlas_1f.texture());
-      }
-      if (scene.resources.images.gl.texture_atlas_3f.texture().is_init()) {
-        program.bind("b_txtr_3f", m_sampler);
-        program.bind("b_txtr_3f", scene.resources.images.gl.texture_atlas_3f.texture());
-      }
-    }
-    if (!scene.resources.meshes.empty()) {
-      program.bind("b_buff_meshes",    scene.resources.meshes.gl.mesh_info);
-      program.bind("b_buff_bvhs_node", scene.resources.meshes.gl.bvh_nodes);
-      program.bind("b_buff_bvhs_prim", scene.resources.meshes.gl.bvh_prims);
+      program.bind("b_buff_blas_info", scene.resources.meshes.gl.blas_info);
+      program.bind("b_buff_blas_node", scene.resources.meshes.gl.blas_nodes);
+      program.bind("b_buff_blas_prim", scene.resources.meshes.gl.blas_prims);
+      // program.bind("b_buff_tlas_info", scene.gl.tlas_info);
+      // program.bind("b_buff_tlas_node", scene.gl.tlas_nodes);
+      // program.bind("b_buff_tlas_prim", scene.gl.tlas_prims);
     }
 
     // Dispatch compute shader

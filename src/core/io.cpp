@@ -1,6 +1,7 @@
 #include <metameric/core/io.hpp>
 #include <metameric/core/mesh.hpp>
 #include <metameric/core/ranges.hpp>
+#include <metameric/scene/scene.hpp>
 #include <metameric/core/utility.hpp>
 #include <nlohmann/json.hpp>
 #include <rapidobj/rapidobj.hpp>
@@ -63,10 +64,11 @@ namespace met::io {
     std::string line;
     while (std::getline(ss, line)) {
       std::ranges::replace(line, '\t', ' ');
-      auto split_vect = line 
-                      | std::views::split(' ') 
-                      | std::views::transform([](auto &&r) { return std::string(r.begin(), r.end()); })
-                      | std::ranges::to<std::vector>();
+      auto split = line 
+                 | std::views::split(' ') 
+                 | std::views::transform([](auto &&r) { return std::string(r.begin(), r.end()); });
+      std::vector<std::string> split_vect;
+      rng::copy(split, std::back_inserter(split_vect));
 
       // Skip empty and commented lines
       guard_continue(!split_vect.empty() && split_vect[0][0] != '#');
@@ -108,10 +110,11 @@ namespace met::io {
     std::string line;
     uint        line_nr = 0;
     while (std::getline(ss, line)) {
-      auto split_vect = line 
-                      | std::views::split(' ') 
-                      | std::views::transform([](auto &&r) { return std::string(r.begin(), r.end()); })
-                      | std::ranges::to<std::vector>();
+      auto split = line 
+                 | std::views::split(' ') 
+                 | std::views::transform([](auto &&r) { return std::string(r.begin(), r.end()); });
+      std::vector<std::string> split_vect;
+      rng::copy(split, std::back_inserter(split_vect));
 
       // Skip empty and commented lines
       guard_continue(!split_vect.empty() && split_vect[0][0] != '#');
@@ -224,15 +227,16 @@ namespace met::io {
         compact_mesh(mesh);
       }
 
-      // 2 - Identify referred texture resource or specify a single diffuse value
-      std::variant<Colr, uint> diffuse = Colr(0.5);
-      if (!load_materials || !has_matrs) {
-        // No material specified; set to neutral gray
-        diffuse = Colr(0.5);
-      } else {
+      // 2 - Identify referred texture resource or specify a single value, and
+      //     generally identify the brdf.
+      std::variant<Colr, uint>  diffuse   = Colr(.5f);
+      std::variant<float, uint> metallic  = 0.f;
+      std::variant<float, uint> roughness = 1.f;
+      Object::BRDFType brdf_type = Object::BRDFType::eDiffuse;
+      if (load_materials && has_matrs) {
         // Access first material only; we ignore per-face materials; 
         const auto &obj_mat = result.materials[shape.mesh.material_ids.front()];
-
+        
         if (obj_mat.diffuse_texname.empty()) {
           // Assign color value if there is no file path
           diffuse = Colr { obj_mat.diffuse[0], obj_mat.diffuse[1], obj_mat.diffuse[2] };
@@ -243,13 +247,42 @@ namespace met::io {
             static_cast<uint>(texture_load_list.size()) // New texture id at end of list
           }).first->second;
         }
+
+        if (obj_mat.metallic_texname.empty()) {
+          metallic = obj_mat.metallic;
+          if (obj_mat.roughness != 1.f || obj_mat.metallic != 0.f)
+            brdf_type = Object::BRDFType::eMicrofacet;
+        } else {
+          // Assign an allocated texture id from texture_load_list or get a new one
+          metallic = texture_load_list.insert({ 
+            obj_mat.metallic_texname,                   // filename of texture as key
+            static_cast<uint>(texture_load_list.size()) // New texture id at end of list
+          }).first->second;
+          brdf_type = Object::BRDFType::eMicrofacet;
+        }
+        
+        if (obj_mat.roughness_texname.empty()) {
+          roughness = obj_mat.roughness;
+          if (obj_mat.roughness != 1.f || obj_mat.metallic != 0.f)
+            brdf_type = Object::BRDFType::eMicrofacet;
+        } else {
+          // Assign an allocated texture id from texture_load_list or get a new one
+          roughness = texture_load_list.insert({ 
+            obj_mat.roughness_texname,                   // filename of texture as key
+            static_cast<uint>(texture_load_list.size()) // New texture id at end of list
+          }).first->second;
+          brdf_type = Object::BRDFType::eMicrofacet;
+        }
       }
 
       // 3 - create an object component referring to mesh/texture
       met::Object object = {
         .mesh_i      = static_cast<uint>(scene.resources.meshes.size()),
         .uplifting_i = 0,
-        .diffuse     = diffuse
+        .brdf_type   = brdf_type,
+        .diffuse     = diffuse,
+        .metallic    = metallic,
+        .roughness   = roughness
       };
 
       // 4 - store mesh and object in scene
@@ -308,9 +341,10 @@ namespace met::io {
       auto split = line 
                  | vws::split(' ') 
                  | vws::take(1 + wavelength_bases)
-                 | vws::transform([](auto &&r) { return std::string(range_iter(r)); })
-                 | rng::to<std::vector>();
-      auto data = std::span(split); // span representation for slicing
+                 | vws::transform([](auto &&r) { return std::string(range_iter(r)); });
+      std::vector<std::string> data_;
+      rng::copy(split, std::back_inserter(data_));
+      auto data = std::span(data_); // representation for slicing
 
       // Skip empty or commented lines
       guard_continue(!data.empty() && data[0][0] != '#' && !data[0].empty());

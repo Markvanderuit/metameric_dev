@@ -4,7 +4,6 @@
 #include <execution>
 #include <cstdint>
 #include <limits>
-#include <format>
 #include <type_traits>
 #include <functional>
 #include <unordered_map>
@@ -154,7 +153,7 @@ namespace met {
       // Attempt to read EXR version data
       if (int ret = ParseEXRVersionFromFile(&exr_version, cpath); ret) {
         debug::check_expr(false,
-          std::format("Could not parse EXR version, image path \"{}\", return code \"{}\"", info.path.string(), ret));
+          fmt::format("Could not parse EXR version, image path \"{}\", return code \"{}\"", info.path.string(), ret));
       }
 
       // Attempt to read EXR header data
@@ -162,7 +161,7 @@ namespace met {
         std::string err_copy(error);
         FreeEXRErrorMessage(error);
         debug::check_expr(false,
-          std::format("Could not parse EXR header, image path \"{}\", error \"{}\"", info.path.string(), err_copy));
+          fmt::format("Could not parse EXR header, image path \"{}\", error \"{}\"", info.path.string(), err_copy));
       }
 
       // Read HALF channel as FLOAT
@@ -178,7 +177,7 @@ namespace met {
         std::string err_copy(error);
         FreeEXRErrorMessage(error);
         debug::check_expr(false,
-          std::format("Could not load EXR image, image path \"{}\", error \"{}\"", info.path.string(), err_copy));
+          fmt::format("Could not load EXR image, image path \"{}\", error \"{}\"", info.path.string(), err_copy));
       }
 
       // Note; here be the assumptions because I really don't have time for this
@@ -193,8 +192,6 @@ namespace met {
       if (exr_header.pixel_types[0] == TINYEXR_PIXELTYPE_UINT)
         m_pixel_type = PixelType::eUInt;
       
-      fmt::print("num_channels : {}\n", exr_image.num_channels);
-      
       // Allocate image memory
       m_data.resize(m_size.prod() * detail::size_from_format(m_pixel_frmt) 
                                   * detail::size_from_type(m_pixel_type));
@@ -205,25 +202,57 @@ namespace met {
       uint pixl_size = pixl_chan * type_size;
 
       // Attempt to scatter EXR data to image memory
-      std::unordered_map<std::string, uint> channel_indices = {
-        { "R", 0 }, { "G", 1 }, { "B", 2 }, { "A", 3 },
-      };
-      for (uint c = 0; c < pixl_chan; ++c) {
-        size_t         chan_offs = channel_indices[exr_header.channels[c].name];
-        unsigned char* chan_data = exr_image.images[c];
+      switch (pixl_chan) {
+      case 1: {
+          unsigned char* chan_data = exr_image.images[0];
+          #pragma omp parallel for
+          for (int i = 0; i < m_size.prod(); ++i) {
+            size_t src_offs = type_size * i;
+            size_t dst_offs = type_size * (i * pixl_chan);
+            std::memcpy(&m_data[dst_offs], &chan_data[src_offs], type_size);
+          } // for (uint i)
+        }
+        break;
+      case 3: {
+          std::unordered_map<std::string, uint> channel_indices = {
+            { "R", 0 }, { "G", 1 }, { "B", 2 },
+          };
+          for (uint c = 0; c < pixl_chan; ++c) {
+            size_t         chan_offs = channel_indices[exr_header.channels[c].name];
+            unsigned char* chan_data = exr_image.images[c];
 
-        #pragma omp parallel for
-        for (int i = 0; i < m_size.prod(); ++i) {
-          size_t src_offs = type_size * i;
-          size_t dst_offs = type_size * (i * pixl_chan + chan_offs);
-          std::memcpy(&m_data[dst_offs], &chan_data[src_offs], type_size);
-        } // for (uint i)
-      } // for (uint c)
+            #pragma omp parallel for
+            for (int i = 0; i < m_size.prod(); ++i) {
+              size_t src_offs = type_size * i;
+              size_t dst_offs = type_size * (i * pixl_chan + chan_offs);
+              std::memcpy(&m_data[dst_offs], &chan_data[src_offs], type_size);
+            } // for (uint i)
+          } // for (uint c)
+        }
+        break;
+      case 4: {
+          std::unordered_map<std::string, uint> channel_indices = {
+            { "R", 0 }, { "G", 1 }, { "B", 2 }, { "A", 3 }
+          };
+          for (uint c = 0; c < pixl_chan; ++c) {
+            size_t         chan_offs = channel_indices[exr_header.channels[c].name];
+            unsigned char* chan_data = exr_image.images[c];
 
-      fmt::print("Attempted to read: channels = {}, width = {}, height = {}, tiles = {}\n",
+            #pragma omp parallel for
+            for (int i = 0; i < m_size.prod(); ++i) {
+              size_t src_offs = type_size * i;
+              size_t dst_offs = type_size * (i * pixl_chan + chan_offs);
+              std::memcpy(&m_data[dst_offs], &chan_data[src_offs], type_size);
+            } // for (uint i)
+          } // for (uint c)
+        }
+        break;
+      default:
+        debug::check_expr(false, "Could not load EXR image, unsupported channel layout");
+      }
+
+      fmt::print("Image: reading/// channels = {}, width = {}, height = {}, tiles = {}\n",
         exr_image.num_channels, exr_image.width, exr_image.height, exr_image.num_tiles);
-      for (uint i = 0; i < exr_header.num_channels; ++i)
-        fmt::print("\tchannel {}, named {}\n", i, exr_header.channels[i].name);
 
       // Cleanup
       FreeEXRImage(&exr_image);
@@ -278,6 +307,17 @@ namespace met {
         && std::equal(std::execution::par_unseq, range_iter(m_data), range_iter(o.m_data));
   }
 
+  void Image::clear(eig::Array4f v, ColorFormat input_frmt) {
+    met_trace();
+    
+    #pragma omp parallel for
+    for (int y = 0; y < m_size.y(); ++y) {
+      for (int x = 0; x < m_size.x(); ++x) {
+        set_pixel({ x, y }, v, input_frmt);
+      }
+    }
+  }
+
   void Image::set_pixel(const eig::Array2u &xy, eig::Array4f v, ColorFormat input_frmt) {
     uint i = xy.y() * m_size.x() + xy.x();
 
@@ -289,7 +329,7 @@ namespace met {
     if (input_frmt != ColorFormat::eNone && m_color_frmt != ColorFormat::eNone)
       v.head<3>() = detail::convert_colr_frmt(m_color_frmt, input_frmt, v.head<3>());
 
-    for (auto [src, dst] : vws::zip(src_range, dst_range))
+    for (auto [src, dst] : view_zip(src_range, dst_range))
       detail::convert_fr_float(m_pixel_type, v[src], m_data[dst]);
   }
 
@@ -302,7 +342,7 @@ namespace met {
     auto src_range  = (type_size * (i * frmt_size + dst_range)).eval();
 
     eig::Array4f v = 0.f;
-    for (auto [src, dst] : vws::zip(src_range, dst_range))
+    for (auto [src, dst] : view_zip(src_range, dst_range))
       detail::convert_to_float(m_pixel_type, m_data[src], v[dst]);
 
     if (output_frmt != ColorFormat::eNone && m_color_frmt != ColorFormat::eNone)
@@ -312,7 +352,7 @@ namespace met {
   }
 
   eig::Array4f Image::sample(const eig::Array2f &uv, ColorFormat output_frmt) const {
-    constexpr auto fmod = [](float f) { return std::fmodf(f, 1.f); };
+    constexpr auto fmod = [](float f) { return fmodf(f, 1.f); };
 
     eig::Array2f xy   = (uv.unaryExpr(fmod) * m_size.cast<float>() - 0.5f).cwiseMax(0.f).eval();
     eig::Array2f lerp = xy - xy.floor();
@@ -325,6 +365,35 @@ namespace met {
     auto d = get_pixel({ maxv.x(), maxv.y() }, output_frmt) * lerp.x();
     
     return (1.f - lerp.y()) * (a + b) + lerp.y() * (c + d);
+  }
+
+  
+  Image Image::flip(bool flip_x, bool flip_y) const {
+    met_trace();
+    
+    // Initialize output image in requested format
+    Image output = {{ 
+      .pixel_frmt = m_pixel_frmt,
+      .pixel_type = m_pixel_type,
+      .color_frmt = m_color_frmt,
+      .size       = m_size
+    }};
+
+    // Perform sample and flip where necessary
+    #pragma omp parallel for
+    for (int y = 0; y < output.size().y(); ++y) {
+      for (int x = 0; x < output.size().x(); ++x) {
+        eig::Array2u pixel  = { x, y };
+        eig::Array2f uv     = ((pixel.cast<float>() + 0.5f) / output.size().cast<float>());
+        if (flip_x)
+          uv.x() = 1.f - uv.x();
+        if (flip_y)
+          uv.y() = 1.f - uv.y();
+        output.set_pixel(pixel, sample(uv, output.m_color_frmt));
+      } // for (int x)
+    } // for (int y)
+
+    return output;
   }
 
   Image Image::convert(ConvertInfo info) const {
@@ -366,7 +435,7 @@ namespace met {
         eig::Array4f f = 0;
 
         // Gather converted input to float representation
-        for (auto [src, ovl] : vws::zip(src_channels, ovl_channels))
+        for (auto [src, ovl] : view_zip(src_channels, ovl_channels))
           detail::convert_to_float(m_pixel_type, m_data[src], f[ovl]);
 
         // Apply color space conversion on float representation, to the first three channels **only**
@@ -374,7 +443,7 @@ namespace met {
           f.head<3>() = convert_func(f.head<3>());
         
         // Scatter float representation to converted output
-        for (auto [ovl, dst] : vws::zip(ovl_channels, dst_channels))
+        for (auto [ovl, dst] : view_zip(ovl_channels, dst_channels))
           detail::convert_fr_float(output.m_pixel_type, f[ovl], output.m_data[dst]);
       } // for (int i)
     } else {
@@ -460,6 +529,6 @@ namespace met {
     const char *error = nullptr;
     if (int ret = SaveEXRImageToFile(&exr_image, &exr_header, cpath, &error); ret)
       debug::check_expr(false,
-        std::format("Could not save to EXR, image path \"{}\", return code \"{}\"", path.string(), ret));
+        fmt::format("Could not save to EXR, image path \"{}\", return code \"{}\"", path.string(), ret));
   }
 } // namespace met

@@ -8,10 +8,12 @@ namespace met::detail {
   void TextureResampleTask<Ty>::init(SchedulerHandle &info) {
     met_trace_full();
 
-    // Initialize shader object
-    m_program = {{ .type = gl::ShaderType::eCompute,
-                   .glsl_path  = "resources/shaders/misc/texture_resample.comp",
-                   .cross_path = "resources/shaders/misc/texture_resample.comp.json", }};
+    // Initialize program object in cache
+    std::tie(m_program_key, std::ignore) = info.global("cache").getw<gl::detail::ProgramCache>().set({{ 
+      .type       = gl::ShaderType::eCompute,
+      .spirv_path = "shaders/misc/texture_resample.comp.spv",
+      .cross_path = "shaders/misc/texture_resample.comp.json"
+    }});
 
     // Initialize uniform buffer and writeable, flushable mapping
     std::tie(m_uniform_buffer, m_uniform_map) = gl::Buffer::make_flusheable_object<UniformBuffer>();
@@ -34,11 +36,17 @@ namespace met::detail {
   void TextureResampleTask<Ty>::eval(SchedulerHandle &info) {
     met_trace_full();
 
-    // Bind image/sampler resources, then dispatch shader to perform resample
-    m_program.bind("b_uniform", m_uniform_buffer);
-    m_program.bind("s_image_r", m_sampler);
-    m_program.bind("s_image_r", info(m_info.input_key.first, m_info.input_key.second).getr<Ty>());
-    m_program.bind("i_image_w", info(m_info.output_key).getw<Ty>());
+    // Draw relevant program from cache
+    auto &program = info.global("cache").getw<gl::detail::ProgramCache>().at(m_program_key);
+
+    // Bind image/sampler resources and program
+    program.bind();
+    program.bind("b_uniform", m_uniform_buffer);
+    program.bind("s_image_r", m_sampler);
+    program.bind("s_image_r", info(m_info.input_key.first, m_info.input_key.second).template getr<Ty>());
+    program.bind("i_image_w", info(m_info.output_key).template getw<Ty>());
+    
+    // Then dispatch shader to perform resample
     gl::dispatch_compute(m_dispatch);
     
     m_is_mutated = false;
@@ -53,17 +61,17 @@ namespace met::detail {
     m_info.texture_info = texture_info;
 
     // Emplace texture resource using new info object; scheduler replaces pre-existing resource
-    info(m_info.output_key).init<Ty, Ty::InfoType>(m_info.texture_info);
+    info(m_info.output_key).template init<Ty, typename Ty::InfoType>(m_info.texture_info);
 
     // Compute nr. of workgroups as nearest upper divide of n / (16, 16), implying wg size of 256
     eig::Array2u dispatch_n    = m_info.texture_info.size;
     eig::Array2u dispatch_ndiv = ceil_div(dispatch_n, 16u);
 
-    m_dispatch = { .groups_x = dispatch_ndiv.x(),
-                   .groups_y = dispatch_ndiv.y(),
-                   .bindable_program = &m_program };
+    m_dispatch = { .groups_x = dispatch_ndiv.x(), .groups_y = dispatch_ndiv.y() };
+
     m_uniform_map->size = dispatch_n;
     m_uniform_buffer.flush();
+
     m_is_mutated = true;
   }
 

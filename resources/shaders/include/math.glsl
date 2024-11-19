@@ -94,39 +94,29 @@ float sdot(in vec2  v) { return dot(v, v); }
 float sdot(in vec3  v) { return dot(v, v); }
 float sdot(in vec4  v) { return dot(v, v); }
 
-// is_all_equal(...) for short, fast, component equality check
+// rcp(...) for reciprocal
+#define RCP(v, type) ( type (1.f) / v )
 
-#define IS_ALL_EQUAL(type, n)                \
-  bool is_all_equal(in type##vec##n v) {     \
-    return all(equal(v, type##vec##n(v.x))); \
-  }
+float rcp(in float v) { return RCP(v, float); }
+vec2  rcp(in vec2  v) { return RCP(v,  vec2); }
+vec3  rcp(in vec3  v) { return RCP(v,  vec3); }
+vec4  rcp(in vec4  v) { return RCP(v,  vec4); }
 
-#define IS_ALL_EQUAL_ALL_N(type) \
-  IS_ALL_EQUAL(type, 2)          \
-  IS_ALL_EQUAL(type, 3)          \
-  IS_ALL_EQUAL(type, 4)
-  
-IS_ALL_EQUAL_ALL_N( )
-IS_ALL_EQUAL_ALL_N(d)
-IS_ALL_EQUAL_ALL_N(i)
-IS_ALL_EQUAL_ALL_N(u)
+// safe_rcp(...) for epsilon-checked reciprocal
+#define SAFE_RCP(v, type) ( type (1.f) / max(v, M_EPS) )
 
-// is_zero(...) for short, fast zero check
+float safe_rcp(in float v) { return SAFE_RCP(v, float); }
+vec2  safe_rcp(in vec2  v) { return SAFE_RCP(v,  vec2); }
+vec3  safe_rcp(in vec3  v) { return SAFE_RCP(v,  vec3); }
+vec4  safe_rcp(in vec4  v) { return SAFE_RCP(v,  vec4); }
 
-#define IS_ZERO(type, n)               \
-  bvec##n is_zero(in type##vec##n v) { \
-    return equal(v, type##vec##n(0));  \
-  }
+// safe_sqrt(...) for epsilon-checked sqrt
+#define SAFE_SQRT(v) sqrt(max(v, 0.f))
 
-#define IS_ZERO_ALL_N(type) \
-  IS_ZERO(type, 2)          \
-  IS_ZERO(type, 3)          \
-  IS_ZERO(type, 4)
-
-IS_ZERO_ALL_N( )
-IS_ZERO_ALL_N(d)
-IS_ZERO_ALL_N(i)
-IS_ZERO_ALL_N(u)
+float safe_sqrt(in float v) { return SAFE_SQRT(v); }
+vec2  safe_sqrt(in vec2  v) { return SAFE_SQRT(v); }
+vec3  safe_sqrt(in vec3  v) { return SAFE_SQRT(v); }
+vec4  safe_sqrt(in vec4  v) { return SAFE_SQRT(v); }
 
 // Swapping of vector objects
 
@@ -154,4 +144,71 @@ float mis_power(in float pdf_a, in float pdf_b) {
   return pdf_a / (pdf_a + pdf_b);
 }
 
+vec4 schlick_fresnel(in vec4 f0, in vec4 f90, in float cos_theta) {
+  float c1 = 1.f - cos_theta;
+  float c2 = c1 * c1;
+  float c5 = c2 * c2 * c1;
+  return clamp(f0 + (f90 - f0) * c5, vec4(0), vec4(1));
+}
+
+// Fresnel according to schlick's model
+vec4 schlick_fresnel(in vec4 f0, in float cos_theta) {
+  return schlick_fresnel(f0, vec4(1), cos_theta);
+}
+
+float fresnel_dielectric(float eta, float cos_theta) {
+  float c = abs(cos_theta);
+  float g = eta * eta - 1.0 + c * c;
+  if (g > 0.0) {
+    g = sqrt(g);
+    float A = (g - c) / (g + c);
+    float B = (c * (g + c) - 1.0) / (c * (g - c) + 1.0);
+    return 0.5 * A * A * (1.0 + B * B);
+  }
+  return 1.0;
+}
+
+/* Fresnel color blend base on fresnel factor */
+// vec3 F_color_blend(float eta, float fresnel, vec4 F0_refl) { // F)_refl should be white
+//   float F0 = F0_from_ior(eta);
+//   float fac = clamp((fresnel - F0) / (1.0 - F0), 0.f, 1.f);
+//   return mix(F0_refl, vec3(1.0), fac);
+// }
+
+// Convert between eta and principled specular
+float eta_to_specular(in float eta) {
+  float div = (eta - 1.f) / (eta + 1.f);
+  return div * div / .08f;
+}
+
+// Convert between eta and principled specular
+float specular_to_eta(in float spec) {
+  float div = sqrt(spec * 0.08f);
+  return 2.f / (1.f - div) - 1.f;
+}
+
+// Implementation of unpolarized complex fresnel reflection coefficient;
+// yarr-de-harred from Mitsuba 1.3
+/* vec4 fresnel_conductor(in float cos_theta_i, in vec2 eta) {
+  float cos_theta_i_2 = cos_theta_i * cos_theta_i,
+        sin_theta_i_2 = 1.f - cos_theta_i_2,
+        sin_theta_i_4 = sin_theta_i_2 * sin_theta_i_2;
+  
+  float temp_1   = eta.x * eta.x - eta.y * eta.y - sin_theta_i_2,
+        a_2_pb_2 = dr::safe_sqrt(temp_1*temp_1 + 4.f * eta.y * eta.y * eta.x * eta.x),
+        a        = dr::safe_sqrt(.5f * (a_2_pb_2 + temp_1));
+        
+  float term_1 = a_2_pb_2 + cos_theta_i_2,
+        term_2 = 2.f * cos_theta_i * a;
+
+  float r_s = (term_1 - term_2) / (term_1 + term_2);
+
+  float term_3 = a_2_pb_2 * cos_theta_i_2 + sin_theta_i_4,
+        term_4 = term_2 * sin_theta_i_2;
+
+  float r_p = r_s * (term_3 - term_4) / (term_3 + term_4);
+
+  return 0.5f * (r_s + r_p);
+}
+ */
 #endif // MATH_GLSL_GUARD

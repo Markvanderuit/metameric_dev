@@ -7,12 +7,10 @@
 #include <imgui_internal.h>
 #include <ImGuizmo.h>
 #include <implot.h>
-#include <fmt/core.h>
 
 namespace ImGui {
   static bool appl_imgui_init = false;
-  static std::string appl_imgui_ini_path  = "resources/misc/imgui.ini";
-  static std::string appl_imgui_font_path = "resources/misc/atkinson_hyperlegible.ttf";
+  static std::string appl_imgui_ini_path  = "data/imgui.ini";
   static ImVector<ImRect> s_GroupPanelLabelStack;
 
   void Init(const gl::Window &window, bool dark_mode) {
@@ -118,7 +116,7 @@ namespace ImGui {
       // Plot data lines
       if (legend.empty()) {
         for (const auto &[i, sd] : met::enumerate_view(reflectances))
-          ImPlot::PlotLine(std::format("{}", i).c_str(), x_values.data(), sd.data(), wavelength_samples);
+          ImPlot::PlotLine(fmt::format("{}", i).c_str(), x_values.data(), sd.data(), wavelength_samples);
       } else {
         for (const auto &[text, sd] : met::vws::zip(legend, reflectances))
           ImPlot::PlotLine(text.c_str(), x_values.data(), sd.data(), wavelength_samples);

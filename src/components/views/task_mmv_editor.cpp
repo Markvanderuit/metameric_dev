@@ -1,6 +1,6 @@
 #include <metameric/core/ranges.hpp>
 #include <metameric/core/convex.hpp>
-#include <metameric/core/scene.hpp>
+#include <metameric/scene/scene.hpp>
 #include <metameric/components/views/task_mmv_editor.hpp>
 #include <metameric/components/views/mmv_viewport/task_gen_mmv.hpp>
 #include <metameric/components/views/mmv_viewport/task_draw_mmv.hpp>
@@ -29,7 +29,7 @@ namespace met {
       const auto &e_vert  = e_scene.uplifting_vertex(e_cs);
 
       // Define window name
-      auto name = std::format("Editing: {} (uplifting {}, vertex {})", 
+      auto name = fmt::format("Editing: {} (uplifting {}, vertex {})", 
         e_vert.name, e_cs.uplifting_i, e_cs.vertex_i);  
       
       // Define window size on first open
@@ -142,8 +142,8 @@ namespace met {
     };
 
     // Framebuffer attachments
+    std::string     m_program_key;
     gl::ComputeInfo m_dispatch;
-    gl::Program     m_program;
     gl::Sampler     m_sampler;
     gl::Buffer      m_uniform_buffer;
     UniformBuffer  *m_uniform_map;
@@ -165,13 +165,17 @@ namespace met {
 
     void init(SchedulerHandle &info) override {
       met_trace_full();
+    
+      // Initialize program object in cache
+      std::tie(m_program_key, std::ignore) = info.global("cache").getw<gl::detail::ProgramCache>().set({{ 
+        .type       = gl::ShaderType::eCompute,
+        .spirv_path = "shaders/misc/texture_resample.comp.spv",
+        .cross_path = "shaders/misc/texture_resample.comp.json"
+      }});
       
-      // Set up draw components for gamma correction
+      // NN-sampler
       m_sampler = {{ .min_filter = gl::SamplerMinFilter::eNearest, 
                      .mag_filter = gl::SamplerMagFilter::eNearest }};
-      m_program = {{ .type       = gl::ShaderType::eCompute, 
-                     .glsl_path  = "resources/shaders/misc/texture_resample.comp", 
-                     .cross_path = "resources/shaders/misc/texture_resample.comp.json" }};
       
       // Initialize uniform buffer and writeable, flushable mapping
       std::tie(m_uniform_buffer, m_uniform_map) = gl::Buffer::make_flusheable_object<UniformBuffer>();
@@ -192,19 +196,20 @@ namespace met {
       if (image_handle("lrgb_target").is_mutated() || is_first_eval()) {
         eig::Array2u dispatch_n    = e_lrgb_target.size();
         eig::Array2u dispatch_ndiv = ceil_div(dispatch_n, 16u);
-        m_dispatch = { .groups_x = dispatch_ndiv.x(),
-                       .groups_y = dispatch_ndiv.y(),
-                       .bindable_program = &m_program };
+        m_dispatch = { .groups_x = dispatch_ndiv.x(), .groups_y = dispatch_ndiv.y() };
         m_uniform_map->size = dispatch_n;
         m_uniform_buffer.flush();
       }
 
-      // Bind relevant resources for dispatch
-      m_program.bind();
-      m_program.bind("b_uniform", m_uniform_buffer);
-      m_program.bind("s_image_r", m_sampler);
-      m_program.bind("s_image_r", e_lrgb_target);
-      m_program.bind("i_image_w", e_srgb_target);
+      // Draw relevant program from cache
+      auto &program = info.global("cache").getw<gl::detail::ProgramCache>().at(m_program_key);
+
+      // Bind image/sampler resources and program
+      program.bind();
+      program.bind("b_uniform", m_uniform_buffer);
+      program.bind("s_image_r", m_sampler);
+      program.bind("s_image_r", e_lrgb_target);
+      program.bind("i_image_w", e_srgb_target);
 
       // Dispatch lrgb->srgb conversion
       gl::dispatch_compute(m_dispatch);
@@ -256,7 +261,7 @@ namespace met {
       const auto &e_scene   = info.global("scene").getr<Scene>();
       const auto &e_cs      = info.parent()("selection").getr<ConstraintRecord>();
       const auto &e_vert    = e_scene.uplifting_vertex(e_cs);
-      auto uplf_handle      = info.task(std::format("gen_upliftings.gen_uplifting_{}", e_cs.uplifting_i)).mask(info);
+      auto uplf_handle      = info.task(fmt::format("gen_upliftings.gen_uplifting_{}", e_cs.uplifting_i)).mask(info);
       const auto &e_hulls   = uplf_handle("mismatch_hulls").getr<std::vector<ConvexHull>>();
       const auto &e_hull    = e_hulls[e_cs.vertex_i];
       const auto &i_clip    = info("clip_point").getr<bool>();

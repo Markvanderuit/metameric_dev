@@ -31,9 +31,9 @@ namespace met::detail {
       alignas(4) uint lrgb_to_srgb;
     };
   
+    std::string     m_program_key;
     InfoType        m_info;
     gl::ComputeInfo m_dispatch;
-    gl::Program     m_program;
     gl::Sampler     m_sampler;
     gl::Buffer      m_uniform_buffer;
     UniformBuffer  *m_uniform_map;

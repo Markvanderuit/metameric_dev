@@ -9,10 +9,17 @@ namespace met {
   // Object describing a single texture patch reserved inside an arbitrary
   // atlas, fit for std140/std430 buffer layout. Kept separate as it is
   // template-independent, and we use it between different-typed atlases.
-  struct TextureAtlasPatchLayout {
-    alignas(4) uint layer_i;
+  struct alignas(16) AtlasBlockLayout {
+    alignas(4) uint         layer_i;
     alignas(8) eig::Array2u offs, size;
     alignas(8) eig::Array2f uv0, uv1;
+  };
+  static_assert(sizeof(AtlasBlockLayout) == 48);
+  
+  // Object describing an std140 buffer layout for atlas data
+  struct AtlasBufferLayout {
+    alignas(4) uint size;
+    std::array<AtlasBlockLayout, detail::met_max_textures> data;
   };
   
   /* TextureAtlas
@@ -21,9 +28,8 @@ namespace met {
    */
   template <typename T, uint D>
   struct TextureAtlas {
-    using Texture     = gl::Texture2d<T, D, gl::TextureType::eImageArray>;
-    using TextureView = gl::TextureView2d<T, D>;
-    using PatchLayout = TextureAtlasPatchLayout;
+    using TextureArray = gl::TextureArray2d<T, D>;
+    using TextureView  = gl::TextureView2d<T, D>;
 
     // Build methods; either prefer adding extra layers, or grow the texture
     // horizontally/vertically if capacity is insufficient
@@ -39,24 +45,24 @@ namespace met {
 
   private:
     // Current reserved spaces and remainder spaces
-    std::vector<PatchLayout> m_patches, m_free;
+    std::vector<AtlasBlockLayout> 
+                             m_patches, m_free;
     bool                     m_is_invalitated;
     
     // Texture/construction information
-    BuildMethod              m_method  = BuildMethod::eLayered;
+    BuildMethod              m_method  = BuildMethod::eSpread;
     uint                     m_levels  = 1u;
     uint                     m_padding = 0u;
 
     // GL-side objects
-    Texture                  m_texture;
+    TextureArray             m_texture;
     std::vector<TextureView> m_texture_views;
     gl::Buffer               m_buffer;
-    std::span<PatchLayout>   m_buffer_map;
+    AtlasBufferLayout       *m_buffer_map;
 
     // Helper private methods
     void init_views();
     void dstr_views();
-    void reserve_buffer(size_t size);
     
   public: // Construction
     using InfoType = CreateInfo;
@@ -119,6 +125,7 @@ namespace met {
       swap(m_free,          o.m_free);
       swap(m_texture,       o.m_texture);
       swap(m_buffer,        o.m_buffer);
+      swap(m_buffer_map,    o.m_buffer_map);
       swap(m_texture_views, o.m_texture_views);
     }
 
@@ -128,4 +135,31 @@ namespace met {
 
     met_declare_noncopyable(TextureAtlas);
   };
+
+  /* Shorthand notations for common texture atlas types follow */
+
+  using TextureAtlas2d1f = TextureAtlas<float, 1>;
+  using TextureAtlas2d2f = TextureAtlas<float, 2>;
+  using TextureAtlas2d3f = TextureAtlas<float, 3>;
+  using TextureAtlas2d4f = TextureAtlas<float, 4>;
+
+  using TextureAtlas2d1i = TextureAtlas<int, 1>;
+  using TextureAtlas2d2i = TextureAtlas<int, 2>;
+  using TextureAtlas2d3i = TextureAtlas<int, 3>;
+  using TextureAtlas2d4i = TextureAtlas<int, 4>;
+
+  using TextureAtlas2d1s = TextureAtlas<short, 1>;
+  using TextureAtlas2d2s = TextureAtlas<short, 2>;
+  using TextureAtlas2d3s = TextureAtlas<short, 3>;
+  using TextureAtlas2d4s = TextureAtlas<short, 4>;
+
+  using TextureAtlas2d1ui = TextureAtlas<uint, 1>;
+  using TextureAtlas2d2ui = TextureAtlas<uint, 2>;
+  using TextureAtlas2d3ui = TextureAtlas<uint, 3>;
+  using TextureAtlas2d4ui = TextureAtlas<uint, 4>;
+
+  using TextureAtlas2d1us = TextureAtlas<ushort, 1>;
+  using TextureAtlas2d2us = TextureAtlas<ushort, 2>;
+  using TextureAtlas2d3us = TextureAtlas<ushort, 3>;
+  using TextureAtlas2d4us = TextureAtlas<ushort, 4>;
 } // namespace met

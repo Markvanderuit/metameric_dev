@@ -1,44 +1,41 @@
+#include <metameric/core/ranges.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/components/views/detail/file_dialog.hpp>
-#include <nfd.h>
+#include <vector>
+#include <tinyfiledialogs.h>
 
 namespace met::detail {
-  bool load_dialog(fs::path &path, const std::string &type_filter) {
-    nfdchar_t  *out = nullptr;
-    nfdresult_t res = NFD_OpenDialog(type_filter.c_str(), nullptr, &out);
-    guard(res == NFD_OKAY, false);
+  bool load_dialog(fs::path &path, std::initializer_list<std::string> type_filters) {
+    met_trace();
 
-    path = out;
-    free(out);
+    // Build list of filter patterns
+    auto filter_ptr = type_filters
+                    | vws::transform([](const std::string &name) { return name.c_str(); })
+                    | view_to<std::vector<const char *>>();
 
-    return true;
-  }
-
-  bool load_dialog_mult(std::vector<fs::path> &paths, const std::string &type_filter) {
-    nfdpathset_t out;
-    nfdresult_t  res = NFD_OpenDialogMultiple(type_filter.c_str(), nullptr, &out);
-    guard(res == NFD_OKAY, false);
-    
-    paths.clear();
-    for (uint i = 0; i < NFD_PathSet_GetCount(&out); ++i) {
-      nfdchar_t *p = NFD_PathSet_GetPath(&out, i);
-      paths.push_back(p);
+    auto c_str = tinyfd_openFileDialog("Load file", nullptr, filter_ptr.size(), filter_ptr.data(), nullptr, 0); 
+    if (c_str) {
+      path = std::string(c_str);
+      return true;
+    } else {
+      return false;
     }
-
-    NFD_PathSet_Free(&out);
-
-    return true;
   }
 
+  bool save_dialog(fs::path &path, std::initializer_list<std::string> type_filters) {
+    met_trace();
 
-  bool save_dialog(fs::path &path, const std::string &type_filter) {
-    nfdchar_t  *out = nullptr;
-    nfdresult_t res = NFD_SaveDialog(type_filter.c_str(), nullptr, &out);
-    guard(res == NFD_OKAY, false);
+    // Build list of filter patterns
+    auto filter_ptr = type_filters
+                    | vws::transform([](const std::string &name) { return name.c_str(); })
+                    | view_to<std::vector<const char *>>();
     
-    path = out;
-    free(out);
-    
-    return true;
+    auto c_str = tinyfd_saveFileDialog("Save file", nullptr, filter_ptr.size(), filter_ptr.data(), nullptr);
+    if (c_str) {
+      path = std::string(c_str);
+      return true;
+    } else {
+      return false;
+    }
   }
 } // namespace met::detail

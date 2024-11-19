@@ -1,4 +1,5 @@
 #include <preamble.glsl>
+#include <distribution.glsl>
 #include <render/load/defaults.glsl>
 #include <render/sensor.glsl>
 
@@ -8,12 +9,12 @@ layout(std430) buffer;
 layout(early_fragment_tests) in;
 
 // Uniform buffer declaration
-layout(binding = 0) uniform b_buff_sensor {
+layout(binding = 0) uniform b_buff_sensor_info {
   mat4  full_trf;
   mat4  proj_trf;
   mat4  view_trf;
   uvec2 film_size; 
-} buff_sensor;
+} buff_sensor_info;
 layout(binding = 1) uniform b_buff_settings {
   float alpha;
 } buff_settings;

@@ -2,7 +2,7 @@
 #include <metameric/core/distribution.hpp>
 #include <metameric/core/metamer.hpp>
 #include <metameric/core/record.hpp>
-#include <metameric/core/scene.hpp>
+#include <metameric/scene/scene.hpp>
 #include <metameric/core/ranges.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/components/views/mmv_viewport/task_gen_mmv.hpp>
@@ -30,7 +30,7 @@ namespace met {
     // Get shared resources
     const auto &e_scene = info.global("scene").getr<Scene>();
     const auto &e_cs    = info.parent()("selection").getr<ConstraintRecord>();
-    auto uplf_handle    = info.task(std::format("gen_upliftings.gen_uplifting_{}", e_cs.uplifting_i)).mask(info);
+    auto uplf_handle    = info.task(fmt::format("gen_upliftings.gen_uplifting_{}", e_cs.uplifting_i)).mask(info);
 
     // Exit early unless inputs have changed somehow
     guard(is_first_eval() || uplf_handle("mismatch_hulls").is_mutated());

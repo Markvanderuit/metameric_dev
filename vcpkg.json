@@ -2,6 +2,7 @@
   "name": "spectral-uplifting",
   "version-string": "0.1.0",
   "dependencies": [
+    "avcpp", 
     "cxxopts",
     "catch2",
     "eigen3",
@@ -24,31 +25,14 @@
     "imguizmo",
     "implot",
     "meshoptimizer",
-    "nativefiledialog",
     "nlohmann-json",
     "nlopt",
     "qhull",
     "stb",
     "tracy",
     "tinyexr",
+    "tinyfiledialogs",
     "zlib",
     "zstr"
-  ],
-  "vcpkg-configuration": {
-    "default-registry": {
-      "kind": "builtin",
-      "baseline": "c3801cf53c614ffc54c94051d124eba097b057b1"
-    },
-    "registries": [
-      {
-        "kind": "filesystem",
-        "baseline": "2023-02-22",
-        "path": "third_party/vcpkg-registry",
-        "packages": [
-          "meshoptimizer",
-          "nlopt"
-        ]
-      }
-    ]
-  }
+  ]
 }

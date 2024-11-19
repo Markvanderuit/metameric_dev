@@ -1,6 +1,6 @@
 #pragma once
 
-#include <metameric/core/scene.hpp>
+#include <metameric/scene/scene.hpp>
 #include <metameric/render/sensor.hpp>
 #include <small_gl/buffer.hpp>
 #include <small_gl/framebuffer.hpp>

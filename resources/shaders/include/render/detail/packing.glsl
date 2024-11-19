@@ -1,33 +1,30 @@
 #ifndef RENDER_DETAIL_PACKING_GLSL_GUARD
 #define RENDER_DETAIL_PACKING_GLSL_GUARD
 
-#include <spectrum.glsl>
-
 // Packed vertex data
-struct MeshVertPack {
+struct VertexPack {
   uint p0; // unorm, 2x16
   uint p1; // unorm, 1x16 + padding 1x16
-  uint n;  // snorm, 2x16, octagonal encoding
+  uint n;  // snorm, 2x16
   uint tx; // unorm, 2x16
 };
 
 // Packed primitive data, comprising three packed vertices,
-// typically queried during bvh travesal
-struct MeshPrimPack {
-  MeshVertPack v0;
-  MeshVertPack v1;
-  MeshVertPack v2;
-  uint padding[4]; // Brings alignment to 64 bytes
+// mostly queried during SurfaceInfo construction, and 
+// partially queried during bvh traversal.
+struct PrimitivePack {
+  VertexPack v0;
+  VertexPack v1;
+  VertexPack v2;
+  uint padding[4]; // Aligned to 64 bytes
 };
 
-// Packed BVH node data, comprising child AABBs and traversal data
+// Packed BVH node data, comprising child AABBs and traversal data; 64 bytes
 struct BVHNodePack {
-  uint aabb_pack_0;    // lo.x, lo.y
-  uint aabb_pack_1;    // hi.x, hi.y
-  uint aabb_pack_2;    // lo.z, hi.z
-  uint data_pack;      // leaf | size | offs
-  uint child_aabb0[8]; // per child: lo.x | lo.y | hi.x | hi.y
-  uint child_aabb1[4]; // per child: lo.z | hi.z
+  uint data;            // type 1b | child mask 8b | size 4b | offs 19b
+  uint aabb[3];         // lo.x, lo.y | hi.x, hi.y | lo.z, hi.z
+  uint child_aabb_0[8]; // 8 child aabbs: lo.x | lo.y | hi.x | hi.y
+  uint child_aabb_1[4]; // 8 child aabbs: lo.z | hi.z
 };
 
 float[8] unpack_snorm_8(in uvec4 p) {
@@ -35,33 +32,45 @@ float[8] unpack_snorm_8(in uvec4 p) {
   vec2 f2;
   f2 = unpackSnorm2x16(p[0]);
   m[0] = f2.x;
-  m[1] = f2.x;
+  m[1] = f2.y;
   f2 = unpackSnorm2x16(p[1]);
   m[2] = f2.x;
-  m[3] = f2.x;
+  m[3] = f2.y;
   f2 = unpackSnorm2x16(p[2]);
   m[4] = f2.x;
-  m[5] = f2.x;
+  m[5] = f2.y;
   f2 = unpackSnorm2x16(p[3]);
   m[6] = f2.x;
-  m[7] = f2.x;
+  m[7] = f2.y;
   return m;
+}
+
+// Extract a single value instead of unpacking the whole lot
+float extract_snorm_8(in uvec4 p, in uint i) {
+  return unpackSnorm2x16(p[i / 2])[i % 2];
 }
 
 float[12] unpack_snorm_12(in uvec4 p) {
   float[12] m;
   for (int i = 0; i < 12; ++i) {
+    int offs = i % 3 == 2 ? 10 : 11; // 11, 11, 10, 11, 11, 10, ...
     uint j = bitfieldExtract(p[i / 3],                // 0,  0,  0,  1,  1,  1,  ...
                              (i % 3) * 11,            // 0,  11, 22, 0,  11, 22, ...
-                             (i % 3) == 2 ? 10 : 11); // 11, 11, 10, 11, 11, 10, ...
-
-    float scale = i % 3 == 2 
-                ? float((1 << 10) - 1) 
-                : float((1 << 11) - 1);
-                
-    m[i] = (float(j) / scale) * 2.f - 1.f;
+                             offs);
+    float scale = float((1 << offs) - 1);
+    m[i] = fma(float(j) / scale, 2.f, - 1.f);
   }
   return m;
+}
+
+// Extract a single value instead of unpacking the whole lot
+float extract_snorm_12(in uvec4 p, in uint i) {
+  int offs = i % 3 == 2 ? 10 : 11; // 11, 11, 10, 11, 11, 10, ...
+  uint j = bitfieldExtract(p[i / 3],          // 0,  0,  0,  1,  1,  1,  ...
+                           (int(i) % 3) * 11, // 0,  11, 22, 0,  11, 22, ...
+                           offs);                        
+  float scale = float((1 << offs) - 1);
+  return fma(float(j) / scale, 2.f, -1.f);
 }
 
 uvec4 pack_snorm_8(in float[8] v) {
@@ -114,6 +123,11 @@ float[16] unpack_snorm_16(in uvec4 p) {
   return m;
 }
 
+// Extract a single value instead of unpacking the whole lot
+float extract_snorm_16(in uvec4 p, in uint i) {
+  return unpackSnorm4x8(p[i / 4])[i % 4];
+}
+
 uvec4 pack_snorm_16(in float[16] v) {
   uvec4 p;
   p[0] = packSnorm4x8(vec4(v[0],  v[1],  v[2],  v[3]));
@@ -134,7 +148,7 @@ uvec4 pack_half_8x16(in float[8] m) {
                packHalf2x16(vec2(m[4], m[5])), packHalf2x16(vec2(m[6], m[7])));
 }
 
-float[wavelength_bases] unpack_bases(in uvec4 p) {
+float[wavelength_bases] unpack_basis_coeffs(in uvec4 p) {
   float[wavelength_bases] v;
 #if   MET_WAVELENGTH_BASES == 16
   v = unpack_snorm_16(p);
@@ -144,11 +158,25 @@ float[wavelength_bases] unpack_bases(in uvec4 p) {
   v = unpack_snorm_8(p);
 #else
   // ...
-#endif;
+#endif
   return v;
 }
 
-uvec4 pack_bases(in float[wavelength_bases] v) {
+float extract_basis_coeff(in uvec4 p, in uint i) {
+  float f;
+#if   MET_WAVELENGTH_BASES == 16
+  f = extract_snorm_16(p, i);
+#elif MET_WAVELENGTH_BASES == 12
+  f = extract_snorm_12(p, i);
+#elif MET_WAVELENGTH_BASES == 8
+  f = extract_snorm_8(p, i);
+#else
+  // ...
+#endif
+  return f;
+}
+
+uvec4 pack_basis_coeffs(in float[wavelength_bases] v) {
   uvec4 p;
 #if   MET_WAVELENGTH_BASES == 16
   p = pack_snorm_16(v);
@@ -158,7 +186,7 @@ uvec4 pack_bases(in float[wavelength_bases] v) {
   p = pack_snorm_8(v);
 #else
   // ...
-#endif;
+#endif
   return p;
 }
 

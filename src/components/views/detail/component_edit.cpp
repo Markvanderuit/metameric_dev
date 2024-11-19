@@ -1,4 +1,4 @@
-#include <metameric/core/scene.hpp>
+#include <metameric/scene/scene.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
 #include <metameric/components/views/detail/component_edit.hpp>
@@ -11,26 +11,53 @@ namespace met {
     // Helper function; given a title, access to a set of textures, and a modifiable variant
     // representing a color or a texture, spawn a combo box for texture/color selection
     constexpr
-    void push_texture_variant_selector(const std::string &title, const auto &resources, auto &variant) {
+    void push_texture_variant_selector_3f(const std::string &title, const auto &resources, auto &variant) {
       // First, spawn a editor for the variant's specific type; color editor, or texture selector
       ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x * 0.75);
       if (std::holds_alternative<Colr>(variant)) {
         auto lrgb = std::get<Colr>(variant);
-        ImGui::ColorEdit3(std::format("##_{}_lrgb", title).c_str(), lrgb.data()/* , ImGuiColorEditFlags_Float */);
+        ImGui::ColorEdit3(fmt::format("##_{}_lrgb", title).c_str(), lrgb.data()/* , ImGuiColorEditFlags_Float */);
         ImGui::SameLine();
-        if (auto srgb = lrgb_to_srgb(lrgb); ImGui::ColorEdit3(std::format("##_{}_srgb", title).c_str(), srgb.data(), ImGuiColorEditFlags_NoInputs /* | ImGuiColorEditFlags_Float */))
+        if (auto srgb = lrgb_to_srgb(lrgb); ImGui::ColorEdit3(fmt::format("##_{}_srgb", title).c_str(), srgb.data(), ImGuiColorEditFlags_NoInputs /* | ImGuiColorEditFlags_Float */))
           lrgb = srgb_to_lrgb(srgb);
         variant = lrgb;
       } else if (std::holds_alternative<uint>(variant)) {
-        push_resource_selector(std::format("##_{}_txtr", title), resources, std::get<uint>(variant));
+        push_resource_selector(fmt::format("##_{}_txtr", title), resources, std::get<uint>(variant));
       }
       
       // Then, spawn a combobox to switch between the variant's types
       ImGui::SameLine();
       ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-      if (ImGui::BeginCombo(std::format("##_{}_data", title).c_str(), title.c_str())) {
+      if (ImGui::BeginCombo(fmt::format("##_{}_data", title).c_str(), title.c_str())) {
         if (ImGui::Selectable("Value", std::holds_alternative<Colr>(variant)))
           variant = Colr(1);
+        if (ImGui::Selectable("Texture", std::holds_alternative<uint>(variant)))
+          variant = uint(0u);
+        ImGui::EndCombo();
+      } // If (BeginCombo)
+    }
+
+    // Helper function; given a title, access to a set of textures, and a modifiable variant
+    // representing a color or a texture, spawn a combo box for texture/color selection
+    constexpr
+    void push_texture_variant_selector_1f(const std::string &title, const auto &resources, auto &variant) {
+      // First, spawn a editor for the variant's specific type; color editor, or texture selector
+      ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x * 0.75);
+      if (std::holds_alternative<float>(variant)) {
+        auto value = std::get<float>(variant);
+        ImGui::SliderFloat(fmt::format("##_{}_value", title).c_str(), &value, 0.f, 1.f);
+        ImGui::SameLine();
+        variant = value;
+      } else if (std::holds_alternative<uint>(variant)) {
+        push_resource_selector(fmt::format("##_{}_txtr", title), resources, std::get<uint>(variant));
+      }
+      
+      // Then, spawn a combobox to switch between the variant's types
+      ImGui::SameLine();
+      ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+      if (ImGui::BeginCombo(fmt::format("##_{}_data", title).c_str(), title.c_str())) {
+        if (ImGui::Selectable("Value", std::holds_alternative<float>(variant)))
+          variant = float(0.f);
         if (ImGui::Selectable("Texture", std::holds_alternative<uint>(variant)))
           variant = uint(0u);
         ImGui::EndCombo();
@@ -59,13 +86,27 @@ namespace met {
       value.transform.scaling = value.transform.scaling.cwiseMax(0.001f);
 
       ImGui::Separator();
+
+      // Type selector
+      if (ImGui::BeginCombo("BRDF Type", fmt::format("{}", value.brdf_type).c_str())) {
+        for (uint i = 0; i < 3; ++i) {
+          auto type = static_cast<Object::BRDFType>(i);
+          auto name = fmt::format("{}", type);
+          if (ImGui::Selectable(name.c_str(), value.brdf_type == type)) {
+            value.brdf_type = type;
+          }
+        } // for (uint i)
+        ImGui::EndCombo();
+      }
         
       // Texture selectors
-      push_texture_variant_selector("Diffuse", scene.resources.images, value.diffuse);
-      // push_texture_variant_selector("Roughness", scene.resources.images, value.roughness);
-      // push_texture_variant_selector("Metallic", scene.resources.images, value.metallic);
-      // push_texture_variant_selector("Normals", scene.resources.images, value.normals);
-      // push_texture_variant_selector("Opacity", scene.resources.images, value.opacity);
+      if (value.brdf_type != Object::BRDFType::eNull) {
+        push_texture_variant_selector_3f("Albedo", scene.resources.images, value.diffuse);
+      }
+      if (value.brdf_type == Object::BRDFType::eMicrofacet) {
+        push_texture_variant_selector_1f("Roughness", scene.resources.images, value.roughness);
+        push_texture_variant_selector_1f("Metallic",  scene.resources.images, value.metallic);
+      }
     };
 
     // Default implementation of editing visitor for Emitter components
@@ -76,10 +117,10 @@ namespace met {
       auto &value = component.value;
       
       // Type selector
-      if (ImGui::BeginCombo("Type", std::format("{}", value.type).c_str())) {
+      if (ImGui::BeginCombo("Type", fmt::format("{}", value.type).c_str())) {
         for (uint i = 0; i < 4; ++i) {
           auto type = static_cast<Emitter::Type>(i);
-          auto name = std::format("{}", type);
+          auto name = fmt::format("{}", type);
           if (ImGui::Selectable(name.c_str(), value.type == type)) {
             value.type = type;
           }
@@ -139,7 +180,7 @@ namespace met {
         for (uint j = 0; j < value.verts.size(); ++j) {
           ImGui::TableNextRow();
           auto &vert = value.verts[j];
-          auto scope = ImGui::ScopedID(std::format("table_row_{}", j));
+          auto scope = ImGui::ScopedID(fmt::format("table_row_{}", j));
 
           // Name editor column
           ImGui::TableSetColumnIndex(0);
@@ -155,10 +196,10 @@ namespace met {
           {
             // Iterate over the types in the std::variant of constraints
             // for this combobox
-            auto combo_str = to_capital(std::format("{}", vert.constraint));
+            auto combo_str = to_capital(fmt::format("{}", vert.constraint));
             if (ImGui::BeginCombo("##constraint_type", combo_str.c_str())) {
               vert.constraint | visit_types([&](auto default_v, bool holds_alternative) {
-                auto selectable_str = to_capital(std::format("{}", default_v));
+                auto selectable_str = to_capital(fmt::format("{}", default_v));
                 if (ImGui::Selectable(selectable_str.c_str(), holds_alternative) && !holds_alternative)
                   vert.constraint = default_v;
               });
@@ -201,7 +242,7 @@ namespace met {
           {
             // Edit button spawns MMVEditorTask window
             if (ImGui::Button("Edit")) {
-              auto child_name   = std::format("mmv_editor_{}_{}", i, j);
+              auto child_name   = fmt::format("mmv_editor_{}_{}", i, j);
               auto child_handle = info.child_task(child_name);
               if (!child_handle.is_init()) {
                 child_handle.init<MMVEditorTask>(
@@ -222,7 +263,7 @@ namespace met {
             // Insert delete button at end of line
             if (ImGui::Button("X")) {
               // Despawn MMVEditorTask window if necessary
-              auto child_name   = std::format("mmv_editor_{}_{}", i, j);
+              auto child_name   = fmt::format("mmv_editor_{}_{}", i, j);
               auto child_handle = info.child_task(child_name);
               if (child_handle.is_init()) {
                 child_handle.mask(info)("is_active").set(false);
@@ -281,10 +322,11 @@ namespace met {
       auto &value = component.value;
 
       push_resource_selector("CMFS", scene.resources.observers, value.observer_i);
+      ImGui::Checkbox("Draw frustrum",      &value.draw_frustrum);
       ImGui::DragFloat("Field of view (y)", &value.camera_fov_y, 1.f, .05f, 90.f);
-      ImGui::InputScalarN("Film size", ImGuiDataType_U32, value.film_size.data(), 2);
-      ImGui::DragFloat3("Position", value.camera_trf.position.data(), 0.01f, -100.f, 100.f);
-      ImGui::DragFloat3("Rotation", value.camera_trf.rotation.data(), 0.01f, -10.f, 10.f);
+      ImGui::InputScalarN("Film size",      ImGuiDataType_U32, value.film_size.data(), 2);
+      ImGui::DragFloat3("Position",         value.camera_trf.position.data(), 0.01f, -100.f, 100.f);
+      ImGui::DragFloat3("Rotation",         value.camera_trf.rotation.data(), 0.01f, -10.f, 10.f);
     };
 
     // Default implementation of editing visitor for Mesh resources
@@ -294,15 +336,8 @@ namespace met {
       const auto &scene = info.global("scene").getr<Scene>();
       const auto &value = resource.value();
       
-      ImGui::LabelText("Vertices", "%d", value.verts.size());
-      ImGui::LabelText("Elements", "%d", value.elems.size());
-
-      /* ImGui::Separator();
-
-      if (fs::path path; ImGui::Button("Reload from file...") && detail::load_dialog(path, "obj")) {
-        auto &value = detail::scene_data_by_type<Resource<Mesh>>(scene)[i];
-
-      } */
+      ImGui::LabelText("Vertices", "%zu", value.verts.size());
+      ImGui::LabelText("Elements", "%zu", value.elems.size());
     };
 
     // Default implementation of editing visitor for Mesh resources
@@ -314,13 +349,6 @@ namespace met {
 
       ImGui::LabelText("Width",  "%d", value.size().x());
       ImGui::LabelText("Height", "%d", value.size().y());
-
-      /* ImGui::Separator();
-
-      if (fs::path path; ImGui::Button("Reload from file...") && detail::load_dialog(path, "exr,png,jpg,jpeg,bmp")) {
-        auto &value = detail::scene_data_by_type<Resource<Image>>(scene)[i];
-        
-      } */
     };
   } // namespace detail
 } // namespace met

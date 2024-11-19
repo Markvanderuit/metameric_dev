@@ -1,6 +1,6 @@
 #pragma once
 
-#include <metameric/core/scene.hpp>
+#include <metameric/scene/scene.hpp>
 #include <metameric/core/scheduler.hpp>
 #include <metameric/render/detail/primitives.hpp>
 #include <small_gl/sampler.hpp>

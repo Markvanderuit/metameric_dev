@@ -19,13 +19,13 @@ layout(std430) buffer;
 layout(constant_id = 2) const uint gbuffer_view_type = GbufferViewTypePosition;
 
 // Uniform buffer declarations
-layout(binding = 0) uniform b_buff_sensor {
+layout(binding = 0) uniform b_buff_sensor_info {
   mat4  full_trf;
   mat4  proj_trf;
   mat4  view_trf;
   uvec2 film_size; 
-} buff_sensor;
-layout(binding = 1) uniform b_buff_objects {
+} buff_sensor_info;
+layout(binding = 1) uniform b_buff_object_info {
   uint n;
   ObjectInfo data[met_max_objects];
 } buff_objects;
@@ -37,15 +37,15 @@ layout(binding = 1, rgba32f) uniform restrict writeonly image2D b_film;    // Ta
 void main() {
   // Clamp invocations to requested size
   ivec2 px = ivec2(gl_GlobalInvocationID.xy);
-  guard(all(lessThan(px, buff_sensor.film_size)));
+  guard(all(lessThan(px, buff_sensor_info.film_size)));
 
   // Determine x/y positions in [-1, 1]
-  vec2 xy = (vec2(px) + vec2(0.5)) / vec2(buff_sensor.film_size);
+  vec2 xy = (vec2(px) + vec2(0.5)) / vec2(buff_sensor_info.film_size);
   xy = (xy - .5f) * 2.f;
 
   // Load gbuffer data
   vec4  gbpk = imageLoad(b_gbuffer, ivec2(gl_GlobalInvocationID.xy));
-  GBuffer gb = unpack_gbuffer(floatBitsToUint(gbpk), xy, inverse(buff_sensor.proj_trf), inverse(buff_sensor.view_trf));
+  GBuffer gb = unpack_gbuffer(floatBitsToUint(gbpk), xy, inverse(buff_sensor_info.proj_trf), inverse(buff_sensor_info.view_trf));
 
   // Output value
   vec3 v = vec3(0);

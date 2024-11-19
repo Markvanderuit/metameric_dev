@@ -14,12 +14,9 @@
 #include <numbers>
 
 namespace met {
-  // Nr. of points on the color system boundary; lower means more space available for constraints
-  constexpr uint n_system_boundary_samples = 128;
+  // Nr. of points generated on the color system boundary through spheriical smpling
+  constexpr static uint n_system_boundary_samples = 128;
   
-  GenUpliftingDataTask:: GenUpliftingDataTask(uint uplifting_i)
-  : m_uplifting_i(uplifting_i) { }
-
   bool GenUpliftingDataTask::is_active(SchedulerHandle &info) {
     met_trace();
     
@@ -31,7 +28,7 @@ namespace met {
     // if some uplifting is still in progress
     return is_first_eval() 
         || e_uplifting
-        || rng::any_of(m_mismatch_builders, [](const auto &builder) { return !builder.is_converged(); });
+        || rng::any_of(m_mmv_builders, [](const auto &builder) { return !builder.is_converged(); });
   }
 
   void GenUpliftingDataTask::init(SchedulerHandle &info) {
@@ -50,8 +47,7 @@ namespace met {
     m_tesselation_coef_map = info("tesselation_coef").getw<gl::Buffer>().map_as<SpecCoefLayout>(buffer_access_flags);
 
     // Specify spectrum cache, for plotting of generated constraint spectra
-    info("constraint_spectra").set<std::vector<Spec>>({});
-    info("constraint_coeffs").set<std::vector<Basis::vec_type>>({});
+    info("constraint_samples").set<std::vector<MismatchSample>>({});
 
     // Specify draw dispatch, as handle for a potential viewer to render the tesselation
     info("tesselation_draw").set<gl::DrawInfo>({});
@@ -87,75 +83,58 @@ namespace met {
     // Color system spectra within which the 'uplifted' texture is defined
     auto csys = ColrSystem { .cmfs = *e_cmfs, .illuminant = *e_illm };
 
-    // 1. Generate color system boundary (spectra)
+    // 1. Generate boundary spectra, coefficients, and colors.
+    //    We use a spherical sampling method; see Uplifting::sample_color_solid
     if (csys_stale) {
-      m_csys_boundary_coeffs = generate_color_system_ocs_coeffs({ .direct_objective = csys,
-                                                                  .basis            = e_basis.value(),
-                                                                  .seed             = 4,
-                                                                  .n_samples        = n_system_boundary_samples });
-      m_csys_boundary_spectra.resize(m_csys_boundary_coeffs.size());
-      std::transform(std::execution::par_unseq, 
-                     range_iter(m_csys_boundary_coeffs), 
-                     m_csys_boundary_spectra.begin(), 
-                     [&](const auto &coef) { return e_basis.value()(coef); });
-
-      // For each spectrum, add a point to the set of tesselation points for later
-      m_tesselation_points.resize(m_csys_boundary_spectra.size() + e_uplifting.verts.size());
-      std::transform(std::execution::par_unseq, 
-        range_iter(m_csys_boundary_spectra), m_tesselation_points.begin(),
-        [&](const Spec &s) { return (csys(s)).eval(); });
-
-      fmt::print("Uplifting color system boundary, {} points\n", m_csys_boundary_spectra.size());
+      m_boundary_samples = e_uplifting.sample_color_solid(e_scene, 4, n_system_boundary_samples);
+      fmt::print("Uplifting: sampled {} boundary points\n", m_boundary_samples.size());
     }
 
-    // Resize internal objects storing vertex positions, and corresponding spectra;
-    // total nr. of vertices = boundary vertices + inner constraint vertices
-    m_tesselation_points.resize(m_csys_boundary_spectra.size() + e_uplifting.verts.size());
-    m_tesselation_spectra.resize(m_csys_boundary_spectra.size() + e_uplifting.verts.size());
-    m_tesselation_coeffs.resize(m_csys_boundary_spectra.size() + e_uplifting.verts.size());
+    // 2. Generate interior spectra, coefficients, and colors.
+    //    We rely on MetamerConstraintBuilder as a shortcut; instead of solving
+    //    for the spectra directly, we interpolate the mismatch volume interior
+    {
+      if (e_state.verts.is_resized())
+        m_mmv_builders.resize(e_uplifting.verts.size());
 
-    // Copy boundary spectra over to vertex spectra, generate corresponding moment coefficients, and update
-    std::copy(std::execution::par_unseq, range_iter(m_csys_boundary_spectra), m_tesselation_spectra.begin());
-    std::copy(std::execution::par_unseq, range_iter(m_csys_boundary_coeffs),  m_tesselation_coeffs.begin());
+      // Generate constraint spectra
+      m_interior_samples.resize(e_uplifting.verts.size());
+      for (int i = 0; i < e_uplifting.verts.size(); ++i) {
+        auto &builder = m_mmv_builders[i];
+        
+        // If a state change occurred, restart spectrum builder
+        if (csys_stale || !builder.matches_vertex(e_uplifting.verts[i]))
+          builder.assign_vertex(e_uplifting.verts[i]);
+        
+        // If the vertex was not edited, or the metamer builder has converged, we can exit early
+        guard_continue(e_state.verts[i] || !builder.is_converged());
 
-    // 2. Generate constraint spectra;
-    // We rely on MetamerConstraintBuilder to make a nice shortcut
-    if (e_state.verts.is_resized())
-      m_mismatch_builders.resize(e_uplifting.verts.size());
-
-    // Note; disable top-level parallellism, as typically the user modified only one constraint,
-    // and this way parallellism at the solver level remains... functional
-    // #pragma omp parallel for
-    for (int i = 0; i < e_uplifting.verts.size(); ++i) {
-      auto &builder = m_mismatch_builders[i];
-      
-      // If a state change occurred, restart spectrum builder
-      if (csys_stale || !builder.matches_vertex(e_uplifting.verts[i]))
-        builder.assign_vertex(e_uplifting.verts[i]);
-      
-      // If the vertex was not edited, or the metamer builder has converged, we can exit early
-      guard_continue(e_state.verts[i] || !builder.is_converged());
-
-      // Generate vertex color, attached metamer, and its originating coefficients
-      auto [c, s, coef] = builder.realize(e_uplifting.verts[i], e_scene, e_uplifting);
-      
-      // Add to set of spectra and coefficients
-      m_tesselation_spectra[m_csys_boundary_spectra.size() + i] = s;
-      m_tesselation_coeffs[m_csys_boundary_spectra.size() + i]  = coef;
-
-      // We only update vertices in the tesselation if the 'primary' has updated
-      // as otherwise we'd trigger re-tesselation on every constraint modification
-      Colr prev_c = m_tesselation_points[m_csys_boundary_spectra.size() + i];
-      if (!prev_c.isApprox(c)) {
-        m_tesselation_points[m_csys_boundary_spectra.size() + i] = c;
-        tssl_stale = true; // skipping atomic, as everyone's just setting to true r.n.
+        // Generate vertex color, attached metamer, and its originating coefficients
+        auto sample = builder.realize(e_uplifting.verts[i], e_scene, e_uplifting);
+        
+        // Add to set of spectra and coefficients; we set tssl_stale to true only if
+        // the color output is changed;
+        {
+          auto sample_old = m_interior_samples[m_boundary_samples.size() + i];
+          m_interior_samples[i] = sample;
+          if (!sample_old.colr.isApprox(sample.colr))
+            tssl_stale = true; // skipping atomic, as everyone's just setting to true r.n.
+        }
       }
     }
 
-    // 3. Generate color system tesselation
+    // Merge boundary and interior sample data
+    {
+      m_tessellation_samples.resize(m_boundary_samples.size() + m_interior_samples.size());
+      rng::copy(m_boundary_samples, m_tessellation_samples.begin());
+      rng::copy(m_interior_samples, m_tessellation_samples.begin() + m_boundary_samples.size());
+    }
+
+    // 3. Generate color system tesselation and pack for the gl-side
     if (tssl_stale) {
       // Generate new tesselation
-      m_tesselation = generate_delaunay<AlDelaunay, Colr>(m_tesselation_points);
+      auto points = m_tessellation_samples | vws::transform(&MismatchSample::colr) | view_to<std::vector<Colr>>();
+      m_tesselation = generate_delaunay<AlDelaunay, Colr>(points);
 
       // Update packed data for fast per-object delaunay traversal
       std::transform(std::execution::par_unseq, 
@@ -182,84 +161,42 @@ namespace met {
       i_tesselation_data.flush();
     } // if (tssl_stale)
 
-    // 4. Modify spectral data on the gl-side
+    // 4. Pack spectral coefficients for the gl-side
     //    Spectra are always changed, so update them either way
     {
-      // Assemble packed spectra into mapped buffer. We pack all four spectra of a tetrahedron
-      // into a single interleaved object, for fast 4-component texture sampling during rendering
+      // Assemble coefficients into mapped buffer. We pack all 4x12 coefficients of a tetrahedron
+      // into a single interleaved object, for fast 4-component texture sampling during baking
       for (uint i = 0; i < m_tesselation.elems.size(); ++i) {
         const auto &el = m_tesselation.elems[i];
-        
-        // Data is transposed and reshaped into a [wvls, 4]-shaped object for gpu-side layout
-        SpecPackLayout pack;
-        for (uint i = 0; i < 4; ++i)
-          pack.col(i) = m_tesselation_spectra[el[i]];
-
-        // Moment coefficients are stored directly
         SpecCoefLayout coeffs;
         for (uint i = 0; i < 4; ++i)
-          coeffs.col(i) = m_tesselation_coeffs[el[i]];
+          coeffs.col(i) = m_tessellation_samples[el[i]].coef;
         m_tesselation_coef_map[i] = coeffs;
       }
 
       // Flush changes to GL-side 
       info("tesselation_coef").getw<gl::Buffer>().flush();
     }
-    
-    // 5. If a viewer task exists, we should supply mesh data for rendering
-    {
-      auto viewer_name   = std::format("uplifting_viewport_{}", m_uplifting_i);
-      auto viewer_handle = info.task(viewer_name);
-      
-      if (tssl_stale && viewer_handle.is_init()) {
-        // Convert delaunay to triangle mesh
-        auto mesh = convert_mesh<AlMesh>(m_tesselation);
 
-        // Push mesh data and generate vertex array; we do a full, expensive, inefficient copy. 
-        // The viewer is only for debugging anyways
-        m_buffer_viewer_verts = {{ .data = cnt_span<const std::byte>(mesh.verts) }};
-        m_buffer_viewer_elems = {{ .data = cnt_span<const std::byte>(mesh.elems) }};
-        m_buffer_viewer_array = {{
-          .buffers  = {{ .buffer = &m_buffer_viewer_verts, .index = 0, .stride = sizeof(eig::Array4f) }},
-          .attribs  = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e3 }},
-          .elements = &m_buffer_viewer_elems
-        }};
-        
-        // Expose dispatch draw information to other tasks
-        info("tesselation_draw").set<gl::DrawInfo>({
-          .type           = gl::PrimitiveType::eTriangles,
-          .vertex_count   = (uint) (m_buffer_viewer_elems.size() / sizeof(uint)),
-          .capabilities   = {{ gl::DrawCapability::eDepthTest, true },
-                             { gl::DrawCapability::eCullOp,   false }},
-          .draw_op        = gl::DrawOp::eLine,
-          .bindable_array = &m_buffer_viewer_array
-        });
+    // 5. Expose some data for visualisation
+    {
+      // Generated spectral constraint data is useful to have
+      info("constraint_samples").getw<std::vector<MismatchSample>>() = m_interior_samples;
+
+      // Mismatch volume hull data is useful to have
+      if (!m_mmv_builders.empty() && rng::any_of(m_mmv_builders, [](const auto &m) {
+        return m.did_sample();
+      })) {
+        auto &i_mismatch_hull = info("mismatch_hulls").getw<std::vector<ConvexHull>>();
+        i_mismatch_hull.resize(m_mmv_builders.size());
+        rng::transform(m_mmv_builders, i_mismatch_hull.begin(), &MetamerConstraintBuilder::chull);
       }
-    }
-
-    // 6. Expose a copy of generated constraint spectra for visualization
-    {
-      auto &i_constraint_spectra = info("constraint_spectra").getw<std::vector<Spec>>();
-      auto &i_constraint_coeffs  = info("constraint_coeffs").getw<std::vector<Basis::vec_type>>();
-      i_constraint_spectra.resize(e_uplifting.verts.size());      
-      i_constraint_coeffs.resize(e_uplifting.verts.size());      
-      rng::copy(m_tesselation_spectra | vws::drop(m_csys_boundary_spectra.size()), i_constraint_spectra.begin());
-      rng::copy(m_tesselation_coeffs  | vws::drop(m_csys_boundary_coeffs.size()),  i_constraint_coeffs.begin());
-    }
-
-    // 7. Expose mismatch volume hull data for visualization and UI parts
-    if (!m_mismatch_builders.empty() && rng::any_of(m_mismatch_builders, [](const auto &m) {
-      return m.did_sample();
-    })) {
-      auto &i_mismatch_hull = info("mismatch_hulls").getw<std::vector<ConvexHull>>();
-      i_mismatch_hull.resize(m_mismatch_builders.size());
-      rng::transform(m_mismatch_builders, i_mismatch_hull.begin(), &MetamerConstraintBuilder::chull);
     }
   }
 
   Spec GenUpliftingDataTask::query_constraint(uint i) const {
     met_trace();
-    return m_tesselation_spectra[m_csys_boundary_spectra.size() + i];
+    return m_interior_samples[i].spec;
   }
 
   TetrahedronRecord GenUpliftingDataTask::query_tetrahedron(uint i) const {
@@ -269,9 +206,9 @@ namespace met {
 
     // Find element indices for this tetrahedron, and then fill per-vertex data
     for (auto [i, elem_i] : enumerate_view(m_tesselation.elems[i])) {
-      int j = static_cast<int>(elem_i) - static_cast<int>(m_csys_boundary_spectra.size());
-      tr.indices[i] = std::max<int>(j, -1);          // Assign constraint index, or -1 if a constraint is a boundary vertex
-      tr.spectra[i] = m_tesselation_spectra[elem_i]; // Assign corresponding spectrum
+      int j = static_cast<int>(elem_i) - static_cast<int>(m_boundary_samples.size());
+      tr.indices[i] = std::max<int>(j, -1);                // Assign constraint index, or -1 if a constraint is a boundary vertex
+      tr.spectra[i] = m_tessellation_samples[elem_i].spec; // Assign corresponding spectrum
     }
 
     return tr;
@@ -311,9 +248,9 @@ namespace met {
 
     // Find element indices for this tetrahedron, and then fill per-vertex data
     for (auto [i, elem_i] : enumerate_view(m_tesselation.elems[result_i])) {
-      int j = static_cast<int>(elem_i) - static_cast<int>(m_csys_boundary_spectra.size());
-      tr.indices[i] = std::max<int>(j, -1);          // Assign constraint index, or -1 if a constraint is a boundary vertex
-      tr.spectra[i] = m_tesselation_spectra[elem_i]; // Assign corresponding spectrum
+      int j = static_cast<int>(elem_i) - static_cast<int>(m_boundary_samples.size());
+      tr.indices[i] = std::max<int>(j, -1);                // Assign constraint index, or -1 if a constraint is a boundary vertex
+      tr.spectra[i] = m_tessellation_samples[elem_i].spec; // Assign corresponding spectrum
     }
 
     return tr;

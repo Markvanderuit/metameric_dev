@@ -3,6 +3,7 @@
 #include <metameric/core/fwd.hpp>
 #include <metameric/core/detail/scheduler_base.hpp>
 #include <metameric/core/detail/scheduler_handle.hpp>
+#include <list>
 #include <unordered_map>
 
 namespace met {

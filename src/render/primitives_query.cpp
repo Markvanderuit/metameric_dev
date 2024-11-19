@@ -21,8 +21,8 @@ namespace met {
     // Initialize program object
     std::tie(m_cache_key, std::ignore) = m_cache_handle.getw<gl::detail::ProgramCache>().set({ 
       .type       = gl::ShaderType::eCompute,
-      .spirv_path = "resources/shaders/render/primitive_query_path.comp.spv",
-      .cross_path = "resources/shaders/render/primitive_query_path.comp.json",
+      .spirv_path = "shaders/render/primitive_query_path.comp.spv",
+      .cross_path = "shaders/render/primitive_query_path.comp.json",
       .spec_const = {{ 0u, 256u        },
                      { 1u, m_max_depth }}
     });
@@ -44,6 +44,12 @@ namespace met {
       m_output_data_map = cast_span<PathRecord>(map.subspan(4 * sizeof(uint)));
     }
 
+    // Return if output and request are both zilch; no work to be done
+    if (spp == 0 && *m_output_head_map == 0) {
+      m_output_sync = {};
+      return m_output;
+    }
+
     // (Re)generate sampling distribution for wavelengths
     bool rebuild_wavelength_distr 
       = !m_wavelength_distr_buffer.is_init() 
@@ -59,10 +65,10 @@ namespace met {
       auto illums = emitters
                   | vws::transform([ ](const auto &comp) { return comp.value.illuminant_i; })
                   | vws::transform([&](uint i) { return *scene.resources.illuminants[i];   })
-                  | rng::to<std::vector>();
+                  | view_to<std::vector<Spec>>();
       auto scales = emitters
                   | vws::transform([](const auto &comp) { return comp.value.illuminant_scale; })
-                  | rng::to<std::vector>();
+                  | view_to<std::vector<float>>();
   
       // Generate average over scaled distributions
       m_wavelength_distr = 1.f;
@@ -96,15 +102,18 @@ namespace met {
     program.bind();
     program.bind("b_buff_output",         m_output);
     program.bind("b_buff_query",          m_query);
-    program.bind("b_buff_sensor",         sensor.buffer());
-    program.bind("b_buff_objects",        scene.components.objects.gl.object_info);
-    program.bind("b_buff_emitters",       scene.components.emitters.gl.emitter_info);
-    program.bind("b_buff_coeffs",         scene.components.upliftings.gl.texture_coefficients.buffer()); 
+    program.bind("b_buff_sensor_info",         sensor.buffer());
+    program.bind("b_buff_object_info",        scene.components.objects.gl.object_info);
+    program.bind("b_buff_emitter_info",       scene.components.emitters.gl.emitter_info);
+    program.bind("b_buff_coef_info",           scene.components.upliftings.gl.texture_coef.buffer()); 
+    program.bind("b_buff_brdf_info",           scene.components.upliftings.gl.texture_brdf.buffer()); 
     program.bind("b_buff_wvls_distr",     m_wavelength_distr_buffer);
     program.bind("b_buff_emitters_distr", scene.components.emitters.gl.emitter_distr_buffer);
     program.bind("b_buff_envmap_info",    scene.components.emitters.gl.emitter_envm_info);
-    program.bind("b_coef_4f",             scene.components.upliftings.gl.texture_coefficients.texture());
+    program.bind("b_coef_4f",             scene.components.upliftings.gl.texture_coef.texture());
     program.bind("b_coef_4f",             m_sampler);
+    program.bind("b_brdf_2f",             scene.components.upliftings.gl.texture_brdf.texture());
+    program.bind("b_brdf_2f",             m_sampler);
     program.bind("b_bsis_1f",             scene.components.upliftings.gl.texture_basis);
     program.bind("b_bsis_1f",             m_sampler);
     program.bind("b_cmfs_3f",             scene.resources.observers.gl.cmfs_texture);
@@ -112,9 +121,9 @@ namespace met {
     program.bind("b_illm_1f",             scene.resources.illuminants.gl.spec_texture);
     program.bind("b_illm_1f",             m_sampler);
     if (!scene.resources.meshes.empty()) {
-      program.bind("b_buff_meshes",    scene.resources.meshes.gl.mesh_info);
-      program.bind("b_buff_bvhs_node", scene.resources.meshes.gl.bvh_nodes);
-      program.bind("b_buff_bvhs_prim", scene.resources.meshes.gl.bvh_prims);
+      program.bind("b_buff_blas_info", scene.resources.meshes.gl.blas_info);
+      program.bind("b_buff_blas_node", scene.resources.meshes.gl.blas_nodes);
+      program.bind("b_buff_blas_prim", scene.resources.meshes.gl.blas_prims);
     }
 
     // Dispatch compute shader
@@ -127,11 +136,12 @@ namespace met {
     // output data is made visible in mapped region
     gl::sync::memory_barrier(gl::BarrierFlags::eClientMappedBuffer);
     m_output_sync = gl::sync::Fence(gl::sync::time_s(1));
-
+    
     return m_output;
   }
 
   std::span<const PathRecord> PathQueryPrimitive::data() const {
+    met_trace();
     // Wait for output data to be visible, and then
     // return generated output data
     guard(m_output_sync.is_init(), std::span<const PathRecord>());
@@ -146,8 +156,8 @@ namespace met {
     // Initialize program object
     std::tie(m_cache_key, std::ignore) = m_cache_handle.getw<gl::detail::ProgramCache>().set({ 
       .type       = gl::ShaderType::eCompute,
-      .spirv_path = "resources/shaders/render/primitive_query_ray.comp.spv",
-      .cross_path = "resources/shaders/render/primitive_query_ray.comp.json",
+      .spirv_path = "shaders/render/primitive_query_ray.comp.spv",
+      .cross_path = "shaders/render/primitive_query_ray.comp.json",
       .spec_const = {{ 0u, 1u }} // Tiny workgroup
     });
   }
@@ -171,14 +181,17 @@ namespace met {
     // Bind required resources to their corresponding targets
     program.bind();
     program.bind("b_buff_output",         m_output);
-    program.bind("b_buff_sensor",         sensor.buffer());
-    program.bind("b_buff_objects",        scene.components.objects.gl.object_info);
-    program.bind("b_buff_emitters",       scene.components.emitters.gl.emitter_info);
+    program.bind("b_buff_sensor_info",         sensor.buffer());
+    program.bind("b_buff_object_info",        scene.components.objects.gl.object_info);
+    program.bind("b_buff_emitter_info",       scene.components.emitters.gl.emitter_info);
     program.bind("b_buff_envmap_info",    scene.components.emitters.gl.emitter_envm_info);
+    // program.bind("b_buff_scene",          scene.gl.scene_info);
+    // program.bind("b_buff_tlas_node",      scene.gl.tlas_nodes);
+    // program.bind("b_buff_tlas_prim",      scene.gl.tlas_prims);
     if (!scene.resources.meshes.empty()) {
-      program.bind("b_buff_meshes",        scene.resources.meshes.gl.mesh_info);
-      program.bind("b_buff_bvhs_node",     scene.resources.meshes.gl.bvh_nodes);
-      program.bind("b_buff_bvhs_prim",     scene.resources.meshes.gl.bvh_prims);
+      program.bind("b_buff_blas_info", scene.resources.meshes.gl.blas_info);
+      program.bind("b_buff_blas_node", scene.resources.meshes.gl.blas_nodes);
+      program.bind("b_buff_blas_prim", scene.resources.meshes.gl.blas_prims);
     }
 
     // Dispatch compute shader

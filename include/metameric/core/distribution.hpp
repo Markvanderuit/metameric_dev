@@ -78,6 +78,9 @@ namespace met {
     }
   };
 
+  // fwd
+  template <uint N> struct DistributionArray;
+
   // Simple 1d sampling distribution
   class Distribution {
     float              m_func_sum;
@@ -88,7 +91,7 @@ namespace met {
     Distribution() = default;
 
     Distribution(std::span<const float> values) {
-      m_func.assign_range(values);
+      m_func = { values.begin(), values.end() };
       m_cdf.resize(values.size() + 1);
       
       // Scan values to build cdf
@@ -159,7 +162,42 @@ namespace met {
       }
     }
 
+    // Dump to opengl buffer with required padding
     gl::Buffer to_buffer_std140() const;
     gl::Buffer to_buffer_std430() const;
+
+  // public: // total hack
+  //   friend DistributionArray<wavelength_samples>;
   };
+
+  // Array of 1d distributions; used to handle a pile of per-wavelength 
+  // emitter sampling distributions during rendering, so we can sample
+  // with the hero wavelength in mind
+  // template <uint N>
+  // struct DistributionArray {
+  //   std::array<Distribution, N> data;
+
+  // public:
+  //   DistributionArray() = default;
+
+  //   DistributionArray(std::span<const float> values) {
+  //     uint n = values.size() / N;
+  //     rng::transform(values | vws::chunk(n), data.begin(), 
+  //       [](const auto &span) { return Distribution(span); });
+  //   }
+    
+  //   DistributionArray(std::span<std::span<const float>> values) {
+  //     debug::check_expr(values.size() == N);
+  //     uint n_expected = values[0].size();
+  //     rng::transform(values, data.begin(), [n_expected](const auto &span) {
+  //       debug::check_expr(span.size() == n_expected);
+  //       return Distribution(span);
+  //     });
+  //   }
+
+  // public:
+  //   // Dump to opengl buffer with required padding
+  //   gl::Buffer to_buffer_std140() const;
+  //   gl::Buffer to_buffer_std430() const;
+  // };
 } // namespace met

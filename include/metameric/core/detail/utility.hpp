@@ -12,7 +12,6 @@
 #include <tuple>
 #include <utility>
 #include <variant>
-#include <vector>
 
 // Risky; add is_variant_v detector
 namespace std {
@@ -32,7 +31,6 @@ namespace met::detail {
    * in which they were provided.
    */
   class Message {
-    std::vector<std::pair<std::string, std::string>> _messages;
     std::string _buffer;
 
   public:
@@ -58,7 +56,7 @@ namespace met::detail {
 
   public:
     const char * what() const noexcept override {
-      _what = fmt::format("met::detail::Exception thrown\n{}", get());
+      _what = fmt::format("Metameric Exception thrown\n{}", get());
       return _what.c_str();
     }
   };

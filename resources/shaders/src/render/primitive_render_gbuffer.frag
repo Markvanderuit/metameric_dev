@@ -3,7 +3,6 @@
 #include <render/gbuffer.glsl>
 #include <render/ray.glsl>
 #include <render/load/defaults.glsl>
-#include <render/scene.glsl>
 
 // Fragment early-Z declaration
 layout(early_fragment_tests) in;
@@ -15,16 +14,18 @@ layout(location = 2) in flat uint in_value_rc;
 layout(location = 0) out vec4     out_value_gb;
 
 // Buffer declarations
-layout(binding = 0) uniform b_buff_sensor {
+layout(binding = 0) uniform b_buff_sensor_info {
   mat4  full_trf; 
   mat4  proj_trf;
   mat4  view_trf;
   uvec2 film_size; 
-} buff_sensor;
-layout(binding = 1) uniform b_buff_objects {
+} buff_sensor_info;
+layout(binding = 1) uniform b_buff_object_info {
   uint n;
   ObjectInfo data[met_max_objects];
 } buff_objects;
+
+#include <render/scene.glsl>
 
 void main() {
   // Store primitive ID in object record
@@ -32,7 +33,6 @@ void main() {
   record_set_object_primitive(rc, gl_PrimitiveID);
 
   // Output packed gbuffer data
-  // out_value_gb = vec4(in_value_n, 1);
   out_value_gb = uintBitsToFloat(pack_gbuffer(
     gl_FragCoord.z, // user can recover position from depth
     in_value_n,

@@ -8,7 +8,7 @@
 
 namespace met {
   static constexpr float selector_near_distance = 12.f;
-  static constexpr uint  indirect_query_spp     = 65536;
+  static constexpr uint  indirect_query_spp     = 8192; // 65536;
 
   namespace detail {
     // From a trio of vertex positions forming a triangle, and a center position,
@@ -34,36 +34,57 @@ namespace met {
 
     // From a RayRecord, recover underlying surface information in the scene
     SurfaceInfo get_surface_info(const Scene &scene, const eig::Array3f &p, const SurfaceRecord &rc) {
-      // Get relevant resources; mostly gl-side resources
+      // Get relevant resources; mostly caches of gl-side resources
       const auto &object    = *scene.components.objects[rc.object_i()];
       const auto &uplifting = *scene.components.upliftings[object.uplifting_i];
+      const auto &mesh_data = scene.resources.meshes.gl.mesh_cache[object.mesh_i];
 
-      // Get object*mesh transform and ivnerse
+      // Get object*mesh transform and inverse
       auto object_trf = object.transform.affine().matrix().eval();
-      auto mesh_trf   = (object_trf * scene.resources.meshes.gl.transforms[object.mesh_i]).eval();
+      auto mesh_trf   = mesh_data.unit_trf;
+      auto trf        = (object_trf * mesh_trf).eval();
 
       // Assemble SurfaceInfo object
       SurfaceInfo si = { .object = object, .uplifting = uplifting  };
       si.record = rc;
 
-      // Unpack relevant primitive data, and restore old, non-reparameterized UV coordinates
-      // so we can sample image data cpu-side
-      auto prim = scene.resources.meshes.gl.bvh_prims_cpu[rc.primitive_i()].unpack();
-      auto txuv = scene.resources.meshes.gl.bvh_txuvs_cpu[rc.primitive_i()];
-      prim.v0.tx = detail::unpack_unorm_2x16(txuv[0]);
-      prim.v1.tx = detail::unpack_unorm_2x16(txuv[1]);
-      prim.v2.tx = detail::unpack_unorm_2x16(txuv[2]);
+      // Assemble relevant primitive data from mesh cache
+      std::array<Vertex, 3> prim;
+      {
+        // Extract element indices, un-scattering data from the weird BVH leaf node order
+        const Mesh &mesh = mesh_data.mesh;
+        const auto &blas = mesh_data.bvh;
+        const auto &elem = mesh.elems[blas.prims[rc.primitive_i() - mesh_data.prims_offs]]; 
+        
+        // Iterate element indices, building primitive vertices
+        for (uint i = 0; i < 3; ++i) {
+          uint j = elem[i];
+          
+          // Get vertex data, and force UV to [0, 1]
+          auto vert = mesh.verts[j];
+          auto norm = mesh.has_norms() ? mesh.norms[j] : eig::Array3f(0, 0, 1);
+          auto txuv = mesh.has_txuvs() ? mesh.txuvs[j] : eig::Array2f(0.5);
+          txuv = txuv.unaryExpr([](float f) {
+            int   i = static_cast<int>(f);
+            float a = f - static_cast<float>(i);
+            return (i % 2) ? 1.f - a : a;
+          });
+
+          // Assemble primitive vertex
+          prim[i] = { .p = vert, .n = norm, .tx = txuv };
+        }
+      }
 
       // Generate barycentric coordinates
-      eig::Vector3f pinv = (mesh_trf.inverse() * eig::Vector4f(p.x(), p.y(), p.z(), 1.f)).head<3>();
-      eig::Vector3f bary = get_barycentric_coords(pinv, prim.v0.p, prim.v1.p, prim.v2.p);
+      eig::Vector3f pinv = (trf.inverse() * eig::Vector4f(p.x(), p.y(), p.z(), 1.f)).head<3>();
+      eig::Vector3f bary = get_barycentric_coords(pinv, prim[0].p, prim[1].p, prim[2].p);
 
       // Recover surface geometric data
-      si.p  = bary.x() * prim.v0.p  + bary.y() * prim.v1.p  + bary.z() * prim.v2.p;
-      si.n  = bary.x() * prim.v0.n  + bary.y() * prim.v1.n  + bary.z() * prim.v2.n;
-      si.tx = bary.x() * prim.v0.tx + bary.y() * prim.v1.tx + bary.z() * prim.v2.tx;
-      si.p  = (mesh_trf * eig::Vector4f(si.p.x(), si.p.y(), si.p.z(), 1.f)).head<3>();
-      si.n  = (mesh_trf * eig::Vector4f(si.n.x(), si.n.y(), si.n.z(), 0.f)).head<3>();
+      si.p  = bary.x() * prim[0].p  + bary.y() * prim[1].p  + bary.z() * prim[2].p;
+      si.n  = bary.x() * prim[0].n  + bary.y() * prim[1].n  + bary.z() * prim[2].n;
+      si.tx = bary.x() * prim[0].tx + bary.y() * prim[1].tx + bary.z() * prim[2].tx;
+      si.p  = (trf * eig::Vector4f(si.p.x(), si.p.y(), si.p.z(), 1.f)).head<3>();
+      si.n  = (trf * eig::Vector4f(si.n.x(), si.n.y(), si.n.z(), 0.f)).head<3>();
       si.n.normalize();
 
       // Recover surface diffuse data based on underlying object material
@@ -133,11 +154,11 @@ namespace met {
       cstr.powr_j = { };
       return;
     }
-    fmt::print("Found {} paths through query\n", paths.size());
+    fmt::print("Query: sampled {} light paths\n", paths.size());
 
     // Collect handle to relevant uplifting task
     // const auto &e_uplf_task = uplf_handles[cs.uplifting_i].realize<GenUpliftingDataTask>();
-    const auto &e_uplf_task = info.task(std::format("gen_upliftings.gen_uplifting_{}", cs.uplifting_i))
+    const auto &e_uplf_task = info.task(fmt::format("gen_upliftings.gen_uplifting_{}", cs.uplifting_i))
                                   .realize<GenUpliftingDataTask>();
     
     // Get the current reflectance distribution used during rendering operations for this constraint
@@ -154,8 +175,9 @@ namespace met {
     // Helper struct
     // Definition for a path vertex; reflectance equals r_weight x our constraint reflectance + remainder
     struct CompactTetrRecord {
-      float        r_weight;  // Barycentric weight of reflectance at one of four vertices
-      eig::Array4f remainder; // Remainder of reflectances, premultiplied and summed
+      Object::BRDFType brdf_type; // Ref. to brdf type; we treat principled diffenently than diffuse
+      float            r_weight;  // Barycentric weight of reflectance at one of four vertices
+      eig::Array4f     remainder; // Remainder of reflectances, premultiplied and summed
     };
 
     // Compact paths into R^P + aR', which likely means separating them instead
@@ -186,7 +208,7 @@ namespace met {
                         });
       
       // Apply filter and return selected vertices
-      auto verts = path.data | verts_view | rng::to<std::vector<CompactTetrRecord>>();
+      auto verts = path.data | verts_view | view_to<std::vector<CompactTetrRecord>>();
       
       // Get the "fixed" part of the path's throughput, by taking the constraint's current refl.
       // and dividing it out of the assembled energy (note; this data is from last frame)
@@ -222,7 +244,7 @@ namespace met {
 
     // Copy tbb over to single vector block
     // std::vector<SeparationRecord> paths_finalized(range_iter(tbb_paths));
-    fmt::print("Separated into {} path permutations\n", paths_finalized.size());
+    fmt::print("Query: separated into {} permutations\n", paths_finalized.size());
 
     // Make space in constraint available, up to maximum power
     // and set everything to zero for now
@@ -290,7 +312,7 @@ namespace met {
     for (const auto &[i, uplifting] : enumerate_view(e_scene.components.upliftings)) {
       for (const auto &[j, vert] : enumerate_view(uplifting->verts)) {
         // Only constraints currently being edited are shown
-        auto str = std::format("scene_components_editor.mmv_editor_{}_{}", i, j);
+        auto str = fmt::format("scene_components_editor.mmv_editor_{}_{}", i, j);
         guard_continue(info.task(str).is_init());
         
         // Only active surface constraints are shown
@@ -333,7 +355,7 @@ namespace met {
     if (cs_nearest.is_valid()) {
       const auto &e_vert = info.global("scene").getr<Scene>().uplifting_vertex(cs_nearest);
       ImGui::BeginTooltip();
-      ImGui::Text(e_vert.name.c_str());
+      ImGui::Text("%s", e_vert.name.c_str());
       ImGui::EndTooltip();
     }
 

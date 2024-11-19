@@ -8,12 +8,12 @@ layout(std430) buffer;
 layout(early_fragment_tests) in;
 
 // Uniform buffer declaration
-layout(binding = 0) uniform b_buff_sensor {
+layout(binding = 0) uniform b_buff_sensor_info {
   mat4  full_trf;
   mat4  proj_trf;
   mat4  view_trf;
   uvec2 film_size; 
-} buff_sensor;
+} buff_sensor_info;
 
 // Fragment stage declarations
 layout(location = 0) in vec3  value_in;

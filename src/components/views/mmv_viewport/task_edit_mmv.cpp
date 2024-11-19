@@ -4,7 +4,7 @@
 #include <metameric/core/convex.hpp>
 #include <metameric/core/metamer.hpp>
 #include <metameric/core/moments.hpp>
-#include <metameric/core/scene.hpp>
+#include <metameric/scene/scene.hpp>
 #include <metameric/core/ranges.hpp>
 #include <small_gl/texture.hpp>
 #include <small_gl/window.hpp>
@@ -27,23 +27,13 @@ namespace met {
     const auto &e_cs      = info.parent()("selection").getr<ConstraintRecord>();
     const auto &e_uplift  = e_scene.components.upliftings[e_cs.uplifting_i].value;
     const auto &e_basis   = e_scene.resources.bases[e_uplift.basis_i].value();
-    auto uplf_handle      = info.task(std::format("gen_upliftings.gen_uplifting_{}", e_cs.uplifting_i)).mask(info);
-    const auto &e_spectra = uplf_handle("constraint_spectra").getr<std::vector<Spec>>();
-    const auto &e_coeffs  = uplf_handle("constraint_coeffs").getr<std::vector<Basis::vec_type>>();
+    auto uplf_handle      = info.task(fmt::format("gen_upliftings.gen_uplifting_{}", e_cs.uplifting_i)).mask(info);
+    const auto &e_spectra = uplf_handle("constraint_samples").getr<std::vector<MismatchSample>>();
     const auto &e_hulls   = uplf_handle("mismatch_hulls").getr<std::vector<ConvexHull>>();
     const auto &e_hull    = e_hulls[e_cs.vertex_i];
 
-    // Generate packed-unpacked roundtrip spectrum to compare to full precision distribution
-    Spec spec = e_spectra[e_cs.vertex_i], unpacked_spec;
-    Basis::vec_type coeffs = e_coeffs[e_cs.vertex_i], unpacked_coeffs;
-    if constexpr (wavelength_bases == 12) {
-      unpacked_coeffs = detail::unpack_snorm_12(detail::pack_snorm_12(e_coeffs[e_cs.vertex_i]));
-      unpacked_spec   = e_basis(coeffs);
-    } else if constexpr (wavelength_bases == 16) {
-      spec = e_spectra[e_cs.vertex_i];
-      unpacked_coeffs = detail::unpack_snorm_16(detail::pack_snorm_16(e_coeffs[e_cs.vertex_i]));
-      unpacked_spec   = e_basis(coeffs);
-    }
+    // Select constraint spectrum
+    Spec spec = e_spectra[e_cs.vertex_i].spec;
     
     // Encapsulate editable data, so changes are saved in an undoable manner
     detail::encapsulate_scene_data<ComponentType>(info, e_cs.uplifting_i, [&](auto &info, uint i, ComponentType &uplf) {
@@ -52,11 +42,6 @@ namespace met {
         eNone,
         eEdit,
         eDelete
-      };
-
-      auto push_separator = [&]() {
-        ImGui::TableNextRow();
-        ImGui::Spacing();
       };
       
       // Helper to handle single row for types with .colr_i
@@ -72,7 +57,7 @@ namespace met {
         // CSYS editor column
         ImGui::TableSetColumnIndex(1);
         ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-        ImGui::Text(e_scene.csys_name(*uplf).c_str());
+        ImGui::Text("%s", e_scene.csys_name(*uplf).c_str());
 
         // lRGB/sRGB color column
         ImGui::TableSetColumnIndex(2);
@@ -238,21 +223,6 @@ namespace met {
               ImGui::EndTabItem();
             }
 
-            if (ImGui::BeginTabItem("Coefficients")) {
-              std::vector<Basis::vec_type> coef = { coeffs, unpacked_coeffs };
-              std::vector<std::string> lgnd     = { "Exact", "Packed"       };
-              if (ImPlot::BeginPlot("##output_coef_plot", { -1.f, 256.f * e_window.content_scale() }, ImPlotFlags_Crosshairs | ImPlotFlags_NoFrame)) {
-                Basis::vec_type x_values;
-                rng::copy(vws::iota(0u, wavelength_bases), x_values.begin());
-                ImPlot::SetupAxes("Index", "Value", ImPlotAxisFlags_NoGridLines, ImPlotAxisFlags_NoDecorations);
-                ImPlot::SetupAxesLimits(-1.f, wavelength_bases, -1.f, 1.f, ImPlotCond_Always);
-                for (const auto &[text, vals] : met::vws::zip(lgnd, coef))
-                  ImPlot::PlotLine(text.c_str(), x_values.data(), vals.data(), wavelength_bases);
-              }
-              ImPlot::EndPlot();
-              ImGui::EndTabItem();
-            }
-
             if (!cstr.cstr_j.empty() && !cstr.cstr_j.back().powr_j.empty() && ImGui::BeginTabItem("Radiance")) {
               // Reconstruct radiance from truncated power series
               Spec s = cstr.cstr_j.back().powr_j[0];
@@ -305,7 +275,7 @@ namespace met {
 
             // Direct constraint rows
             for (uint j = 0; j < cstr.cstr_j.size(); ++j) {
-              auto name = std::format("Direct #{}", j);
+              auto name = fmt::format("Direct #{}", j);
               auto actn = push_colr_cstr_row(name, cstr.cstr_j, j);
               if (actn == PushReturnAction::eDelete) {
                 cstr.cstr_j.erase(cstr.cstr_j.begin() + j);
@@ -344,7 +314,7 @@ namespace met {
 
             // Indirect constraint rows
             for (uint j = 0; j < cstr.cstr_j.size(); ++j) {
-              auto name = std::format("Indirect #{}", j);
+              auto name = fmt::format("Indirect #{}", j);
               auto actn = push_powr_cstr_row(name, cstr.cstr_j, j);
               if (actn == PushReturnAction::eDelete) {
                 cstr.cstr_j.erase(cstr.cstr_j.begin() + j);
@@ -436,7 +406,8 @@ namespace met {
           ImGui::SetTooltip("Metamers can only be correctly generated inside the volume"); */
 
         // Show optional color patches
-        const auto &e_patches = info.relative("viewport_gen_patches")("patches").getr<std::vector<Colr>>();
+        const auto &e_patches = info.relative("viewport_gen_patches")("patches")
+                                    .template getr<std::vector<Colr>>();
         if (!e_patches.empty()) {
           for (uint i = 0; i < e_patches.size(); ++i) {
             // Wrap around if we are out of line space
@@ -446,7 +417,7 @@ namespace met {
             // Spawn color button viewing the srgb-transformed patch color
             Colr lrgb = e_patches[i];
             auto srgb = (eig::Array4f() << lrgb_to_srgb(lrgb), 1.f).finished();
-            if (ImGui::ColorButton(std::format("##patch_{}", i).c_str(), srgb, ImGuiColorEditFlags_Float))
+            if (ImGui::ColorButton(fmt::format("##patch_{}", i).c_str(), srgb, ImGuiColorEditFlags_Float))
               vert.set_mismatch_position(lrgb);
             
             if (i < e_patches.size() - 1)

@@ -1,4 +1,4 @@
-#include <metameric/core/scene.hpp>
+#include <metameric/scene/scene.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/components/schedule.hpp>
 #include <small_gl/window.hpp>
@@ -15,15 +15,16 @@ namespace met {
 
   // Application create settings
   struct MetamericEditorInfo {
-    // Direct load scene path
-    fs::path scene_path = "";
+    // Direct load scene path; optionally allowed to fail for a default scene load
+    fs::path scene_path      = "";
+    bool     scene_fail_safe = false;
 
     // Shader cache path
-    fs::path shader_path = "resources/shaders/shaders.bin";
+    fs::path shader_path = "shaders/shaders.bin";
 
     // Window settings
-    eig::Array2u app_size  = { 1680, 1024 };
-    std::string  app_title = "Metameric Toolkit";
+    eig::Array2u app_size  = { 1800, 1024 };
+    std::string  app_title = "Metameric Editor";
   };
 
   // Application create function
@@ -50,7 +51,7 @@ namespace met {
     // Enable OpenGL debug messages, if requested
     if constexpr (met_enable_debug) {
       gl::debug::enable_messages(gl::DebugMessageSeverity::eLow, gl::DebugMessageTypeFlags::eAll);
-      gl::debug::insert_message("OpenGL debug messages are active!", gl::DebugMessageSeverity::eLow);
+      gl::debug::insert_message("OpenGL messages enabled", gl::DebugMessageSeverity::eLow);
     }
 
     // Initialize program cache as resource ownedd by the scheduler;
@@ -66,7 +67,7 @@ namespace met {
     scheduler.global("scene").set<Scene>({ });
 
     // Load scene if a scene path is provided
-    if (!info.scene_path.empty())
+    if (!info.scene_path.empty() && (info.scene_fail_safe || fs::exists(info.scene_path)))
       scheduler.global("scene").getw<Scene>().load(info.scene_path);
 
     // Load appropriate set of schedule tasks, then start the runtime loop
@@ -82,11 +83,12 @@ namespace met {
 
 // Application entry point
 int main() {
-  // try {
-    met::metameric_editor({ /* .scene_path = "path/to/file.json" */ });
-  // } catch (const std::exception &e) {
-  //   fmt::print(stderr, "{}\n", e.what());
-  //   return EXIT_FAILURE;
-  // }
+  try {
+    // Supply a default scene; this can fail silently
+    met::metameric_editor({ .scene_path = "data/cornell_box.json", .scene_fail_safe = true });
+  } catch (const std::exception &e) {
+    fmt::print(stderr, "{}\n", e.what());
+    return EXIT_FAILURE;
+  }
   return EXIT_SUCCESS;
 }

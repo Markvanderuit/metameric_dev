@@ -10,7 +10,7 @@ namespace met {
   class MeshViewportDrawOverlayTask : public detail::TaskNode {
     using Depthbuffer = gl::Renderbuffer<gl::DepthComponent, 1>;
 
-    gl::Program     m_program;
+    std::string     m_program_key; 
     gl::Array       m_vao;
     gl::Framebuffer m_fbo;
     Depthbuffer     m_dbo;

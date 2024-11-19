@@ -6,25 +6,31 @@
 #include <array>
 
 namespace met {
+  // AABB representation used in cpu-side BVH
+  struct AABB {
+    eig::AlArray3f minb, maxb;
+
+  public:
+    // Abuse operator+ for reduce/fold
+    AABB operator+(const AABB &o) {
+      return { .minb = minb.cwiseMin(o.minb), .maxb = maxb.cwiseMax(o.maxb) };
+    }
+  };
+
+  template <uint K>
   struct BVH {
-    // AABB representation used in cpu-side BVH
-    struct AABB {
-      eig::AlArray3f minb, maxb;
-    };
-
-    // BVH node representation; not for gpu-side packing
+    // BVH node representation; not for gpu-side packing, but
+    // preparing for this step either way
     struct Node {
-      // AABBs of children; is not set for leaves
-      std::array<AABB, 8> child_aabb;
+      // Underlying type; true == leaf, false  == node
+      bool type;
 
-      // Offset into child nodes or primitives, overlapped with flag bit
-      // to indicate leaves
-      uint offs_data, size_data;
+      // Range of <= K underlying child nodes or primitives
+      uint offset, size;
 
-    public:
-      inline constexpr bool is_leaf() const { return offs_data & 0x80000000u;    }
-      inline constexpr uint    offs() const { return offs_data & (~0x80000000u); }
-      inline constexpr uint    size() const { return size_data;                  }
+      // Child data, only set if type is leaf
+      std::array<AABB, K> child_aabb; // AABB of <= K child node
+      std::array<bool, K> child_mask; // Mask of <= K is_leaf/!is_leaf
     };
 
   public: // Internal BVH data
@@ -34,16 +40,14 @@ namespace met {
   public: // Constructors
     // BVH helper struct; create BVH from mesh
     struct CreateMeshInfo {
-      const Mesh &mesh;                // Reference mesh to build BVH over
-      uint n_node_children = 8;        // Maximum fan-out of BVH on each node
-      uint n_leaf_children = 4;        // Maximum nr of primitives on each leaf
+      const Mesh &mesh;         // Reference mesh to build BVH over
+      uint n_leaf_children = 4; // Maximum nr of primitives on each leaf
     };
-
+    
     // BVH helper struct; create BVH from set of boxes
     struct CreateAABBInfo {
-      std::span<const BVH::AABB> aabb; // Range of bounding boxes to build BVH over
-      uint n_node_children = 8;        // Maximum fan-out of BVH on each node
-      uint n_leaf_children = 4;        // Maximum nr of primitives on each leaf
+      std::span<const AABB> aabb; // Range of bounding boxes to build BVH over
+      uint n_leaf_children = 4;   // Maximum nr of primitives on each leaf
     };
 
     BVH() = default;

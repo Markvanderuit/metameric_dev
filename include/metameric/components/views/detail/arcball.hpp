@@ -52,7 +52,6 @@ namespace met::detail {
   public: // Public members
     using InfoType = ArcballInfo;
 
-    Arcball() = default;
     Arcball(ArcballInfo info = { });
 
     // Data accessors 

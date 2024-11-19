@@ -37,7 +37,8 @@ void record_set_anyhit(inout uint rc, in bool hit) {
   rc = uint(hit); 
 }
 
-// Getters to read stored record data
+// Getters to read packed Ray/SurfaceInfo data;
+// uint records are used by intersection tests to store type and index of a hit
 bool record_is_valid(in uint rc)             { return rc != RECORD_INVALID_DATA;      }
 bool record_is_emitter(in uint rc)           { return (rc & RECORD_EMITTER_FLAG) != 0;}
 bool record_is_object(in uint rc)            { return (rc & RECORD_EMITTER_FLAG) == 0;}
@@ -46,38 +47,16 @@ uint record_get_emitter(in uint rc)          { return (rc >> 24) & 0x0000007F;  
 uint record_get_object_primitive(in uint rc) { return rc & 0x00FFFFFF;                }
 bool record_get_anyhit(in uint rc)           { return rc == 0x1;                      }
 
-struct PositionSample {
-  // Position/normal on surface of entity
-  vec3  p, n;
+// Getters to read packed Object material data;
+// uvec2/uint records are used by objects to store material values/texture indices
+bool  record_is_sampled(in uvec2 rc) { return (rc.y & 0xFFFF0000) != 0; }
+bool  record_is_sampled(in uint rc)  { return (rc & 0xFFFF0000) != 0;     }
+bool  record_is_direct(in uvec2 rc)  { return (rc.y & 0xFFFF0000) == 0; }
+bool  record_is_direct(in uint rc)   { return (rc & 0xFFFF0000) == 0;     }
+uint  record_get_sampler_index(in uvec2 rc) { return rc.x & 0x0000FFFF; }
+uint  record_get_sampler_index(in uint rc)  { return rc & 0x0000FFFF;   }
+vec3  record_get_direct_value(in uvec2 rc)  { return vec3(unpackHalf2x16(rc.x), 
+                                                          unpackHalf2x16(rc.y).x); }
+float record_get_direct_value(in uint rc)   { return unpackHalf2x16(rc).x; }
 
-  // Exitant sampled direction to p, world space
-  vec3  d;
-
-  // Distance from surface to position
-  float t;
-
-  // Sampling density
-  float pdf;
-
-  // Is the sample some weird dirac
-  bool is_delta;
-
-  // Record referring to underlying entity
-  uint data;
-};
-
-struct BRDFSample {
-  // Exitant sampled direction, local space
-  vec3  wo;
-
-  // BSDF value divided by (probability x cosine foreshortening)
-  vec4  f;
-
-  // Is the sample some weird dirac
-  bool is_delta;
-
-  // Sampling density
-  float pdf;
-};
-
-#endif RECORD_GLSL_GUARD
+#endif // RECORD_GLSL_GUARD

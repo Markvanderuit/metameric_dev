@@ -97,6 +97,10 @@ namespace met {
   template <typename MeshTy>
   eig::Matrix4f unitize_mesh(MeshTy &mesh);
 
+  // Adjust a mesh so there are no triangles with 0-size UVs
+  template <typename MeshTy>
+  void fix_degenerate_uvs(MeshTy &mesh);
+
   /* Copying modification functions */
   
   // Convert between indexed/aligned/other mesh types
@@ -136,6 +140,15 @@ namespace met {
     met_trace();
     auto copy = convert_mesh<OutputMesh>(mesh);
     renormalize_mesh(copy);
+    return copy;
+  }
+
+  // Slightly adjust collapsed or degenerate UV coordinates
+  template <typename OutputMesh, typename InputMesh>
+  OutputMesh fixed_degenerate_uvs(const InputMesh &mesh) {
+    met_trace();
+    auto copy = convert_mesh<OutputMesh>(mesh);
+    fix_degenerate_uvs(copy);
     return copy;
   }
 

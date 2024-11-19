@@ -2,10 +2,9 @@
 #define RENDER_SENSOR_GLSL_GUARD
 
 #include <render/ray.glsl>
-#include <spectrum.glsl>
 
 // Simple sensor definition based on matrices
-struct Sensor {
+struct FilmSensor {
   mat4  proj_trf;
   mat4  view_trf;
   uvec2 film_size;
@@ -27,11 +26,12 @@ struct RaySensor {
 
 // Sample from sensor at a specific pixel
 struct SensorSample {
-  Ray   ray;  // Sensor ray
-  vec4  wvls; // Packet of wavelengths along ray
-  vec4  pdfs; // Packet of pdfs for each ray/wavelength pair
+  Ray  ray;  // Sensor ray
+  vec4 wvls; // Packet of wavelengths along ray
+  vec4 pdfs; // Packet of pdfs for each ray/wavelength pair
 };
 
+// Simple hero sampling helper
 float rotate_sample_1d(in float sample_1d, in uint i, in uint n) {
   return mod(sample_1d + float(i) / float(n), 1.f);
 }
@@ -50,6 +50,7 @@ vec2 sample_tent_filter(in vec2 sample_2d) {
   return xy; // [-1, 1]
 }
 
+// Given a ray sensor, generate a sample
 SensorSample sample_sensor(in RaySensor sensor, in float sample_1d) {
   SensorSample ss;
 
@@ -57,16 +58,50 @@ SensorSample sample_sensor(in RaySensor sensor, in float sample_1d) {
   ss.ray = init_ray(sensor.o, sensor.d);
 
   // Sample wavelengths; stratified sample through invercse cdf, if available
+#ifndef WAVELENGTH_SAMPLING_BUCKETED
   for (uint i = 0; i < 4; ++i) {
     DistributionSampleContinuous ds = sample_wavelength_continuous(rotate_sample_1d(sample_1d, i, 4));
     ss.wvls[i] = ds.f;
     ss.pdfs[i] = ds.pdf;
   }
+#endif
 
   return ss;
 }
 
-SensorSample sample_sensor(in Sensor sensor, in ivec2 px, in uint sample_i, in vec3 sample_3d) {
+// Given a single pixel sensor, generate a sample
+SensorSample sample_sensor(in PixelSensor sensor, in vec3 sample_3d) {
+  SensorSample ss;
+
+  // Get necessary sensor information
+  float tan_y    = 1.f / sensor.proj_trf[1][1];
+  float aspect   = float(sensor.film_size.x) / float(sensor.film_size.y);
+  mat4  view_inv = inverse(sensor.view_trf);
+
+  // Sample film position inside pixel, transform to [-1, 1]
+  vec2 xy = (vec2(sensor.pixel) + 0.5 + sample_tent_filter(sample_3d.xy)) / vec2(sensor.film_size);
+  xy = (xy - .5f) * 2.f;
+  
+  // Generate camera ray from sample
+  ss.ray = init_ray(
+    (view_inv * vec4(0, 0, 0, 1)).xyz,
+    normalize((view_inv * vec4(xy.x * tan_y * aspect, xy.y * tan_y, -1, 0)).xyz)
+  );
+
+  // Sample wavelengths; stratified sample through invercse cdf, if available
+#ifndef WAVELENGTH_SAMPLING_BUCKETED
+  for (uint i = 0; i < 4; ++i) {
+    DistributionSampleContinuous ds = sample_wavelength_continuous(rotate_sample_1d(sample_3d.z, i, 4));
+    ss.wvls[i] = ds.f;
+    ss.pdfs[i] = ds.pdf;
+  }
+#endif
+
+  return ss;
+}
+
+// Given a full film camera sensor, generate a sample
+SensorSample sample_sensor(in FilmSensor sensor, in ivec2 px, in uint sample_i, in vec3 sample_3d) {
   SensorSample ss;
 
   // Stratify into n_bins^2 subpixels
@@ -91,43 +126,13 @@ SensorSample sample_sensor(in Sensor sensor, in ivec2 px, in uint sample_i, in v
   );
 
   // Sample wavelengths; stratified sample through invercse cdf, if available
+#ifndef WAVELENGTH_SAMPLING_BUCKETED
   for (uint i = 0; i < 4; ++i) {
-    // ss.wvls[i] = rotate_sample_1d(sample_3d.z, i, 4);
-    // ss.pdfs[i] = 1.f;
     DistributionSampleContinuous ds = sample_wavelength_continuous(rotate_sample_1d(sample_3d.z, i, 4));
     ss.wvls[i] = ds.f;
     ss.pdfs[i] = ds.pdf;
   }
-
-  return ss;
-}
-
-SensorSample sample_sensor(in PixelSensor sensor, in vec3 sample_3d) {
-  SensorSample ss;
-
-  // Get necessary sensor information
-  float tan_y    = 1.f / sensor.proj_trf[1][1];
-  float aspect   = float(sensor.film_size.x) / float(sensor.film_size.y);
-  mat4  view_inv = inverse(sensor.view_trf);
-
-  // Sample film position inside pixel, transform to [-1, 1]
-  vec2 xy = (vec2(sensor.pixel) + sample_3d.xy) / vec2(sensor.film_size);
-  xy = (xy - .5f) * 2.f;
-  
-  // Generate camera ray from sample
-  ss.ray = init_ray(
-    (view_inv * vec4(0, 0, 0, 1)).xyz,
-    normalize((view_inv * vec4(xy.x * tan_y * aspect, xy.y * tan_y, -1, 0)).xyz)
-  );
-
-  // Sample wavelengths; stratified sample through invercse cdf, if available
-  for (uint i = 0; i < 4; ++i) {
-    // ss.wvls[i] = rotate_sample_1d(sample_3d.z, i, 4);
-    // ss.pdfs[i] = 1.f;
-    DistributionSampleContinuous ds = sample_wavelength_continuous(rotate_sample_1d(sample_3d.z, i, 4));
-    ss.wvls[i] = ds.f;
-    ss.pdfs[i] = ds.pdf;
-  }
+#endif
 
   return ss;
 }
