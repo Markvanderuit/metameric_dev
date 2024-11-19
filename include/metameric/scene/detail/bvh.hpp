@@ -5,7 +5,7 @@
 #include <metameric/core/utility.hpp>
 #include <array>
 
-namespace met {
+namespace met::detail {
   // AABB representation used in cpu-side BVH
   struct AABB {
     eig::AlArray3f minb, maxb;
@@ -54,4 +54,4 @@ namespace met {
     BVH(CreateMeshInfo info);
     BVH(CreateAABBInfo info);
   };
-} // namespace met
+} // namespace met::detail

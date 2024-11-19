@@ -1,11 +1,11 @@
 #pragma once
 
 #include <metameric/core/fwd.hpp>
-#include <metameric/core/atlas.hpp>
-#include <metameric/core/bvh.hpp>
 #include <metameric/core/mesh.hpp>
 #include <metameric/core/image.hpp>
 #include <metameric/core/detail/packing.hpp>
+#include <metameric/scene/detail/atlas.hpp>
+#include <metameric/scene/detail/bvh.hpp>
 #include <metameric/scene/detail/utility.hpp>
 #include <small_gl/array.hpp>
 #include <small_gl/buffer.hpp>
@@ -19,8 +19,8 @@ namespace met::detail {
     // All cpu-side data is cached per mesh resource; meshes are simplified to the 
     // maximum BVH size and transformed to fit a unit cube before the BVH is computed
     struct MeshData {
-      met::Mesh     mesh;
-      met::BVH<8>   bvh;
+      Mesh          mesh;
+      BVH<8>        bvh;
       eig::Matrix4f unit_trf;   // Transform to undo mesh' packing into a unit cube
       uint          prims_offs; // Offset/extent into blas_prims buffer
       uint          nodes_offs; // Offset/extent into blas_nodes buffer
@@ -90,8 +90,8 @@ namespace met::detail {
     
     // Texture atlases store packed image data in f32 format; one atlas for 3-component
     // images, another for 1-component images
-    TextureAtlas2d3f texture_atlas_3f;
-    TextureAtlas2d1f texture_atlas_1f;
+    detail::TextureAtlas2d3f texture_atlas_3f;
+    detail::TextureAtlas2d1f texture_atlas_1f;
   
   public:
     // Class constructor and update function handle GL-side data

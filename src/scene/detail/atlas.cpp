@@ -1,9 +1,9 @@
 #include <metameric/core/ranges.hpp>
-#include <metameric/core/atlas.hpp>
+#include <metameric/scene/detail/atlas.hpp>
 #include <algorithm>
 #include <deque>
 
-namespace met {
+namespace met::detail {
   // Helper function to take a space, and a required size, and return
   // the split result and the set of remainder spaces
   constexpr auto atlas_split = [](auto padded_size, auto space) {
@@ -282,4 +282,4 @@ namespace met {
     met_explicit_atlas_components(float)
 
   met_explicit_atlas_types()
-} // namespace met
+} // namespace met::detail

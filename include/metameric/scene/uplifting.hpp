@@ -1,9 +1,9 @@
 #pragma once
 
 #include <metameric/core/fwd.hpp>
-#include <metameric/core/atlas.hpp>
 #include <metameric/core/constraints.hpp>
 #include <metameric/core/convex.hpp>
+#include <metameric/scene/detail/atlas.hpp>
 #include <metameric/scene/detail/utility.hpp>
 #include <small_gl/framebuffer.hpp>
 #include <small_gl/buffer.hpp>
@@ -242,13 +242,10 @@ namespace met {
       std::vector<ObjectData>    object_data;
 
       // Atlas textures; each scene object has a patch in the atlas for some material parameters
-      TextureAtlas2d4ui texture_coef; // Stores packed linear coefficients representing surface spectral reflectances in basis
+      detail::TextureAtlas2d4ui texture_coef; // Stores packed linear coefficients representing surface spectral reflectances in basis
 
       // Array texture; each layer holds one of 12 basis function spectra
       gl::TextureArray1d1f texture_basis;
-
-    public:
-      // Accessor functions
 
     public:
       // Class constructor and update function handle GL-side data

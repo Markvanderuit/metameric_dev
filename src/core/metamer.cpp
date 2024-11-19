@@ -3,7 +3,6 @@
 #include <metameric/core/solver.hpp>
 #include <metameric/core/math.hpp>
 #include <metameric/core/metamer.hpp>
-#include <metameric/core/moments.hpp>
 #include <metameric/core/ranges.hpp>
 #include <metameric/core/utility.hpp>
 #include <algorithm>

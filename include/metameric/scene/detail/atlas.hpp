@@ -5,7 +5,7 @@
 #include <small_gl/buffer.hpp>
 #include <small_gl/texture.hpp>
 
-namespace met {
+namespace met::detail {
   // Object describing a single texture patch reserved inside an arbitrary
   // atlas, fit for std140/std430 buffer layout. Kept separate as it is
   // template-independent, and we use it between different-typed atlases.
@@ -165,4 +165,4 @@ namespace met {
   using TextureAtlas2d2us = TextureAtlas<ushort, 2>;
   using TextureAtlas2d3us = TextureAtlas<ushort, 3>;
   using TextureAtlas2d4us = TextureAtlas<ushort, 4>;
-} // namespace met
+} // namespace met::detail

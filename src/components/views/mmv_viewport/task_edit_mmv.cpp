@@ -3,7 +3,6 @@
 #include <metameric/components/views/detail/file_dialog.hpp>
 #include <metameric/core/convex.hpp>
 #include <metameric/core/metamer.hpp>
-#include <metameric/core/moments.hpp>
 #include <metameric/scene/scene.hpp>
 #include <metameric/core/ranges.hpp>
 #include <small_gl/texture.hpp>

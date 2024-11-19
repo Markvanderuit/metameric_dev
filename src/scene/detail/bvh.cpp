@@ -1,5 +1,5 @@
-#include <metameric/core/bvh.hpp>
 #include <metameric/core/ranges.hpp>
+#include <metameric/scene/detail/bvh.hpp>
 #include <embree4/rtcore.h>
 #include <algorithm>
 #include <execution>
@@ -7,7 +7,7 @@
 #include <optional>
 #include <stack>
 
-namespace met {
+namespace met::detail {
   struct BuildNode {
     virtual float sah()     const = 0;
     virtual bool  is_leaf() const = 0;
@@ -258,4 +258,4 @@ namespace met {
   template class BVH<2>;
   template class BVH<4>;
   template class BVH<8>;
-} // namespace met
+} // namespace met::detail

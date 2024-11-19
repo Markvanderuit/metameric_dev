@@ -1,6 +1,7 @@
 #pragma once
 
 #include <metameric/core/fwd.hpp>
+#include <metameric/scene/detail/atlas.hpp>
 #include <metameric/scene/detail/utility.hpp>
 #include <small_gl/buffer.hpp>
 
@@ -96,7 +97,7 @@ namespace met {
       gl::Buffer object_info;
 
       // Stores packing of some brdf parameters (roughness, metallic at fp16)
-      TextureAtlas2d1ui texture_brdf; 
+      detail::TextureAtlas2d1ui texture_brdf; 
     
     public:
       // Class constructor and update function handle GL-side data
