@@ -31,7 +31,7 @@ namespace met {
       gl::Program::unbind_all();
       
       // Signal schedule re-creation and submit new schedule for main view
-      submit_metameric_editor_schedule(info);
+      submit_editor_schedule_auto(info);
     }
 
     bool handle_open(SchedulerHandle &info) {
@@ -46,7 +46,7 @@ namespace met {
         gl::Program::unbind_all();
 
         // Signal schedule re-creation and submit new schedule for main view
-        submit_metameric_editor_schedule(info);
+        submit_editor_schedule_auto(info);
         
         return true;
       }
@@ -81,7 +81,7 @@ namespace met {
       gl::Program::unbind_all();
       
       // Signal schedule re-creation and submit new schedule for main view
-      submit_metameric_editor_schedule(info);
+      submit_editor_schedule_auto(info);
     }
 
     void handle_close(SchedulerHandle &info) {
@@ -95,7 +95,7 @@ namespace met {
       info.global("scene").getw<Scene>().unload();
       
       // Signal schedule re-creation and submit empty schedule for main view
-      submit_metameric_editor_schedule(info);
+      submit_editor_schedule_auto(info);
     }
 
     void handle_exit(SchedulerHandle &info) {

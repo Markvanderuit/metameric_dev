@@ -5,7 +5,6 @@
 const uint met_max_meshes      = MET_SUPPORTED_MESHES;
 const uint met_max_objects     = MET_SUPPORTED_OBJECTS;
 const uint met_max_emitters    = MET_SUPPORTED_EMITTERS;
-const uint met_max_upliftings  = MET_SUPPORTED_UPLIFTINGS;
 const uint met_max_constraints = MET_SUPPORTED_CONSTRAINTS;
 const uint met_max_textures    = MET_SUPPORTED_TEXTURES;
 

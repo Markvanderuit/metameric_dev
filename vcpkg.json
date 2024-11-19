@@ -3,8 +3,6 @@
   "version-string": "0.1.0",
   "dependencies": [
     "avcpp", 
-    "cxxopts",
-    "catch2",
     "eigen3",
     "fmt",
     {

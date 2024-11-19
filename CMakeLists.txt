@@ -21,12 +21,8 @@ set(MET_WAVELENGTH_BASES    12) # Maximum nr. of bases used in generative functi
 set(MET_SUPPORTED_MESHES        32) # Maximum supported scene meshes
 set(MET_SUPPORTED_OBJECTS       32) # Maximum supported scene objects
 set(MET_SUPPORTED_EMITTERS      32) # Maximum supported scene emitters
-set(MET_SUPPORTED_UPLIFTINGS     8) # Maximum supported uplifting structures; multiple objects can share an uplifting
-set(MET_SUPPORTED_CONSTRAINTS  512) # Maximum supported boundary spectra + interior spectra
 set(MET_SUPPORTED_TEXTURES     128) # Maximum supported scene textures
-
-# TODO remove; inserted in code/shaders as preprocessor defines
-set(MET_MOMENT_COEFFICIENTS 12) # Nr. of coeffs used for moment-based spectral representation
+set(MET_SUPPORTED_CONSTRAINTS  512) # Maximum supported boundary + interior spectra per uplifting
 
 # Print configuration info
 message(STATUS "Metameric : Enabling exceptions = ${MET_ENABLE_EXCEPTIONS}")
@@ -46,17 +42,16 @@ set(CMAKE_INSTALL_PREFIX           ${CMAKE_BINARY_DIR}/out)
 find_package(OpenMP REQUIRED)
 find_package(Threads REQUIRED)
 
-# Include xAtlas/Autodiff/small_gl manually
+# Include the following with source
 option(gl_enable_exceptions  "" ${MET_ENABLE_EXCEPTIONS})
 option(gl_enable_tracy       "" ${MET_ENABLE_TRACY})
 add_subdirectory(third_party/autodiff)
 add_subdirectory(third_party/rapidobj)
 add_subdirectory(third_party/small_gl)
-add_subdirectory(third_party/xatlas)
+# add_subdirectory(third_party/xatlas) # disabled for now
 add_subdirectory(third_party/embree)
 
 # Include third party libraries
-find_package(Catch2    CONFIG REQUIRED)
 find_package(Eigen3    CONFIG REQUIRED)
 find_package(fmt       CONFIG REQUIRED)
 find_package(imgui     CONFIG REQUIRED)
@@ -77,7 +72,6 @@ find_path(ZSTR_INCLUDE_DIRS "zstr.hpp")
 
 # Specify cmake modules/finds
 include(CTest)
-include(Catch)
 include(spirv)
 include(dependency)
 
@@ -87,11 +81,9 @@ set(preprocessor_defines
   -DMET_WAVELENGTH_MAX=${MET_WAVELENGTH_MAX} 
   -DMET_WAVELENGTH_SAMPLES=${MET_WAVELENGTH_SAMPLES} 
   -DMET_WAVELENGTH_BASES=${MET_WAVELENGTH_BASES} 
-  -DMET_MOMENT_COEFFICIENTS=${MET_MOMENT_COEFFICIENTS}
   -DMET_SUPPORTED_MESHES=${MET_SUPPORTED_MESHES}
   -DMET_SUPPORTED_OBJECTS=${MET_SUPPORTED_OBJECTS}
   -DMET_SUPPORTED_EMITTERS=${MET_SUPPORTED_EMITTERS}
-  -DMET_SUPPORTED_UPLIFTINGS=${MET_SUPPORTED_UPLIFTINGS}
   -DMET_SUPPORTED_CONSTRAINTS=${MET_SUPPORTED_CONSTRAINTS}
   -DMET_SUPPORTED_TEXTURES=${MET_SUPPORTED_TEXTURES}
 )
@@ -106,6 +98,7 @@ endif()
 set(thrp_includes ${STB_INCLUDE_DIRS} ${ZSTR_INCLUDE_DIRS})
 set(core_dependencies
   autodiff::autodiff
+  # xatlas
   Eigen3::Eigen
   fmt::fmt-header-only
   nlohmann_json::nlohmann_json
@@ -116,11 +109,12 @@ set(core_dependencies
   rapidobj
   small_gl
   Tracy::TracyClient
-  xatlas
   ZLIB::ZLIB
+)
+set(scene_dependencies
   embree
 )
-set(component_dependencies
+set(editor_dependencies
   imgui::imgui
   imguizmo::imguizmo
   implot::implot
@@ -165,7 +159,7 @@ add_library_pch(core)
 
 # Set up scene library
 add_library_r(scene scene)
-target_link_libraries(scene PUBLIC core)
+target_link_libraries(scene PUBLIC core ${scene_dependencies})
 target_precompile_headers(scene REUSE_FROM core)
 
 # Set up render library
@@ -173,15 +167,15 @@ add_library_r(render render)
 target_link_libraries(render PUBLIC scene)
 target_precompile_headers(render REUSE_FROM core)
 
-# Set up components library
-add_library_r(components components)
-target_link_libraries(components PUBLIC render ${component_dependencies})
-target_precompile_headers(components REUSE_FROM core)
+# Set up editor library
+add_library_r(editor editor)
+target_link_libraries(editor PUBLIC render ${editor_dependencies})
+target_precompile_headers(editor REUSE_FROM core)
 
 # Specify shader/resource targets, link these as dependencies for preprocessing
 add_shader_target(shaders shaders.bin)
-add_dependencies(render       shaders)
-add_dependencies(components   shaders)
+add_dependencies(render shaders)
+add_dependencies(editor shaders)
 
 # Copy ./resources/misc to bin/resources
 add_folder_copy_target(data_copy 
@@ -192,7 +186,7 @@ add_folder_copy_target(data_copy
 # Setup editor executable
 add_executable(metameric_editor src/app/metameric_editor.cpp)
 target_compile_features(metameric_editor PUBLIC cxx_std_23)
-target_link_libraries(metameric_editor PRIVATE core render components)
+target_link_libraries(metameric_editor PRIVATE core scene render editor)
 add_dependencies(metameric_editor data_copy embree_copy)
 
 # Setup render executable

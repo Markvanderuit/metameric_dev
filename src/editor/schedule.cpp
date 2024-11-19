@@ -14,7 +14,7 @@
 #include <metameric/editor/detail/imgui.hpp>
 
 namespace met {
-  void submit_metameric_editor_schedule_unloaded(detail::SchedulerBase &scheduler) {
+  void submit_editor_schedule_unloaded(detail::SchedulerBase &scheduler) {
     met_trace();
 
     debug::check_expr(scheduler.global("scene").is_init() && 
@@ -27,7 +27,7 @@ namespace met {
     scheduler.task("frame_end").init<detail::FrameEndTask>(false);
   }
 
-  void submit_metameric_editor_schedule_loaded(detail::SchedulerBase &scheduler) {
+  void submit_editor_schedule_loaded(detail::SchedulerBase &scheduler) {
     met_trace();
 
     debug::check_expr(scheduler.global("scene").is_init() && 
@@ -81,7 +81,7 @@ namespace met {
     scheduler.task("frame_end").init<detail::FrameEndTask>(false);
   }
   
-  void submit_metameric_editor_schedule(detail::SchedulerBase &scheduler) {
+  void submit_editor_schedule_auto(detail::SchedulerBase &scheduler) {
     met_trace();
 
     debug::check_expr(scheduler.global("scene").is_init() && 
@@ -89,9 +89,9 @@ namespace met {
 
     const auto &e_scene = scheduler.global("scene").getr<Scene>();
     if (e_scene.save_state == Scene::SaveState::eUnloaded) {
-      submit_metameric_editor_schedule_unloaded(scheduler);
+      submit_editor_schedule_unloaded(scheduler);
     } else {
-      submit_metameric_editor_schedule_loaded(scheduler);
+      submit_editor_schedule_loaded(scheduler);
     }
   }
 } // namespace met

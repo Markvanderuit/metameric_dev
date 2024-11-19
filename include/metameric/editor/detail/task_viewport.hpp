@@ -171,8 +171,8 @@ namespace met::detail {
       // Initialize program object in cache
       std::tie(m_program_key, std::ignore) = info.global("cache").getw<gl::detail::ProgramCache>().set({{ 
         .type       = gl::ShaderType::eCompute,
-        .spirv_path = "shaders/misc/texture_resample.comp.spv",
-        .cross_path = "shaders/misc/texture_resample.comp.json"
+        .spirv_path = "shaders/editor/detail/texture_resample.comp.spv",
+        .cross_path = "shaders/editor/detail/texture_resample.comp.json"
       }});
       
       // NN-sampler

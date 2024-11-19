@@ -18,8 +18,8 @@ namespace met {
     // Initialize program object in cache
     std::tie(m_program_key, std::ignore) = info.global("cache").getw<gl::detail::ProgramCache>().set({{ 
       .type       = gl::ShaderType::eCompute,
-      .spirv_path = "shaders/views/scene_viewport/combine.comp.spv",
-      .cross_path = "shaders/views/scene_viewport/combine.comp.json"
+      .spirv_path = "shaders/editor/scene_viewport/combine.comp.spv",
+      .cross_path = "shaders/editor/scene_viewport/combine.comp.json"
     }});
 
     // Initialize uniform buffers and corresponding mappings

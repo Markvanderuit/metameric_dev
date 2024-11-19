@@ -111,11 +111,11 @@ namespace met {
     
     // Generate program object
     m_program = {{ .type       = gl::ShaderType::eVertex,   
-                   .spirv_path = "shaders/views/mmv_viewport/draw_mmv_hull.vert.spv",
-                   .cross_path = "shaders/views/mmv_viewport/draw_mmv_hull.vert.json" },
+                   .spirv_path = "shaders/editor/mmv_viewport/draw_mmv_hull.vert.spv",
+                   .cross_path = "shaders/editor/mmv_viewport/draw_mmv_hull.vert.json" },
                  { .type       = gl::ShaderType::eFragment, 
-                   .spirv_path = "shaders/views/mmv_viewport/draw_mmv_hull.frag.spv",
-                   .cross_path = "shaders/views/mmv_viewport/draw_mmv_hull.frag.json" }};
+                   .spirv_path = "shaders/editor/mmv_viewport/draw_mmv_hull.frag.spv",
+                   .cross_path = "shaders/editor/mmv_viewport/draw_mmv_hull.frag.json" }};
     
     // Generate and set mapped uniform buffer
     std::tie(m_unif_buffer, m_unif_buffer_map) = gl::Buffer::make_flusheable_object<UnifLayout>();

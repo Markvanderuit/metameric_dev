@@ -314,8 +314,7 @@ namespace met::detail {
   }
 
   /* 
-    The following focuses on specific 8/12-component eigen packs, which come up when dealing
-    with moment/basis coefficients.
+    The following focuses on specific 8/12-component eigen packs, which come up when dealing with basis coefficients.
    */
 
   inline

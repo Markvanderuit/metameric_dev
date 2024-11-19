@@ -89,8 +89,8 @@ namespace met {
   void decimate_mesh(MeshTy &mesh, uint target_elems, float target_error = std::numeric_limits<float>::max());
 
   // Generate unique texture coordinates for a currently uv-mapped mesh
-  template <typename MeshTy>
-  std::vector<typename MeshTy::txuv_type> parameterize_mesh(MeshTy &mesh);
+  /* template <typename MeshTy>
+  std::vector<typename MeshTy::txuv_type> parameterize_mesh(MeshTy &mesh); */
 
   // Adjust a mesh s.t. the entire shape fits within [0, 1], and return
   // a transform to invert the operation
@@ -170,14 +170,14 @@ namespace met {
     return copy;
   }
 
-  // Parameterize a mesh s.t. uv coordinates are unique
+  /* // Parameterize a mesh s.t. uv coordinates are unique
   template <typename OutputMesh, typename InputMesh>
   std::pair<OutputMesh, std::vector<typename OutputMesh::txuv_type>> parameterized_mesh(const InputMesh &mesh) {
     met_trace();
     auto copy = convert_mesh<OutputMesh>(mesh);
     auto txuv = parameterize_mesh(copy);
     return { copy, txuv };
-  }
+  } */
 
   // Unitize a mesh s.t. it sits in a [0, 1] cube, and return mesh and inverse transform
   template <typename OutputMesh, typename InputMesh>

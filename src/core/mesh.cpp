@@ -2,7 +2,7 @@
 #include <metameric/core/ranges.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/core/detail/trace.hpp>
-#include <xatlas.h>
+// #include <xatlas.h>
 #include <meshoptimizer.h>
 #include <libqhullcpp/Qhull.h>
 #include <libqhullcpp/QhullVertexSet.h>
@@ -375,8 +375,7 @@ namespace met {
     compact_mesh(mesh);
   }
 
-  
-  template <typename MeshTy>
+  /* template <typename MeshTy>
   std::vector<typename MeshTy::txuv_type> parameterize_mesh(MeshTy &mesh) {
     met_trace();
 
@@ -457,7 +456,7 @@ namespace met {
     // Input mesh becomes placeholder mesh, and old (remapped) UVs are returned
     mesh = mesh_;
     return old_txuvs;
-  }
+  } */
   
   template <typename MeshTy>
   eig::Matrix4f unitize_mesh(MeshTy &mesh) {
@@ -546,13 +545,14 @@ namespace met {
     template                                                                                          \
     void fix_degenerate_uvs<OutputMesh>(OutputMesh &);                                                \
     template                                                                                          \
-    std::vector<typename OutputMesh::txuv_type> parameterize_mesh<OutputMesh>(OutputMesh &);          \
-    template                                                                                          \
     eig::Matrix4f unitize_mesh<OutputMesh>(OutputMesh &);                                             \
     template                                                                                          \
     OutputMesh generate_convex_hull<OutputMesh, eig::Array3f>(std::span<const eig::Array3f>);         \
     template                                                                                          \
     OutputMesh generate_convex_hull<OutputMesh, eig::AlArray3f>(std::span<const eig::AlArray3f>);
+
+    /* template
+    std::vector<typename OutputMesh::txuv_type> parameterize_mesh<OutputMesh>(OutputMesh &); */
 
   declare_function_delaunay_output_only(Delaunay)
   declare_function_delaunay_output_only(AlDelaunay)

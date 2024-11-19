@@ -1,5 +1,5 @@
-#include <metameric/scene/scene.hpp>
 #include <metameric/core/utility.hpp>
+#include <metameric/scene/scene.hpp>
 #include <metameric/editor/schedule.hpp>
 #include <small_gl/window.hpp>
 #include <small_gl/program.hpp>
@@ -67,7 +67,7 @@ namespace met {
       scheduler.global("scene").getw<Scene>().load(info.scene_path);
 
     // Load appropriate set of schedule tasks, then start the runtime loop
-    submit_metameric_editor_schedule(scheduler);
+    submit_editor_schedule_auto(scheduler);
     while (!window.should_close())
       scheduler.run();
 
