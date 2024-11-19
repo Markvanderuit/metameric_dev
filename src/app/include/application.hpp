@@ -5,7 +5,7 @@
 #include <metameric/core/scheduler.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/render/primitives_render.hpp>
-#include <metameric/components/views/detail/arcball.hpp>
+#include <metameric/editor/detail/arcball.hpp>
 #include <small_gl/window.hpp>
 #include <small_gl/detail/program_cache.hpp>
 #include <animation.hpp>
@@ -95,7 +95,7 @@ namespace met {
       scene.load(m_info.scene_path);
 
       // We use the scheduler to ensure scene data and spectral constraints are all handled properly
-      m_scheduler.task("scene_handler").init<LambdaTask>(
+      m_scheduler.task("scene_handler").init<detail::LambdaTask>(
       [view_name = m_info.view_name, view_scale = m_info.view_scale](auto &info) { 
         met_trace();
 
@@ -132,7 +132,7 @@ namespace met {
           sensor.flush();
         }
       });
-      m_scheduler.task("render").init<LambdaTask>([&](auto &info) {
+      m_scheduler.task("render").init<detail::LambdaTask>([&](auto &info) {
         met_trace();
 
         const auto &scene  = info.global("scene").getr<Scene>();

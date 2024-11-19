@@ -1,6 +1,6 @@
 #include <metameric/scene/scene.hpp>
 #include <metameric/core/utility.hpp>
-#include <metameric/components/schedule.hpp>
+#include <metameric/editor/schedule.hpp>
 #include <small_gl/window.hpp>
 #include <small_gl/program.hpp>
 #include <small_gl/detail/program_cache.hpp>

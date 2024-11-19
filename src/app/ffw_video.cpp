@@ -4,7 +4,7 @@
 #include <metameric/core/scheduler.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/render/primitives_render.hpp>
-#include <metameric/components/views/detail/arcball.hpp>
+#include <metameric/editor/detail/arcball.hpp>
 #include <video.hpp>
 #include <animation.hpp>
 #include <small_gl/window.hpp>
@@ -230,12 +230,12 @@ namespace met {
       scene.load(m_info.scene_path);
 
       // We use the scheduler to ensure scene data and spectral constraints are all handled properly
-      m_scheduler.task("scene_handler").init<LambdaTask>(
+      m_scheduler.task("scene_handler").init<detail::LambdaTask>(
         [](auto &info) { 
           met_trace();
           info.global("scene").getw<Scene>().update(); 
       });
-      m_scheduler.task("render").init<LambdaTask>([&](auto &info) {
+      m_scheduler.task("render").init<detail::LambdaTask>([&](auto &info) {
         met_trace();
 
         const auto &scene = info.global("scene").getr<Scene>();
