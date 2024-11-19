@@ -27,38 +27,39 @@ namespace met {
     using cnstr_type  = typename Uplifting::Vertex::cnstr_type;
 
     bool                        m_did_sample    = false;                   // Cache; did we generate samples this iteration?
-    std::deque<Colr>            m_colr_samples  = { };                     // For tracking incoming and exiting samples' positions
-    std::deque<Basis::vec_type> m_coef_samples  = { };                     // For tracking incoming and exiting samples' coefficeints
+    std::deque<MismatchSample>  m_samples       = { };                     // Tracks incoming/exiting sample data
     uint                        m_curr_samples  = 0;                       // How many samples are of the current vertex constraint
     uint                        m_prev_samples  = 0;                       // How many samples are of an old vertex constriant
     cnstr_type                  m_cstr_cache    = DirectColorConstraint(); // Cache of current vertex constraint, to detect mismatch volume change
 
     void insert(std::span<const MismatchSample> samples) {
       met_trace();
+      
       // If old samples exist, these need to be incrementally discarded,
       // figure out which parts to discard at the front before adding new samples
       if (m_prev_samples > 0) {
         auto reduce_size = std::min({ static_cast<uint>(samples.size()),
-                                      static_cast<uint>(m_colr_samples.size()),
+                                      static_cast<uint>(m_samples.size()),
                                       m_prev_samples });
         m_prev_samples -= reduce_size;
-        m_colr_samples.erase(m_colr_samples.begin(), m_colr_samples.begin() + reduce_size);
-        m_coef_samples.erase(m_coef_samples.begin(), m_coef_samples.begin() + reduce_size);
+        m_samples.erase(m_samples.begin(), m_samples.begin() + reduce_size);
       }
 
       // Add new samples to the end of the queue
-      rng::transform(samples, std::back_inserter(m_colr_samples), &MismatchSample::colr);
-      rng::transform(samples, std::back_inserter(m_coef_samples), &MismatchSample::coef);
+      rng::copy(samples, std::back_inserter(m_samples));
+
+      // Extract point data into range
+      auto points = m_samples | vws::transform(&MismatchSample::colr) | view_to<std::vector<Colr>>();
 
       // Determine extents of current full point set
-      auto maxb = rng::fold_left_first(m_colr_samples, [](auto a, auto b) { return a.max(b).eval(); }).value();
-      auto minb = rng::fold_left_first(m_colr_samples, [](auto a, auto b) { return a.min(b).eval(); }).value();
+      auto maxb = rng::fold_left_first(points, [](auto a, auto b) { return a.max(b).eval(); }).value();
+      auto minb = rng::fold_left_first(points, [](auto a, auto b) { return a.min(b).eval(); }).value();
 
       // Minimum threshold for convex hull generation exceeds simplex size,
       // because QHull can throw a fit on small inputs
       // if (m_colr_samples.size() >= 6 && (maxb - minb).minCoeff() > .005f) {
-      if (m_colr_samples.size() >= 6 && (maxb - minb).minCoeff() > .0005f) {
-        chull = {{ .data = m_colr_samples | view_to<std::vector<Colr>>() }};
+      if (m_samples.size() >= 6 && (maxb - minb).minCoeff() > .0005f) {
+        chull = {{ .data = points }};
       } else {
         chull = { };
       }
@@ -72,8 +73,8 @@ namespace met {
       // Update convex hull samples, or discard them if mismatching is not possible
       if (vert.has_mismatching(scene, uplifting)) {
         if (m_did_sample = !is_converged(); m_did_sample) {
-          auto samples = vert.realize_mismatch(scene, uplifting, m_curr_samples, mmv_uplift_samples_iter);
-          insert(samples);
+          auto new_samples = vert.realize_mismatch(scene, uplifting, m_curr_samples, mmv_uplift_samples_iter);
+          insert(new_samples);
           m_curr_samples += mmv_uplift_samples_iter;
         }
       } else {
@@ -82,8 +83,7 @@ namespace met {
         m_curr_samples = 0;
         m_prev_samples = 0;
         m_did_sample   = true;
-        m_colr_samples.clear();
-        m_coef_samples.clear();
+        m_samples.clear();
       }
 
       // Return zero constraint for inactive vertices
@@ -95,7 +95,10 @@ namespace met {
         // nonlinear solver runs. Find the best enclosing simplex, and then mix the
         // attached coefficients to generate a spectrum at said position
         auto [bary, elem] = chull.find_enclosing_elem(vert.get_mismatch_position());
-        auto coeffs       = elem | index_into_view(m_coef_samples) | view_to<std::vector<Basis::vec_type>>();
+        auto coeffs       = elem 
+                          | index_into_view(m_samples) 
+                          | vws::transform(&MismatchSample::coef)
+                          | view_to<std::vector<Basis::vec_type>>();
 
         // Linear combination reconstructs coefficients for this metamer
         auto coef =(bary[0] * coeffs[0] + bary[1] * coeffs[1]
@@ -135,7 +138,7 @@ namespace met {
       m_cstr_cache    = v.constraint;
       m_curr_samples  = 0;
       m_did_sample    = true;
-      m_prev_samples  = m_colr_samples.size();
+      m_prev_samples  = m_samples.size();
     }
   };
 

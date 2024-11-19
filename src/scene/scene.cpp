@@ -223,12 +223,36 @@ namespace met {
     js.at("upliftings").get_to(scene.components.upliftings.data());
     js.at("views").get_to(scene.components.views.data());
   }
+
+  // Scene serialization to/from si partial; only resource data is serialized
+  namespace io {
+    void to_stream(const Scene &scene, std::ostream &str) {
+      met_trace();
+      io::to_stream(scene.resources.meshes,      str);
+      io::to_stream(scene.resources.images,      str);
+      io::to_stream(scene.resources.illuminants, str);
+      io::to_stream(scene.resources.observers,   str);
+      io::to_stream(scene.resources.bases,       str);
+    }
+
+    void from_stream(Scene &scene, std::istream &str) {
+      met_trace();
+      io::from_stream(scene.resources.meshes,      str);
+      io::from_stream(scene.resources.images,      str);
+      io::from_stream(scene.resources.illuminants, str);
+      io::from_stream(scene.resources.observers,   str);
+      io::from_stream(scene.resources.bases,       str);
+    }
+  } // namespace io
+
+  Scene::Scene(ResourceHandle cache_handle) 
+  : m_cache_handle(cache_handle) { }
   
   void Scene::create() {
     met_trace();
  
     // Clear out scene first
-    *this = { };
+    unload();
 
     // Normalized D65 integrating to 1 luminance; probably more useful during rendering
     // than regular D65
@@ -297,7 +321,7 @@ namespace met {
     met_trace();
 
     // Clear out scene first
-    *this = { };
+    *this = { m_cache_handle };
 
     // Set state to unloaded
     save_path  = "";
@@ -315,7 +339,7 @@ namespace met {
     // Attempt opening zlib compressed stream, and serialize scene resources
     auto str = zstr::ofstream(data_path.string(), scene_o_flags, Z_BEST_SPEED);
     debug::check_expr(str.good());
-    to_stream(str);
+    io::to_stream(*this, str);
 
     // Attempt serialize and save of scene object to .json file
     json js = *this;
@@ -330,7 +354,7 @@ namespace met {
     met_trace();
     
     // Clear out scene first
-    *this = { };
+    unload();
 
     // Get paths to .json and .data files with matching extensions
     fs::path json_path = io::path_with_ext(path, ".json");
@@ -343,7 +367,7 @@ namespace met {
     // Next, attempt opening zlib compressed stream, and deserialize to scene object
     auto str = zstr::ifstream(data_path.string(), scene_i_flags);
     debug::check_expr(str.good());
-    from_stream(str);
+    io::from_stream(*this, str);
       
     // Set state to fresh load
     save_path  = io::path_with_ext(path, ".json");
@@ -353,7 +377,7 @@ namespace met {
 
   void Scene::import_scene(const fs::path &path) {
     met_trace();
-    Scene other;
+    Scene other = { m_cache_handle };
     other.load(path);
     import_scene(std::move(other));
   }
@@ -632,23 +656,5 @@ namespace met {
     components.objects.update(*this);
     components.upliftings.update(*this);
     components.views.update(*this);
-  }
-  
-  void Scene::to_stream(std::ostream &str) const {
-    met_trace();
-    io::to_stream(resources.meshes,      str);
-    io::to_stream(resources.images,      str);
-    io::to_stream(resources.illuminants, str);
-    io::to_stream(resources.observers,   str);
-    io::to_stream(resources.bases,       str);
-  }
-
-  void Scene::from_stream(std::istream &str) {
-    met_trace();
-    io::from_stream(resources.meshes,      str);
-    io::from_stream(resources.images,      str);
-    io::from_stream(resources.illuminants, str);
-    io::from_stream(resources.observers,   str);
-    io::from_stream(resources.bases,       str);
   }
 } // namespace met

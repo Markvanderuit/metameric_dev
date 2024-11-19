@@ -375,6 +375,262 @@ namespace met {
         const auto &basis = scene.resources.bases[0].value();
         texture_basis.set(obj_span<const float>(basis.func));
       }
+
+      // Adjust nr of UpliftingData and ObjectData blocks up to or down to relevant size
+      for (uint i = uplifting_data.size(); i < scene.components.upliftings.size(); ++i)
+        uplifting_data.push_back(i);
+      for (uint i = uplifting_data.size(); i > scene.components.upliftings.size(); --i)
+        uplifting_data.pop_back();
+      for (uint i = object_data.size(); i < scene.components.objects.size(); ++i)
+        object_data.push_back(i);
+      for (uint i = object_data.size(); i > scene.components.objects.size(); --i)
+        object_data.pop_back();
+
+      // Generate spectral uplifting data and per-object spectral texture
+      for (auto &data : uplifting_data)
+        data.update(scene);
+      for (auto &data : object_data)
+        data.update(scene);
+    }
+
+    using MetamerBuilder = SceneGLHandler<met::Uplifting>::MetamerBuilder;
+
+    void MetamerBuilder::insert_samples(std::span<const MismatchSample> new_samples) {
+      met_trace();
+      
+      // If old samples exist, these are incrementally discarded,
+      // figure out which parts to discard at the front before adding new samples
+      if (m_samples_prev > 0) {
+        auto reduce_size = std::min({ static_cast<uint>(new_samples.size()),
+                                      static_cast<uint>(m_samples.size()),
+                                      m_samples_prev });
+        m_samples_prev -= reduce_size;
+        m_samples.erase(m_samples.begin(), m_samples.begin() + reduce_size);
+      }
+
+      // Add new samples to the end of the queue
+      rng::copy(new_samples, std::back_inserter(m_samples));
+
+      // Extract point data into range, and determine AABB of this full point set
+      auto points = m_samples | vws::transform(&MismatchSample::colr) | view_to<std::vector<Colr>>();
+      auto maxb   = rng::fold_left_first(points, [](auto a, auto b) { return a.max(b).eval(); }).value();
+      auto minb   = rng::fold_left_first(points, [](auto a, auto b) { return a.min(b).eval(); }).value();
+
+      // Minimum threshold for convex hull generation exceeds simplex size,
+      // because QHull can throw a fit on small inputs
+      // if (m_colr_samples.size() >= 6 && (maxb - minb).minCoeff() > .005f) {
+      if (m_samples.size() >= 6 && (maxb - minb).minCoeff() > .0005f) {
+        hull = {{ .data = points }};
+      } else {
+        hull = { };
+      }
+    }
+
+    MismatchSample MetamerBuilder::realize(const Scene &scene, uint uplifting_i, uint vertex_i) {
+      met_trace();
+
+      // Get handles
+      const auto &uplifting = scene.components.upliftings[uplifting_i];
+      const auto &vert      = uplifting->verts[vertex_i];
+
+      // Return dead data if the vertex is inactive
+      guard(vert.is_active, MismatchSample { Colr(0), Spec(0), Basis::vec_type(0) });
+
+      // First, deal with new mismatch samples
+      if (vert.has_mismatching(scene, *uplifting)) {
+        // Vertex data supports metamer mismatching;
+        // then, if the builder is not converged, generate new samples
+        if (m_did_sample = !is_converged(); m_did_sample) {
+          auto new_samples = vert.realize_mismatch(scene, *uplifting, m_samples_curr, n_uplifting_mismatch_samples_iter);
+          insert_samples(new_samples);
+          m_samples_curr += new_samples.size();
+        }
+      } else {
+        // Vertex data does not support metamer mismatching; 
+        // clear internal state entirely as the builder should play dead
+        hull = { };
+        m_samples.clear();
+        m_samples_curr = 0;
+        m_samples_prev = 0;
+        m_did_sample   = true;
+      }
+
+      // Next, deal with generating a spectral output
+      if (hull.has_delaunay()) {
+        // We use the convex hull to quickly find a metamer, instead of doing costly
+        // solver runs. Find the best enclosing simplex, and then mix the
+        // attached coefficients to generate a spectrum at said position
+        auto [bary, elem] = hull.find_enclosing_elem(vert.get_mismatch_position());
+        auto coeffs       = elem 
+                          | index_into_view(m_samples) 
+                          | vws::transform(&MismatchSample::coef)
+                          | view_to<std::vector<Basis::vec_type>>();
+
+        // Linear combination reconstructs coefficients for this metamer
+        auto coef =(bary[0] * coeffs[0] + bary[1] * coeffs[1]
+                  + bary[2] * coeffs[2] + bary[3] * coeffs[3]).cwiseMax(-1.f).cwiseMin(1.f).eval();
+        auto spec = scene.resources.bases[uplifting->basis_i].value()(coef);
+        auto colr = vert.is_position_shifting()
+                  ? scene.csys(*uplifting)(spec)
+                  : vert.get_vertex_position();
+
+        // Return all three
+        return MismatchSample { colr, spec, coef };
+      } else {
+        // Fallback; let a solver handle the constraint, potentially
+        // outputting a metamer that does not satisfy all constraints. Either
+        // there are no constraints, or the constraints conflict somehow
+        return vert.realize(scene, *uplifting);
+      }
+    }
+
+    bool MetamerBuilder::supports_vertex(const Scene &scene, uint uplifting_i, uint vertex_i) {
+      met_trace();
+
+      // Forward to vertex
+      const auto &uplifting = scene.components.upliftings[uplifting_i];
+      return uplifting->verts[vertex_i].has_equal_mismatching(m_cnstr_cache);
+    }
+    
+    void MetamerBuilder::set_vertex(const Scene &scene, uint uplifting_i, uint vertex_i) {
+      met_trace();
+      
+      // Reset the cache for the new vertex
+      const auto &uplifting = scene.components.upliftings[uplifting_i];
+      m_cnstr_cache  = uplifting->verts[vertex_i].constraint;
+      m_samples_prev = m_samples.size();
+      m_samples_curr = 0;
+      m_did_sample   = true;
+    }
+
+    SceneGLHandler<met::Uplifting>::UpliftingData::UpliftingData(uint uplifting_i)
+    : m_uplifting_i(uplifting_i), m_is_first_update(true) {
+      met_trace_full();
+
+      // Instantiate mapped buffer objects; these'll hold packed barycentric and spectral coefficient
+      // data, which is used by ObjectData::update below to bake spectral textures per object
+      std::tie(buffer_bary, m_buffer_bary_map) = gl::Buffer::make_flusheable_object<BufferBaryLayout>();
+      std::tie(buffer_coef, m_buffer_coef_map) = gl::Buffer::make_flusheable_object<BufferCoefLayout>();
+    }
+
+    void SceneGLHandler<met::Uplifting>::UpliftingData::update(const Scene &scene) {
+      met_trace_full();
+
+      // Get handles to uplifting and linked resources
+      const auto &uplifting  = scene.components.upliftings[m_uplifting_i];
+      const auto &basis      = scene.resources.bases[uplifting->basis_i];
+      const auto &observer   = scene.resources.observers[uplifting->observer_i];
+      const auto &illuminant = scene.resources.illuminants[uplifting->illuminant_i];
+      
+      // Flag 1; test if color system has, in any way/shape/form, been modified
+      bool is_color_system_stale = m_is_first_update
+        || uplifting->basis_i      || basis
+        || uplifting->observer_i   || observer
+        || uplifting->illuminant_i || illuminant;
+      
+      // Flag 2; test if the tessellation has, in any way/shape/form, been modified;
+      //         note that later steps can set this to true if necessary
+      bool is_tessellation_stale = m_is_first_update
+        || uplifting.state.verts.is_resized() || is_color_system_stale;
+      
+      // Flag 3; test if a spectrum was changed; set to true if necessary
+      bool is_spectrum_stale = m_is_first_update;
+
+      // Step 1; generate a color system boundary; spectra, coefficients, and colors
+      if (is_color_system_stale) {
+        boundary = uplifting->sample_color_solid(scene, 4, n_uplifting_boundary_samples);
+        fmt::print("Uplifting {} sampled {} color system boundary points\n", m_uplifting_i, boundary.size());
+      }
+
+      // Step 2; generate the interior spectra, coefficients, and colors for uplifting constraints.
+      //         We rely on MetamerBuilder, which gives us both a boundary for the user
+      //         in the UI, and simple interpolated interior spectra.
+      {
+        // Ensure the right data is present
+        metamer_builders.resize(uplifting->verts.size());
+        interior.resize(uplifting->verts.size());
+
+        // Iterate interior vertioces
+        for (int i = 0; i < uplifting->verts.size(); ++i) {
+          auto &builder = metamer_builders[i];
+
+          // Test if the builder is due for a reset; either the color system changed, or the
+          // vertex did in some important way
+          if (is_color_system_stale || !builder.supports_vertex(scene, m_uplifting_i, i))
+            builder.set_vertex(scene, m_uplifting_i, i);
+
+          // If the builder has already converged, or the vertex wasn't even touched; exit early
+          guard_continue(!builder.is_converged() || uplifting.state.verts[i]);
+          is_spectrum_stale = true;
+
+          // Generate a new sample from the builder
+          auto new_sample = builder.realize(scene, m_uplifting_i, i);
+
+          // Check if the color output of this sample is different from the previous sample;
+          // if so, we denote the tessellation as stale
+          auto old_sample = interior[i];
+          interior[i] = new_sample;
+          if (!old_sample.colr.isApprox(new_sample.colr))
+            is_tessellation_stale = true;
+        } // for (int i)
+      }
+
+      // Step 3; merge boundary and interior spectra, and over this generate an R^3 delaunay tessellation
+      boundary_and_interior.resize(boundary.size() + interior.size());
+      rng::copy(boundary, boundary_and_interior.begin());
+      rng::copy(interior, boundary_and_interior.begin() + boundary.size());
+      if (is_tessellation_stale) {
+        auto points = boundary_and_interior | vws::transform(&MismatchSample::colr) | view_to<std::vector<Colr>>();
+        tessellation = generate_delaunay<AlDelaunay, Colr>(points);
+      }
+
+      // Step 4; update GL-side packed data for ObjectData::update() to use later on
+      if (is_color_system_stale || is_tessellation_stale || is_spectrum_stale) {
+        // Updated buffer size values to the nr. of tetrahedra
+        m_buffer_bary_map->size = tessellation.elems.size();
+        m_buffer_coef_map->size = tessellation.elems.size();
+
+        // Per tetrahedron, emplace packed matrix representation of vertex barycentric weights
+        std::transform(
+          std::execution::par_unseq,
+          range_iter(tessellation.elems),
+          m_buffer_bary_map->data.begin(),
+          [&](const eig::Array4u &el) {
+            const auto vts = el | index_into_view(tessellation.verts);
+            BufferBaryBlock block;
+            block.inv.block<3, 3>(0, 0) = (eig::Matrix3f() 
+              << vts[0] - vts[3], vts[1] - vts[3], vts[2] - vts[3]
+            ).finished().inverse();
+            block.sub.head<3>() = vts[3];
+            return block;
+          });
+        
+        // Per tetrahedron, emplace packed spectral coefficients of vertex spectra
+        std::transform(
+          std::execution::par_unseq,
+          range_iter(tessellation.elems),
+          m_buffer_coef_map->data.begin(),
+          [&](const eig::Array4u &el) {
+            BufferCoefBlock block;
+            for (uint i = 0; i < 4; ++i)
+              block.col(i) = boundary_and_interior[el[i]].coef;
+            return block;
+          });
+        
+        // Flush buffer up to relevant used range
+        buffer_bary.flush(sizeof(uint) + sizeof(BufferBaryBlock) * tessellation.elems.size());
+        buffer_coef.flush(sizeof(uint) + sizeof(BufferCoefBlock) * tessellation.elems.size());
+      }
+    }
+
+    SceneGLHandler<met::Uplifting>::ObjectData::ObjectData(uint object_i)
+    : m_object_i(object_i) {
+      met_trace();
+      // ...
+    }
+
+    void SceneGLHandler<met::Uplifting>::ObjectData::update(const Scene &scene) {
+      // ...
     }
   } // namespace detail
 } // namespace met

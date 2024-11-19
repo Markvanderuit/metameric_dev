@@ -66,9 +66,6 @@ namespace met {
     const auto &e_basis   = e_scene.resources.bases[e_uplifting.basis_i];
     const auto &e_cmfs    = e_scene.resources.observers[e_uplifting.observer_i];
     const auto &e_illm    = e_scene.resources.illuminants[e_uplifting.illuminant_i];
-    const auto &e_objects = e_scene.components.objects;
-    const auto &e_meshes  = e_scene.resources.meshes;
-    const auto &e_images  = e_scene.resources.images;
     
     // Flag tells if the color system spectra have, in any way, been modified
     bool csys_stale = is_first_eval() 
@@ -115,7 +112,7 @@ namespace met {
         // Add to set of spectra and coefficients; we set tssl_stale to true only if
         // the color output is changed;
         {
-          auto sample_old = m_interior_samples[m_boundary_samples.size() + i];
+          auto sample_old = m_interior_samples[i];
           m_interior_samples[i] = sample;
           if (!sample_old.colr.isApprox(sample.colr))
             tssl_stale = true; // skipping atomic, as everyone's just setting to true r.n.
@@ -123,14 +120,14 @@ namespace met {
       }
     }
 
-    // Merge boundary and interior sample data
+    // 3. Merge boundary and interior sample data
     {
       m_tessellation_samples.resize(m_boundary_samples.size() + m_interior_samples.size());
       rng::copy(m_boundary_samples, m_tessellation_samples.begin());
       rng::copy(m_interior_samples, m_tessellation_samples.begin() + m_boundary_samples.size());
     }
 
-    // 3. Generate color system tesselation and pack for the gl-side
+    // 4. Generate color system tesselation and pack for the gl-side
     if (tssl_stale) {
       // Generate new tesselation
       auto points = m_tessellation_samples | vws::transform(&MismatchSample::colr) | view_to<std::vector<Colr>>();
@@ -161,7 +158,7 @@ namespace met {
       i_tesselation_data.flush();
     } // if (tssl_stale)
 
-    // 4. Pack spectral coefficients for the gl-side
+    // 5. Pack spectral coefficients for the gl-side
     //    Spectra are always changed, so update them either way
     {
       // Assemble coefficients into mapped buffer. We pack all 4x12 coefficients of a tetrahedron
@@ -178,7 +175,7 @@ namespace met {
       info("tesselation_coef").getw<gl::Buffer>().flush();
     }
 
-    // 5. Expose some data for visualisation
+    // 6. Expose some data for visualisation
     {
       // Generated spectral constraint data is useful to have
       info("constraint_samples").getw<std::vector<MismatchSample>>() = m_interior_samples;

@@ -3,13 +3,22 @@
 #include <metameric/core/fwd.hpp>
 #include <metameric/core/atlas.hpp>
 #include <metameric/core/constraints.hpp>
+#include <metameric/core/convex.hpp>
 #include <metameric/scene/detail/utility.hpp>
+#include <small_gl/buffer.hpp>
+#include <small_gl/program.hpp>
 #include <small_gl/texture.hpp>
+#include <deque>
 
 namespace met {
   // Forward declaration
   struct Uplifting;
   struct UpliftingVertex;
+
+  // Spectral sample rates
+  constexpr static uint n_uplifting_boundary_samples      = 128u; // Color system boundary samples
+  constexpr static uint n_uplifting_mismatch_samples      = 256u; // Metamer mismatch volume samples
+  constexpr static uint n_uplifting_mismatch_samples_iter = 16u;  // Above, but per frame total
 
   // Spectral uplifting data;
   // Formed by a color system whose spectral boundary is found, and whose interior is
@@ -23,7 +32,7 @@ namespace met {
     uint                observer_i   = 0; // Index of primary color system observer data
     uint                illuminant_i = 0; // Index of primary color system illuminant data
     uint                basis_i      = 0; // Index of underlying basis function data
-    std::vector<Vertex> verts;            // All vertex constraints on mesh
+    std::vector<Vertex> verts;            // All vertex constraints
 
   public: // Public methods
     // Generate N spectral samples on the color system boundary, using the spherical sampling
@@ -74,8 +83,7 @@ namespace met {
     // minor roundtrip error to the uplifting's color system, or whether this error
     // is intentional as the base linear constraint may be disabled 
     bool is_position_shifting() const;
-
-
+  
   public: // Constraint-specific boilerplate; depend on which constraint is used
     bool operator==(const UpliftingVertex &o) const = default;
     
@@ -95,11 +103,135 @@ namespace met {
   
   namespace detail {
     // Template specialization of SceneGLHandler that provides up-to-date storage
-    // for per-object uplifted texture data. Note that this class handles
-    // allocation and resizing, but the program pipeline fills in the data before rendering.
-    // See task_gen_uplifting_data.hpp and task_gen_object_data.hpp for details.
+    // for per-object uplifted texture data. This class handles spectral uplifting,
+    // texture baking, etc. Probably the biggest class as a result. Relies on a trio
+    // of helper classes to generate mismatch data, gl-side data, and bake textures.
     template <>
     struct SceneGLHandler<met::Uplifting> : public SceneGLHandlerBase {
+      // Helper object that
+      // - iteratively builds mismatch volumes (MMVs) for constraints, eating the cost over several frames
+      // - recovers constraint spectra through linear interpolation of the resulting convex structure
+      // - exposes the mismatch volume hull data for the editor
+      // which, alltogether, is faster and more stable than solving for constraint spectra directly.
+      struct MetamerBuilder {
+        ConvexHull hull;
+        
+      private:
+        using cnstr_type = typename Uplifting::Vertex::cnstr_type;
+
+        bool  	                   m_did_sample   = false;
+        std::deque<MismatchSample> m_samples      = { };
+        uint                       m_samples_curr = 0;
+        uint                       m_samples_prev = 0;
+        cnstr_type                 m_cnstr_cache;
+
+        // Insert newly generated MMV boundary samples, and retire old ones
+        void insert_samples(std::span<const MismatchSample> new_samples);
+
+      public:
+        // Get a spectral sample for the given uplifting constraint over which this MMV is defined;
+        // also returns whether the sample is equal to the previous sample
+        MismatchSample realize(const Scene &scene, uint uplifting_i, uint vertex_i);
+
+        // Test if the vertex at vertex_i results in the same mismatch region
+        // as the current sample set for a cached constraint
+        bool supports_vertex(const Scene &scene, uint uplifting_i, uint vertex_i);
+
+        // Set the cached constraint to produce a mismatch volume for a given vertex
+        void set_vertex(const Scene &scene, uint uplifting_i, uint vertex_i);
+
+        // Builder has reached the required sample count and should just regurgitate the current result
+        bool is_converged() const {
+          return (hull.deln.verts.size() - m_samples_prev) >= n_uplifting_mismatch_samples;
+        }
+
+        // Builder generated new samples, meaning the output of realize() also changed
+        bool did_sample() const {
+          return m_did_sample;
+        }
+      };
+
+      // Helper object that
+      // - holds per-uplifting generated spectral data, tessellation, mismatch volumes, etc
+      // - pushes these to the GL-side for ObjectData::update() to use
+      class UpliftingData {
+        // Per-object block layout for std140 uniform buffer, mapped for write
+        struct alignas(16) BufferBaryBlock {
+          eig::Matrix<float, 4, 3> inv; // 3+1, last column is padding
+          eig::Matrix<float, 4, 1> sub; // 3+1, last value is padding
+        };
+        static_assert(sizeof(BufferBaryBlock) == 64);
+
+        // All-object block layout for std140 uniform buffer, mapped for write
+        struct BufferBaryLayout {
+          alignas(4) uint size;
+          std::array<BufferBaryBlock, met_max_constraints> data;
+        } *m_buffer_bary_map;
+
+        // Per-object block layout for std430 storage buffer, mapped for write
+        using BufferCoefBlock = eig::Array<float, wavelength_bases, 4>;
+        static_assert(sizeof(BufferCoefBlock) == wavelength_bases * 4 * sizeof(float));
+
+        // All-object block layout for std430 storage buffer, mapped for write
+        struct BufferCoefLayout {
+          alignas(4) uint size;
+          std::array<BufferCoefBlock, met_max_constraints> data;
+        } *m_buffer_coef_map;
+        
+        // Small private state
+        bool m_is_first_update;
+        uint m_uplifting_i;
+        
+      public:
+        // Helper objects per vertex constraint, to iteratively generate mismatch volume
+        // data and produce metamers (tends to be cheaper than solving directly)
+        std::vector<MetamerBuilder> metamer_builders;
+      
+        // Generated spectral data; boundary, interior, and both sets together
+        std::vector<MismatchSample> boundary;
+        std::vector<MismatchSample> interior;
+        std::vector<MismatchSample> boundary_and_interior;
+
+        // R^3 delaunay tessellation resulting from the connected boundary and interior vertices
+        AlDelaunay tessellation;
+
+        // Buffers made available for use in update_object_texture
+        gl::Buffer buffer_bary; // tetrahedron baycentric data
+        gl::Buffer buffer_coef; // tetrahedron coefficient data
+
+      public:
+        UpliftingData(uint uplifting_i);
+        void update(const Scene &scene);
+      };
+
+      // Helper object that
+      // - generates per-object spectral texture data
+      // - writes this data to the scene texture atlas
+      struct ObjectData {
+        // Key to program handle in cache
+        std::string m_program_key;
+
+        // Index of current object
+        uint m_object_i;
+      
+      public:
+        ObjectData(uint object_i);
+        void update(const Scene &scene);
+      };
+    
+    private:
+      // Generate per-uplifting data necessary for spectral texture generation
+      void generate_uplifting_data(const Scene &scene, uint uplifting_i);
+
+      // Generate per-object spectral texture, based on uplifting data; bake away!
+      void generate_object_texture(const Scene &scene, uint object_i);
+
+    public:
+      // Object caches; these help generate uplifting data and bake object textures, and
+      // are exposed so the editor can access their data
+      std::vector<UpliftingData> uplifting_data;
+      std::vector<ObjectData>    object_data;
+
       // Atlas textures; each scene object has a patch in the atlas for some material parameters
       TextureAtlas2d4ui texture_coef; // Stores packed linear coefficients representing surface spectral reflectances in basis
       TextureAtlas2d1ui texture_brdf; // Stores packing of other brdf parameters (roughness, metallic at fp16)
@@ -132,6 +264,8 @@ namespace met {
       }
     };
 
+    // Template specialization of SceneStateHandler that exposes fine-grained
+    // state tracking for object members in the program view
     template <>
     struct SceneStateHandler<Uplifting> : public SceneStateHandlerBase<Uplifting> {
       SceneStateHandler<decltype(Uplifting::observer_i)>              observer_i;
@@ -153,6 +287,7 @@ namespace met {
   } // namespace detail
 } // namespace met
 
+// Helper output for fmtlib
 template<>
 struct fmt::formatter<met::Uplifting::Vertex::cnstr_type>{
   template <typename context_ty>

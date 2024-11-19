@@ -2,6 +2,7 @@
 
 #include <metameric/core/fwd.hpp>
 #include <metameric/core/record.hpp>
+#include <metameric/core/scheduler.hpp>
 #include <metameric/scene/resources.hpp>
 #include <metameric/scene/emitter.hpp>
 #include <metameric/scene/uplifting.hpp>
@@ -45,10 +46,14 @@ namespace met {
     // Current scene path, only set if SaveState is ::eSaved or ::eUnsaved
     fs::path save_path  = "";
 
-    void create();                   // Create new, empty scene
-    void load(const fs::path &path); // Load scene data from path 
-    void save(const fs::path &path); // Save scene data to path
-    void unload();                   // Clear out scene data
+    // Constructor creates empty scene, and sets handle to program shader cache
+    Scene(ResourceHandle cache_handle);
+
+    // Manage scene state
+    void create();                    // Load, set to a default scene
+    void load(const fs::path &path);  // Load scene data from path
+    void save(const fs::path &path);  // Save scene data to path
+    void unload();                    // Reset to an empty scene
 
     // Import an existing scene, adding its components into the loaded scene
     void import_scene(const fs::path &path);
@@ -95,9 +100,10 @@ namespace met {
     // Run update of state tracking and gl-side data
     void update();
 
-  public: // Serialization
-    void to_stream(std::ostream &str) const;
-    void from_stream(std::istream &str);
+  private: 
+    // Handle to program shader cache, accessible to gl-side data builders;
+    ResourceHandle m_cache_handle;
+    template <typename> friend class SceneGLHandler;
   };
 
   // Component/Resource test helpers; check if Ty instantiates Component<>/Resource<>

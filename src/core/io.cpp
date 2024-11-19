@@ -170,7 +170,7 @@ namespace met::io {
     auto obj_txuvs = cnt_span<eig::Array2f>(result.attributes.texcoords);
 
     // Return object; create (empty) scene to store objects/meshes/textures for output
-    Scene scene;
+    Scene scene = { ResourceHandle() };
 
     // List of material textures to load, coupled
     // to a compact list of scene texture IDs
