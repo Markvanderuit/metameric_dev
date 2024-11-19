@@ -14,8 +14,6 @@
 #include <metameric/components/views/detail/component_edit.hpp>
 #include <metameric/components/views/detail/task_viewport.hpp>
 #include <metameric/components/views/detail/task_arcball_input.hpp>
-#include <metameric/components/pipeline/task_gen_uplifting_data.hpp>
-#include <metameric/components/pipeline/task_gen_object_data.hpp>
 
 namespace met {
   void submit_metameric_editor_schedule_unloaded(detail::SchedulerBase &scheduler) {
@@ -49,10 +47,6 @@ namespace met {
       met_trace();
       info.global("scene").template getw<Scene>().update();
     });
-
-    // Pipeline tasks generate uplifting data and then bake a spectral texture per object
-    scheduler.task("gen_upliftings").init<GenUpliftingsTask>();
-    scheduler.task("gen_objects").init<GenObjectsTask>();
 
     // Editor task for scene components (objects, emitters, etc)
     scheduler.task("scene_components_editor").init<LambdaTask>([](auto &info) {

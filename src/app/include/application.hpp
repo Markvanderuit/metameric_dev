@@ -132,8 +132,6 @@ namespace met {
           sensor.flush();
         }
       });
-      m_scheduler.task("gen_upliftings").init<GenUpliftingsTask>(256); // build many, not few
-      m_scheduler.task("gen_objects").init<GenObjectsTask>();
       m_scheduler.task("render").init<LambdaTask>([&](auto &info) {
         met_trace();
 

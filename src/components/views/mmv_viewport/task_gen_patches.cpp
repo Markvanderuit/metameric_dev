@@ -33,13 +33,17 @@ namespace met {
     met_trace();
     
     // Get shared resources
-    auto gizmo_active   = info.relative("viewport_guizmo")("is_active").getr<bool>();
+    const auto &e_scene = info.global("scene").getr<Scene>();
     const auto &e_cs    = info.parent()("selection").getr<ConstraintRecord>();
-    auto uplf_handle    = info.task(fmt::format("gen_upliftings.gen_uplifting_{}", e_cs.uplifting_i)).mask(info);
-    const auto &e_hulls = uplf_handle("mismatch_hulls").getr<std::vector<ConvexHull>>();
-    const auto &e_hull  = e_hulls[e_cs.vertex_i];
+    auto gizmo_active   = info.relative("viewport_guizmo")("is_active").getr<bool>();
 
-    return e_hull.has_delaunay() && !gizmo_active;
+    // Obtain the generated convex hull for this uplifting/vertex combination
+    const auto &chull = e_scene.components.upliftings.gl
+                               .uplifting_data[e_cs.uplifting_i]
+                               .metamer_builders[e_cs.vertex_i]
+                               .hull;
+    
+    return chull.has_delaunay() && !gizmo_active;
   }
 
   void GenPatchesTask::init(SchedulerHandle &info) {
@@ -51,28 +55,32 @@ namespace met {
     met_trace();
 
     // Get shared resources
-    auto gizmo_active   = info.relative("viewport_guizmo")("is_active").getr<bool>();
+    const auto &e_scene = info.global("scene").getr<Scene>();
     const auto &e_cs    = info.parent()("selection").getr<ConstraintRecord>();
-    auto uplf_handle    = info.task(fmt::format("gen_upliftings.gen_uplifting_{}", e_cs.uplifting_i)).mask(info);
-    const auto &e_hulls = uplf_handle("mismatch_hulls").getr<std::vector<ConvexHull>>();
-    const auto &e_hull  = e_hulls[e_cs.vertex_i];
+    auto gizmo_active   = info.relative("viewport_guizmo")("is_active").getr<bool>();
     auto &i_patches     = info("patches").getw<std::vector<Colr>>();
+    
+    // Obtain the generated convex hull for this uplifting/vertex combination
+    const auto &chull_builder = e_scene.components.upliftings.gl
+                                       .uplifting_data[e_cs.uplifting_i]
+                                       .metamer_builders[e_cs.vertex_i];
+    const auto &chull = chull_builder.hull;
 
     // Do not output any patches until the convex hull is in a converged state;
-    if (!e_hull.has_delaunay()) {
+    if (!chull.has_delaunay()) {
       i_patches.clear();
       return;
     }
 
     // Exit early unless inputs have changed somehow
-    guard(is_first_eval() || uplf_handle("mismatch_hulls").is_mutated());
+    guard(is_first_eval() || chull_builder.did_sample());
     
     // Compute volume of each tetrahedron in delaunay
-    std::vector<float> volumes(e_hull.deln.elems.size());
-    std::transform(std::execution::par_unseq, range_iter(e_hull.deln.elems), volumes.begin(),
+    std::vector<float> volumes(chull.deln.elems.size());
+    std::transform(std::execution::par_unseq, range_iter(chull.deln.elems), volumes.begin(),
     [&](const eig::Array4u &el) {
       // Get vertex positions for this tetrahedron
-      auto p = el | index_into_view(e_hull.deln.verts);
+      auto p = el | index_into_view(chull.deln.verts);
 
       // Compute tetrahedral volume
       return std::abs((p[0] - p[3]).matrix().dot((p[1] - p[3]).matrix().cross((p[2] - p[3]).matrix()))) / 6.f;
@@ -102,8 +110,8 @@ namespace met {
       }
 
       // Next, sample a tetrahedron uniformly based on volume, and grab its vertices
-      auto el = e_hull.deln.elems[distr.sample_discrete(sampler.next_1d())];
-      auto p = el | index_into_view(e_hull.deln.verts);
+      auto el = chull.deln.elems[distr.sample_discrete(sampler.next_1d())];
+      auto p = el | index_into_view(chull.deln.verts);
         
       // Then, recover position inside hull using the generated barycentric coordinates
       return p[0] * (1.f - x.sum()) 

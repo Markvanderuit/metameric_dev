@@ -59,6 +59,9 @@ namespace met {
     void import_scene(const fs::path &path);
     void import_scene(Scene &&other);
 
+    // Run update of state tracking and gl-side data
+    void update();
+
   public: // History (redo/undo) handling
     struct SceneMod {
       std::string name;
@@ -94,16 +97,11 @@ namespace met {
     const Uplifting::Vertex &uplifting_vertex(ConstraintRecord cs) const;
     Uplifting::Vertex &uplifting_vertex(ConstraintRecord cs);
 
-    // Extract scene surface information from ray hit data
-    SurfaceInfo get_surface_info(const eig::Array3f p, const SurfaceRecord &rc) const;
-
-    // Run update of state tracking and gl-side data
-    void update();
-
   private: 
     // Handle to program shader cache, accessible to gl-side data builders;
     mutable ResourceHandle m_cache_handle;
     friend class detail::SceneGLHandler<Uplifting>::ObjectData;
+    friend class detail::SceneGLHandler<Object>::ObjectData;
   };
 
   // Component/Resource test helpers; check if Ty instantiates Component<>/Resource<>

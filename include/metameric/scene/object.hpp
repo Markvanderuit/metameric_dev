@@ -41,7 +41,37 @@ namespace met {
     // representations of object data on the GL side. Information
     // is updated based on state tracking.
     template <>
-    class SceneGLHandler<met::Object> : public SceneGLHandlerBase {
+    struct SceneGLHandler<met::Object> : public SceneGLHandlerBase {
+      // Helper object that
+      // - generates per-object packed brdf data
+      // - writes this data to the `texture_brdf` atlas below
+      struct ObjectData {
+        // std140 layout for data written to buffer
+        struct BlockLayout {
+          uint object_i;
+        };
+
+        // Objects for texture bake
+        uint            m_atlas_layer_i;
+        std::string     m_program_key;
+        gl::Framebuffer m_fbo;
+        gl::Sampler     m_sampler;
+        gl::Buffer      m_buffer;
+        BlockLayout    *m_buffer_map;
+
+        // Small private state
+        uint m_object_i;
+        bool m_is_first_update;
+      
+      public:
+        ObjectData(const Scene &scene, uint object_i);
+        void update(const Scene &scene);
+      };
+    
+      // Object cache; helps pack brdf components
+      std::vector<ObjectData> object_data;
+
+    private:
       // Per-object block layout for std140 uniform buffer
       struct alignas(16) BlockLayout {
         alignas(16) eig::Matrix4f trf;
@@ -62,9 +92,12 @@ namespace met {
       } *m_object_info_map;
 
     public:
-      // This buffer stores one instance of BlockLayout per object component
+      // Stores one instance of BlockLayout per object component
       gl::Buffer object_info;
 
+      // Stores packing of some brdf parameters (roughness, metallic at fp16)
+      TextureAtlas2d1ui texture_brdf; 
+    
     public:
       // Class constructor and update function handle GL-side data
       SceneGLHandler();

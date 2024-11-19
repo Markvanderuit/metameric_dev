@@ -66,12 +66,18 @@ namespace met {
     void SceneGLHandler<met::Object>::update(const Scene &scene) {
       met_trace_full();
 
-      const auto &objects = scene.components.objects;
-      guard(!objects.empty() && objects);
+      // Get relevant resources
+      const auto &objects  = scene.components.objects;
+      const auto &images   = scene.resources.images;
+      const auto &settings = scene.components.settings;
+
+      guard(!objects.empty());
 
       // Set appropriate object count, then flush change to buffer
-      m_object_info_map->size = static_cast<uint>(objects.size());
-      object_info.flush(sizeof(uint));
+      if (objects.is_resized()) {
+        m_object_info_map->size = static_cast<uint>(objects.size());
+        object_info.flush(sizeof(uint));
+      }
 
       // Write updated objects to mapping
       for (uint i = 0; i < objects.size(); ++i) {
@@ -99,6 +105,193 @@ namespace met {
         // so we flush specific regions instead of the whole
         object_info.flush(sizeof(BlockLayout), sizeof(BlockLayout) * i + sizeof(uint));
       } // for (uint i)
+
+      // Flag that the atlas' internal texture has **not** been invalidated by internal resize
+      if (texture_brdf.is_init())
+        texture_brdf.set_invalitated(false);
+
+      // Handle `texture_brdf` atlas resize
+      if (objects || settings.state.texture_size || !texture_brdf.is_init()) {
+        // First, ensure atlas exists for us to operate on
+        if (!texture_brdf.is_init())
+          texture_brdf = {{ .levels  = 1, .padding = 0 }};
+
+        // Gather necessary texture sizes for each object
+        // If the texture index was specified, we insert the texture size as an input
+        // for the atlas. If a value was specified, we allocate a small patch
+        // As we'd like to cram multiple brdf values into a single lookup, we will
+        // take the larger size for each patch. Makes baking slightly more expensive
+        std::vector<eig::Array2u> inputs(objects.size());
+        rng::transform(objects, inputs.begin(), [&](const auto &object) -> eig::Array2u {
+          auto metallic_size = object->metallic | visit {
+            [&](uint  i) { return images[i]->size(); },
+            [&](float f) { return eig::Array2u { 16, 16 }; },
+          };
+          auto roughness_size = object->roughness | visit {
+            [&](uint  i) { return images[i]->size(); },
+            [&](float f) { return eig::Array2u { 16, 16 }; },
+          };
+          return metallic_size.cwiseMax(roughness_size).eval();
+        });
+
+        // Scale atlas inputs to respect the maximum texture size set in Settings::texture_size
+        eig::Array2u maximal = rng::fold_left(inputs, eig::Array2u(0), [](auto a, auto b) { return a.cwiseMax(b).eval(); });
+        eig::Array2f scaled  = settings->apply_texture_size(maximal).cast<float>() / maximal.cast<float>();
+        for (auto &input : inputs)
+          input = (input.cast<float>() * scaled).max(2.f).cast<uint>().eval();
+        
+        // Regenerate atlas if inputs don't match the atlas' current layout
+        // Note; barycentric weights will need a full rebuild, which is detected
+        //       by the nr. of objects changing or the texture setting changing. A bit spaghetti-y :S
+        texture_brdf.resize(inputs);
+        if (texture_brdf.is_invalitated()) {
+          // The barycentric texture was re-allocated, which means underlying memory was all invalidated.
+          // So in a case of really bad spaghetti-code, we force object-dependent parts to update
+          auto &e_scene = const_cast<Scene &>(scene);
+          e_scene.components.objects.set_mutated(true);
+        }
+      }
+
+      // Adjust nr. of ObjectData blocks up to or down to relevant size
+      for (uint i = object_data.size(); i < scene.components.objects.size(); ++i)
+        object_data.push_back({ scene, i });
+      for (uint i = object_data.size(); i > scene.components.objects.size(); --i)
+        object_data.pop_back();
+
+      // Generate per-object packed brdf data
+      for (auto &data : object_data)
+        data.update(scene);
+    }
+
+    SceneGLHandler<met::Object>::ObjectData::ObjectData(const Scene &scene, uint object_i)
+    : m_object_i(object_i) {
+      met_trace_full();
+
+      // Build shader in program cache, if it is not loaded already
+      auto &cache = scene.m_cache_handle.getw<gl::detail::ProgramCache>();
+      std::tie(m_program_key, std::ignore) = cache.set(
+        {{ .type       = gl::ShaderType::eVertex,
+            .spirv_path = "shaders/scene/gen_texture.vert.spv",
+            .cross_path = "shaders/scene/gen_texture.vert.json" },
+          { .type       = gl::ShaderType::eFragment,
+            .spirv_path = "shaders/scene/gen_texture_brdf.frag.spv",
+            .cross_path = "shaders/scene/gen_texture_brdf.frag.json" }});
+
+      // Initialize uniform buffers and writeable, flushable mappings
+      std::tie(m_buffer, m_buffer_map) = gl::Buffer::make_flusheable_object<BlockLayout>();
+      m_buffer_map->object_i = m_object_i;
+      m_buffer.flush();
+
+      // Linear texture sampler
+      m_sampler = {{ .min_filter = gl::SamplerMinFilter::eLinear, .mag_filter = gl::SamplerMagFilter::eLinear }};
+    }
+
+    void SceneGLHandler<met::Object>::ObjectData::update(const Scene &scene) {
+      met_trace_full();
+
+      // Get handles to relevant scene data
+      const auto &object    = scene.components.objects[m_object_i];
+      const auto &settings  = scene.components.settings;
+      const auto &mesh      = scene.resources.meshes[object->mesh_i];
+
+      // Find relevant patch in the texture atlas
+      const auto &atlas = scene.components.objects.gl.texture_brdf;
+      const auto &patch = atlas.patch(m_object_i);
+
+      // We continue only after careful checking of internal state, as the bake
+      // is relatively expensive and doesn't always need to happen. Careful in
+      // this case means "ewwwwwww"
+      bool is_active 
+         = m_is_first_update            // First run, demands render anyways
+        || atlas.is_invalitated()       // Texture atlas re-allocated, demands re-render
+        || object.state.roughness       // Different albedo value set on object
+        || object.state.metallic        // Different albedo value set on object
+        || object.state.mesh_i          // Different mesh attached to object
+        || scene.resources.meshes       // User loaded/deleted a mesh;
+        || scene.resources.images       // User loaded/deleted an image;
+        || settings.state.texture_size; // Texture size setting changed
+      guard(is_active);
+
+      // Rebuild framebuffer if necessary
+      if (m_is_first_update || atlas.is_invalitated() || m_atlas_layer_i != patch.layer_i) {
+        m_atlas_layer_i = patch.layer_i;
+        m_fbo = {{ .type       = gl::FramebufferType::eColor,
+                   .attachment = &atlas.texture(),
+                   .layer      = m_atlas_layer_i }};
+      }
+
+      // Get relevant program handle, bind, then bind resources to corresponding targets
+      auto &cache = scene.m_cache_handle.getw<gl::detail::ProgramCache>();
+      auto &program = cache.at(m_program_key);
+      program.bind();
+      program.bind("b_buff_unif",        m_buffer);
+      program.bind("b_buff_atlas",       atlas.buffer());
+      program.bind("b_buff_object_info", scene.components.objects.gl.object_info);
+      if (!scene.resources.images.empty()) {
+        program.bind("b_buff_textures",  scene.resources.images.gl.texture_info);
+        program.bind("b_txtr_3f",        scene.resources.images.gl.texture_atlas_3f.texture());
+        program.bind("b_txtr_3f",        m_sampler);  
+        program.bind("b_txtr_1f",        scene.resources.images.gl.texture_atlas_1f.texture());
+        program.bind("b_txtr_1f",        m_sampler);  
+      }
+
+      // Set relevant scoped gl state;
+      // Viewport addresses the full atlas texture, while we enable a scissor 
+      // test to restrict all operations in this scope to the relevant texture patch
+      gl::state::ScopedSet scope(gl::DrawCapability::eScissorTest, true);
+      gl::state::set(gl::DrawCapability::eScissorTest, true);
+      gl::state::set(gl::DrawCapability::eDither,     false);
+      gl::state::set_scissor(patch.size, patch.offs);
+      gl::state::set_viewport(atlas.texture().size().head<2>());
+      gl::state::set_line_width(4.f);
+
+      // Prepare framebuffer, clear relevant patch (not actually necessary)
+      m_fbo.bind();
+      m_fbo.clear(gl::FramebufferType::eColor, 0u);
+
+      // Find relevant draw command to map mesh UVs;
+      // if no UVs are present or diffuse color is specified,
+      // we fall back on rectangle UVs to simply fill the patch
+      gl::MultiDrawInfo::DrawCommand command;
+      if (mesh->has_txuvs() && object->diffuse.index() == 1) {
+        command = scene.resources.meshes.gl.mesh_draw[object->mesh_i];
+      } else {
+        command = scene.resources.meshes.gl.mesh_draw[0]; // Draw full ectangle
+      }
+
+      // Insert relevant barriers
+      gl::sync::memory_barrier(gl::BarrierFlags::eFramebuffer        | 
+                               gl::BarrierFlags::eTextureFetch       |
+                               gl::BarrierFlags::eClientMappedBuffer |
+                               gl::BarrierFlags::eStorageBuffer      | 
+                               gl::BarrierFlags::eUniformBuffer      );
+                     
+      // Triangle fill for most data
+      gl::dispatch_draw({
+        .type           = gl::PrimitiveType::eTriangles,
+        .vertex_count   = command.vertex_count,
+        .vertex_first   = command.vertex_first,
+        .capabilities   = {{ gl::DrawCapability::eDepthTest, false },
+                           { gl::DrawCapability::eCullOp,    false },
+                           { gl::DrawCapability::eBlendOp,   false }},
+        .draw_op        = gl::DrawOp::eFill,
+        .bindable_array = &scene.resources.meshes.gl.mesh_array
+      });
+      
+      // Line fill to overlap boundaries
+      gl::dispatch_draw({
+        .type           = gl::PrimitiveType::eTriangles,
+        .vertex_count   = command.vertex_count,
+        .vertex_first   = command.vertex_first,
+        .capabilities   = {{ gl::DrawCapability::eDepthTest, false },
+                           { gl::DrawCapability::eCullOp,    false },
+                           { gl::DrawCapability::eBlendOp,   false }},
+        .draw_op        = gl::DrawOp::eLine,
+        .bindable_array = &scene.resources.meshes.gl.mesh_array
+      });
+
+      // Finally; set entry state to false
+      m_is_first_update = false;
     }
   } // namespace detail
 } // namespace met

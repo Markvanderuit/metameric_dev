@@ -335,14 +335,14 @@ namespace met {
     program.bind("b_buff_emitter_info",   scene.components.emitters.gl.emitter_info);
     program.bind("b_buff_envmap_info",    scene.components.emitters.gl.emitter_envm_info);
     program.bind("b_buff_coef_info",      scene.components.upliftings.gl.texture_coef.buffer());
-    program.bind("b_buff_brdf_info",      scene.components.upliftings.gl.texture_brdf.buffer());
+    program.bind("b_buff_brdf_info",      scene.components.objects.gl.texture_brdf.buffer());
     program.bind("b_buff_wvls_distr",     get_wavelength_distr());
     program.bind("b_buff_emitters_distr", scene.components.emitters.gl.emitter_distr_buffer);
     program.bind("b_illm_1f",             scene.resources.illuminants.gl.spec_texture);
     program.bind("b_illm_1f",             m_sampler);
     program.bind("b_bsis_1f",             scene.components.upliftings.gl.texture_basis);
     program.bind("b_bsis_1f",             m_sampler);
-    program.bind("b_brdf_2f",             scene.components.upliftings.gl.texture_brdf.texture()); 
+    program.bind("b_brdf_2f",             scene.components.objects.gl.texture_brdf.texture()); 
     program.bind("b_brdf_2f",             m_sampler);
     program.bind("b_coef_4f",             scene.components.upliftings.gl.texture_coef.texture()); 
     program.bind("b_coef_4f",             m_sampler);

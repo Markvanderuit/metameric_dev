@@ -8,8 +8,8 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/resources/cmake"
 project(Metameric LANGUAGES CXX)
 
 # Build options
-option(MET_ENABLE_EXCEPTIONS "Enable exceptions on release" ON)
-option(MET_ENABLE_TRACY      "Enable Tracy support"        OFF)
+option(MET_ENABLE_EXCEPTIONS "Enable exceptions on release"  ON)
+option(MET_ENABLE_TRACY      "Enable Tracy support"         OFF)
 
 # Spectral layout; inserted in code/shaders as preprocessor defines
 set(MET_WAVELENGTH_MIN     380) # Minimum wavelength of spectral range

@@ -14,12 +14,7 @@ layout(location = 0) out uint out_brdf; // Per fragment MESE representations of 
 // Uniform buffer declarations
 layout(binding = 0) uniform b_buff_unif {
   uint  object_i;
-  float px_scale;
 } unif;
-/* layout(binding = 1) uniform b_buff_atlas {
-  uint n;
-  AtlasInfo data[met_max_textures];
-} buff_atlas; */
 layout(binding = 2) uniform b_buff_object_info {
   uint n;
   ObjectInfo data[met_max_objects];

@@ -5,10 +5,9 @@
 #include <metameric/scene/scene.hpp>
 #include <metameric/core/ranges.hpp>
 #include <metameric/core/utility.hpp>
+#include <metameric/render/primitives_query.hpp>
 #include <metameric/components/views/detail/arcball.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
-#include <metameric/components/pipeline/task_gen_uplifting_data.hpp>
-#include <metameric/render/primitives_query.hpp>
 #include <small_gl/texture.hpp>
 #include <small_gl/window.hpp>
 #include <algorithm>
@@ -65,11 +64,6 @@ namespace met {
         eig::Array4f wvls;   // integration wavelengths 
         eig::Array4f values; // remainder of incident radiance, without constraint reflectance
       };
-
-      // Collect handles to all uplifting tasks
-      std::vector<TaskHandle> uplf_handles;
-      rng::transform(vws::iota(0u, static_cast<uint>(e_scene.components.upliftings.size())), 
-        std::back_inserter(uplf_handles), [&](uint i) { return info.task(fmt::format("gen_upliftings.gen_uplifting_{}", i)); });
 
       // Integration color matching functions, s.t. a unit spectrum integrates to 1 luminance
       CMFS cmfs = ColrSystem { .cmfs = e_scene.primary_observer(), .illuminant = Spec(1) }.finalize();

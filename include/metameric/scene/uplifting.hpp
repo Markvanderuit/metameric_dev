@@ -115,10 +115,7 @@ namespace met {
       // - recovers constraint spectra through linear interpolation of the resulting convex structure
       // - exposes the mismatch volume hull data for the editor
       // which, alltogether, is faster and more stable than solving for constraint spectra directly.
-      struct MetamerBuilder {
-        ConvexHull hull;
-        
-      private:
+      class MetamerBuilder {
         using cnstr_type = typename Uplifting::Vertex::cnstr_type;
 
         bool  	                   m_did_sample   = false;
@@ -151,6 +148,10 @@ namespace met {
         bool did_sample() const {
           return m_did_sample;
         }
+        
+      public: 
+        // Expose generated convex hull structure for editors
+        ConvexHull hull;
       };
 
       // Helper object that
@@ -203,6 +204,9 @@ namespace met {
       public:
         UpliftingData(uint uplifting_i);
         void update(const Scene &scene);
+
+        // Helper function to find some tetrahedron info, given an input position inside the tesselation
+        std::pair<eig::Vector4f, uint> find_enclosing_tetrahedron(const eig::Vector3f &p) const;
       };
 
       // Helper object that
@@ -231,13 +235,6 @@ namespace met {
         void update(const Scene &scene);
       };
 
-    private:
-      // Generate per-uplifting data necessary for spectral texture generation
-      void generate_uplifting_data(const Scene &scene, uint uplifting_i);
-
-      // Generate per-object spectral texture, based on uplifting data; bake away!
-      void generate_object_texture(const Scene &scene, uint object_i);
-
     public:
       // Object caches; these help generate uplifting data and bake object textures, and
       // are exposed so the editor can access their data
@@ -246,10 +243,12 @@ namespace met {
 
       // Atlas textures; each scene object has a patch in the atlas for some material parameters
       TextureAtlas2d4ui texture_coef; // Stores packed linear coefficients representing surface spectral reflectances in basis
-      TextureAtlas2d1ui texture_brdf; // Stores packing of other brdf parameters (roughness, metallic at fp16)
 
       // Array texture; each layer holds one of 12 basis function spectra
       gl::TextureArray1d1f texture_basis;
+
+    public:
+      // Accessor functions
 
     public:
       // Class constructor and update function handle GL-side data

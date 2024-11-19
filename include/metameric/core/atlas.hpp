@@ -95,6 +95,9 @@ namespace met {
     bool is_invalitated() const { return m_is_invalitated; }
     void set_invalitated(bool b) { m_is_invalitated = b; }
 
+    // Test if the underlying data even exists
+    bool is_init() const { return texture().is_init(); }
+
     // General accessors
     const auto & texture()    const { return m_texture;    }
           auto & texture()          { return m_texture;    }

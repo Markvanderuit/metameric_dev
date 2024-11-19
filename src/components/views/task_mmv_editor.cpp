@@ -261,10 +261,13 @@ namespace met {
       const auto &e_scene   = info.global("scene").getr<Scene>();
       const auto &e_cs      = info.parent()("selection").getr<ConstraintRecord>();
       const auto &e_vert    = e_scene.uplifting_vertex(e_cs);
-      auto uplf_handle      = info.task(fmt::format("gen_upliftings.gen_uplifting_{}", e_cs.uplifting_i)).mask(info);
-      const auto &e_hulls   = uplf_handle("mismatch_hulls").getr<std::vector<ConvexHull>>();
-      const auto &e_hull    = e_hulls[e_cs.vertex_i];
       const auto &i_clip    = info("clip_point").getr<bool>();
+
+      // Obtain the generated convex hull for this uplifting/vertex combination
+      const auto &hull = e_scene.components.upliftings.gl
+                                .uplifting_data[e_cs.uplifting_i]
+                                .metamer_builders[e_cs.vertex_i]
+                                .hull;
 
       // Visitor handles gizmo and modifies color position
       e_vert.constraint | visit([&](const auto &cstr) {
@@ -291,7 +294,7 @@ namespace met {
 
           // Expose a marker point for the snap position inside the convex hull;
           // don't snap as it feels weird while moving the point
-          auto gizmo_clip_p = info("closest_point").set<Colr>(e_hull.find_closest_interior(m_gizmo_curr_p))
+          auto gizmo_clip_p = info("closest_point").set<Colr>(hull.find_closest_interior(m_gizmo_curr_p))
                                                    .getr<Colr>();
 
           // Feed clipped color to scene
@@ -312,7 +315,7 @@ namespace met {
         if (m_gizmo.end_delta()) {
           // Clip vertex position to inside convex hull, if enabled
           if (i_clip)
-            m_gizmo_curr_p = e_hull.find_closest_interior(m_gizmo_curr_p);
+            m_gizmo_curr_p = hull.find_closest_interior(m_gizmo_curr_p);
 
           // Handle save
           info.global("scene").getw<Scene>().touch({

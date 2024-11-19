@@ -30,36 +30,29 @@ namespace met {
     // Get shared resources
     const auto &e_scene = info.global("scene").getr<Scene>();
     const auto &e_cs    = info.parent()("selection").getr<ConstraintRecord>();
-    auto uplf_handle    = info.task(fmt::format("gen_upliftings.gen_uplifting_{}", e_cs.uplifting_i)).mask(info);
+
+    // Obtain the generated convex hull for this uplifting/vertex combination
+    const auto &chull_builder = e_scene.components.upliftings.gl
+                                       .uplifting_data[e_cs.uplifting_i]
+                                       .metamer_builders[e_cs.vertex_i];
+    const auto &chull = chull_builder.hull;
 
     // Exit early unless inputs have changed somehow
-    guard(is_first_eval() || uplf_handle("mismatch_hulls").is_mutated());
+    guard(is_first_eval() || chull_builder.did_sample());
 
-    // Get list of convex hulls for this uplifting; exit early if it doesn't exist
-    auto &i_array       = info("chull_array").getw<gl::Array>();
-    auto &i_draw        = info("chull_draw").getw<gl::DrawInfo>();
-    auto &i_trnf        = info("chull_trnf").getw<eig::Matrix4f>();
-    const auto &e_hulls = uplf_handle("mismatch_hulls").getr<std::vector<ConvexHull>>();
-    const auto &e_hull  = e_hulls[e_cs.vertex_i];
-    
-    // Get specific convex hull; exit early and reset if it is empty
-    if (e_hull.hull.empty()) {
+    // If the convex hull is empty, exit early and reset draw info
+    auto &i_array = info("chull_array").getw<gl::Array>();
+    auto &i_draw  = info("chull_draw").getw<gl::DrawInfo>();
+    auto &i_trnf  = info("chull_trnf").getw<eig::Matrix4f>();
+    if (chull.hull.empty()) {
       i_array = {};
       i_draw  = {};
       i_trnf  = eig::Matrix4f::Identity();
       return;
     }
 
-    // Determine extents of current point sets
-    // auto maxb = rng::fold_left_first(e_hull.hull.verts, [](auto a, auto b) { return a.max(b).eval(); }).value();
-    // auto minb = rng::fold_left_first(e_hull.hull.verts, [](auto a, auto b) { return a.min(b).eval(); }).value();
-
-    // // If a set of points is available, generate an approximate center for the camera
-    // auto new_center = eig::Array3f(.5f); // (minb + 0.5 * (maxb - minb)).eval();
-    // info.relative("viewport_camera")("arcball").getw<detail::Arcball>().set_center(new_center);
-    
     // Generate output mesh    
-    auto mesh = convert_mesh<AlMesh>(e_hull.hull);
+    auto mesh = convert_mesh<AlMesh>(chull.hull);
     auto lrgb = mesh.verts;
     eig::Matrix4f trf = export_unitized_mesh 
                       ? unitize_mesh<AlMesh>(mesh) 

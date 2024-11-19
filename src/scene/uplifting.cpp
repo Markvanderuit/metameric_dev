@@ -276,48 +276,57 @@ namespace met {
   namespace detail {
     SceneGLHandler<met::Uplifting>::SceneGLHandler() {
       met_trace_full();
-      texture_coef  = {{ .levels  = 1, .padding = 0 }};
-      texture_brdf  = {{ .levels  = 1, .padding = 0 }};
-      texture_basis = {{ .size = { wavelength_samples, wavelength_bases } }};
+      
     }
         
     void SceneGLHandler<met::Uplifting>::update(const Scene &scene) {
       met_trace_full();
 
       // Get relevant resources
-      const auto &e_objects    = scene.components.objects;
-      const auto &e_upliftings = scene.components.upliftings;
-      const auto &e_images     = scene.resources.images;
-      const auto &e_settings   = scene.components.settings;
+      const auto &objects    = scene.components.objects;
+      const auto &upliftings = scene.components.upliftings;
+      const auto &images     = scene.resources.images;
+      const auto &bases      = scene.resources.bases;
+      const auto &settings   = scene.components.settings;
       
-      // Flag that the atlas' internal texture has **not** been invalidated by internal resize
-      e_upliftings.gl.texture_coef.set_invalitated(false);
-      e_upliftings.gl.texture_brdf.set_invalitated(false);
-
       // Only rebuild if there are upliftings and objects
-      guard(!e_upliftings.empty() && !e_upliftings.empty());
-      guard(e_upliftings                                        || 
-            e_objects                                           ||
-            e_settings.state.texture_size                       ||
-            !e_upliftings.gl.texture_coef.texture().is_init()   ||
-            !e_upliftings.gl.texture_coef.buffer().is_init()    );
-      
-      // Check for texture_coef resize
-      {
+      guard(!upliftings.empty());
+
+      // Push basis function data, just defaulted to basis 0 for now
+      if (bases || !texture_basis.is_init()) {
+        // First, ensure texture exists for us to operate on
+        if (!texture_basis.is_init())
+          texture_basis = {{ .size = { wavelength_samples, wavelength_bases } }};
+
+        // Then, copy basis data
+        const auto &basis = scene.resources.bases[0].value();
+        texture_basis.set(obj_span<const float>(basis.func));
+      }
+
+      // Flag that the atlas' internal texture has **not** been invalidated by internal resize yet
+      if (texture_coef.is_init())
+        texture_coef.set_invalitated(false);
+
+      // Check for atlas resize
+      if (upliftings || objects || settings.state.texture_size || !texture_coef.is_init()) {
+        // First, ensure atlas exists for us to operate on
+        if (!texture_coef.is_init())
+          texture_coef = {{ .levels  = 1, .padding = 0 }};
+
         // Gather necessary texture sizes for each object
         // If the texture index was specified, we insert the texture size as an input
         // for the atlas. If a color was specified, we allocate a small patch
-        std::vector<eig::Array2u> inputs(e_objects.size());
-        rng::transform(e_objects, inputs.begin(), [&](const auto &object) -> eig::Array2u {
+        std::vector<eig::Array2u> inputs(objects.size());
+        rng::transform(objects, inputs.begin(), [&](const auto &object) -> eig::Array2u {
           return object->diffuse | visit {
-            [&](uint i) { return e_images[i]->size(); },
+            [&](uint i) { return images[i]->size(); },
             [&](Colr f) { return eig::Array2u { 16, 16 }; },
           };
         });
 
         // Scale atlas inputs to respect the maximum texture size set in Settings::texture_size
         eig::Array2u maximal = rng::fold_left(inputs, eig::Array2u(0), [](auto a, auto b) { return a.cwiseMax(b).eval(); });
-        eig::Array2f scaled  = e_settings->apply_texture_size(maximal).cast<float>() / maximal.cast<float>();
+        eig::Array2f scaled  = settings->apply_texture_size(maximal).cast<float>() / maximal.cast<float>();
         for (auto &input : inputs)
           input = (input.cast<float>() * scaled).max(2.f).cast<uint>().eval();
 
@@ -331,50 +340,6 @@ namespace met {
           auto &e_scene = const_cast<Scene &>(scene);
           e_scene.components.objects.set_mutated(true);
         }
-      }
-
-      // Check for texture_brdf resize
-      {
-        // Gather necessary texture sizes for each object
-        // If the texture index was specified, we insert the texture size as an input
-        // for the atlas. If a value was specified, we allocate a small patch
-        // As we'd like to cram multiple brdf values into a single lookup, we will
-        // take the larger size for each patch. Makes baking slightly more expensive
-        std::vector<eig::Array2u> inputs(e_objects.size());
-        rng::transform(e_objects, inputs.begin(), [&](const auto &object) -> eig::Array2u {
-          auto metallic_size = object->metallic | visit {
-            [&](uint  i) { return e_images[i]->size(); },
-            [&](float f) { return eig::Array2u { 16, 16 }; },
-          };
-          auto roughness_size = object->roughness | visit {
-            [&](uint  i) { return e_images[i]->size(); },
-            [&](float f) { return eig::Array2u { 16, 16 }; },
-          };
-          return metallic_size.cwiseMax(roughness_size).eval();
-        });
-
-        // Scale atlas inputs to respect the maximum texture size set in Settings::texture_size
-        eig::Array2u maximal = rng::fold_left(inputs, eig::Array2u(0), [](auto a, auto b) { return a.cwiseMax(b).eval(); });
-        eig::Array2f scaled  = e_settings->apply_texture_size(maximal).cast<float>() / maximal.cast<float>();
-        for (auto &input : inputs)
-          input = (input.cast<float>() * scaled).max(2.f).cast<uint>().eval();
-        
-        // Regenerate atlas if inputs don't match the atlas' current layout
-        // Note; barycentric weights will need a full rebuild, which is detected
-        //       by the nr. of objects changing or the texture setting changing. A bit spaghetti-y :S
-        texture_brdf.resize(inputs);
-        if (texture_brdf.is_invalitated()) {
-          // The barycentric texture was re-allocated, which means underlying memory was all invalidated.
-          // So in a case of really bad spaghetti-code, we force object-dependent parts to update
-          auto &e_scene = const_cast<Scene &>(scene);
-          e_scene.components.objects.set_mutated(true);
-        }
-      }
-
-      // Push basis function data, just defaulted to basis 0 for now
-      {
-        const auto &basis = scene.resources.bases[0].value();
-        texture_basis.set(obj_span<const float>(basis.func));
       }
 
       // Adjust nr of UpliftingData and ObjectData blocks up to or down to relevant size
@@ -525,7 +490,7 @@ namespace met {
       
       // Announce first run
       if (m_is_first_update)
-        fmt::print("Uplifting {} just woke up\n", m_uplifting_i);
+        fmt::print("Spectral uplifting {} just woke up\n", m_uplifting_i);
 
       // Flag 1; test if color system has, in any way/shape/form, been modified
       bool is_color_system_stale = m_is_first_update
@@ -544,7 +509,7 @@ namespace met {
       // Step 1; generate a color system boundary; spectra, coefficients, and colors
       if (is_color_system_stale) {
         boundary = uplifting->sample_color_solid(scene, 4, n_uplifting_boundary_samples);
-        fmt::print("Uplifting {} sampled {} color system boundary points\n", m_uplifting_i, boundary.size());
+        fmt::print("Spectral uplifting {} sampled {} color system boundary points\n", m_uplifting_i, boundary.size());
       }
 
       // Step 2; generate the interior spectra, coefficients, and colors for uplifting constraints.
@@ -593,7 +558,7 @@ namespace met {
       if (is_color_system_stale || is_tessellation_stale || is_spectrum_stale) {
         // Updated buffer size values to the nr. of tetrahedra
         m_buffer_bary_map->size = tessellation.elems.size();
-
+        
         // Per tetrahedron, emplace packed matrix representation of vertex barycentric weights
         std::transform(
           std::execution::par_unseq,
@@ -624,12 +589,45 @@ namespace met {
         // Flush buffer up to relevant used range
         buffer_bary.flush();
         buffer_coef.flush();
-        // buffer_bary.flush(sizeof(uint) + sizeof(BufferBaryBlock) * tessellation.elems.size());
-        // buffer_coef.flush(sizeof(uint) + sizeof(BufferCoefBlock) * tessellation.elems.size());
       }
 
       // Finally; set state to false
       m_is_first_update = false;
+    }
+
+    std::pair<eig::Vector4f, uint> SceneGLHandler<met::Uplifting>::UpliftingData::find_enclosing_tetrahedron(const eig::Vector3f &p) const {
+      met_trace();
+      
+      // Search data, initial value
+      float result_err = std::numeric_limits<float>::max();
+      uint  result_i = 0;
+      auto  result_bary = eig::Vector4f(0.f);
+
+      // Search tetrahedron with all positive barycentric weights
+      for (uint i = 0; i < tessellation.elems.size(); ++i) {
+        // Unpack matrix data from mapped buffer; not ideal exactly
+        auto block = m_buffer_bary_map->data[i];
+        auto inv   = block.inv.block<3, 3>(0, 0).eval();
+        auto sub   = block.sub.head<3>().eval();
+
+        // Compute barycentric weights using packed element data
+        eig::Vector3f xyz  = (inv * (p.array() - sub.array()).matrix()).eval();
+        eig::Vector4f bary = (eig::Array4f() << xyz, 1.f - xyz.sum()).finished();
+
+        // Compute squared error of potentially unbounded barycentric weights
+        float err = (bary - bary.cwiseMax(0.f).cwiseMin(1.f)).matrix().squaredNorm();
+
+        // Continue if error does not improve
+        // or store best result
+        if (err > result_err)
+          continue;
+        result_err  = err;
+        result_bary = bary;
+        result_i    = i;
+      }
+
+      debug::check_expr(result_i < tessellation.elems.size());
+      return { result_bary, result_i };
     }
 
     SceneGLHandler<met::Uplifting>::ObjectData::ObjectData(const Scene &scene, uint object_i)
@@ -683,6 +681,7 @@ namespace met {
         || scene.resources.images       // User loaded/deleted a image;
         || settings.state.texture_size; // Texture size setting changed
       guard(is_active);
+      fmt::print("Spectral texture bake for object {}, uplifting {}\n", m_object_i, object->uplifting_i);
 
       // Rebuild framebuffer if necessary
       if (m_is_first_update || atlas.is_invalitated() || m_atlas_layer_i != patch.layer_i) {

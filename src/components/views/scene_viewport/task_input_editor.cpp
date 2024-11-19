@@ -1,6 +1,6 @@
 #include <metameric/core/ranges.hpp>
+#include <metameric/scene/detail/query.hpp>
 #include <metameric/components/views/scene_viewport/task_input_editor.hpp>
-#include <metameric/components/pipeline/task_gen_uplifting_data.hpp>
 #include <algorithm>
 #include <bitset>
 #include <execution>
@@ -52,8 +52,9 @@ namespace met {
   void ViewportEditorInputTask::build_indirect_constraint(SchedulerHandle &info, const ConstraintRecord &cs, NLinearConstraint &cstr) {
     met_trace_full();
 
-    // Get scene handle
+    // Get shared resources
     const auto &e_scene = info.global("scene").getr<Scene>();
+    const auto &e_uplft = e_scene.components.upliftings.gl.uplifting_data[cs.uplifting_i];
 
     // Perform path query and obtain path samples
     // If no paths were found, clear data so the constraint becomes invalid for MMV/spectrum generation
@@ -63,114 +64,69 @@ namespace met {
       cstr.powr_j = { };
       return;
     }
-    fmt::print("Query: sampled {} light paths\n", paths.size());
 
-    // Collect handle to relevant uplifting task; we use this to query underlying tetrahedron data
-    const auto &e_uplf_task = info.task(fmt::format("gen_upliftings.gen_uplifting_{}", cs.uplifting_i))
-                                  .realize<GenUpliftingDataTask>();
-    
+    fmt::print("Path query sampled {} light paths\n", paths.size());
+
     // Get the current reflectance distribution used during rendering operations for this constraint
-    Spec constraint_refl = e_uplf_task.query_constraint(cs.vertex_i);
+    Spec spec = e_uplft.interior[cs.vertex_i].spec;
 
-    // Helper struct
-    // A path's is restructured into values * reflectance^power
-    struct SeparationRecord {
+    // Helper struct; a path sample is restructured into a collection of r^p * c_p
+    struct PowerSeriesSample {
       uint         power;  // nr. of times constraint reflectance appears along path
       eig::Array4f wvls;   // integration wavelengths 
       eig::Array4f values; // remainder of incident radiance, without constraint reflectance multiplied against it
     };
 
-    // Helper struct
-    // Definition for a path vertex; reflectance equals r_weight x our constraint reflectance + remainder
-    struct TetrahedronRecord {
-      float        r_weight;  // Barycentric weight of reflectance at one of four vertices
-      eig::Array4f remainder; // Remainder of reflectances, premultiplied and summed
-    };
-
     // Compact paths into R^P + aR', which likely means separating them instead
-    std::vector<SeparationRecord> paths_finalized;
-    paths_finalized.reserve(paths.size());
+    std::vector<PowerSeriesSample> power_series_samples;
+    power_series_samples.reserve(paths.size());
     #pragma omp parallel for
     for (int i = 0; i < paths.size(); ++i) {
       const PathRecord &path = paths[i];
-
-      // Filter to find vertices along path for which the uplifting data is relevant to the constraint
-      auto verts_view = vws::take(std::max(static_cast<int>(path.path_depth) - 1, 0))                           // 1. drop padded parts of path data
-                      | vws::transform([&](const auto &vt) { 
-                        return e_scene.get_surface_info(vt.p, vt.record);                                       // 2. sample surface info at path vertex
-                      })           
-                      | vws::filter([&](const auto &si) { 
-                        return si.uplifting_i == cs.uplifting_i;                                                // 3. drop path vertices unrelated to current uplifting object
-                      })               
-                      | vws::transform([&](const auto &si) { 
-                        return e_uplf_task.query_tetrahedron(si.diffuse);                                       // 4. obtain the uplifting tetrahedron that describes the surface reflectance
-                      })           
-                      | vws::transform([&](const auto &tetr) {                                                  // 5. find index of tetrahedron vertex linked to our constraint
-                          uint i = std::distance(tetr.indices.begin(), rng::find(tetr.indices, cs.vertex_i));   //    and return both tetr. and index
-                          return std::pair { tetr, i }; 
-                      })                                        
-                      | vws::filter([&](const auto &pair) { return pair.second < 4; })                          // 6. filter out tetrahedra unrelated to current uplifting vertex
-                      | vws::transform([&](const auto &pair) {                                                  // 7. return a compact representation, see TetrahedronRecord
-                          // We now have four vertex weights, and the index of the constraint-associated vertex
-                          auto [tetr, i] = pair;
-                          TetrahedronRecord rc = { .r_weight = tetr.weights[i], .remainder = 0.f };
-
-                          // For each vertex that isn't the constraint, we add theiir spectrum into the remainder
-                          for (uint j = 0; j < 4; ++j) {
-                            guard_continue(j != i);
-                            rc.remainder += tetr.weights[j] 
-                                          * sample_spectrum(path.wvls, tetr.spectra[j]);
-                          }
-
-                          return rc; 
-                        });
       
-      // Apply filter and return selected vertices
-      auto verts = path.data | verts_view | view_to<std::vector<TetrahedronRecord>>();
-      
+      // Perform a reconstruction of the uplifting behavior along this path, for the path's
+      // wavelength, this specific uplifting and this specific constraint only
+      auto reconstruction = detail::query_path_reconstruction(e_scene, path, cs);
+
       // Get the "fixed" part of the path's throughput, by taking the constraint's current refl.
       // and dividing it out of the assembled energy (note; this data is from last frame)
       eig::Array4f back = path.L;
-      eig::Array4f refl = sample_spectrum(path.wvls, constraint_refl);
-      for (const auto &vt : verts) {
-        eig::Array4f rdiv = refl * vt.r_weight + vt.remainder; // r_i = a_i*r + w_i
-        // back = (rdiv > 0.0001f).select(back / rdiv, 0.f); // we ignore small values to prevent fireflies from mucking up a measurement
+      eig::Array4f refl = sample_spectrum(path.wvls, spec);
+      for (const auto &vt : reconstruction) {
+        eig::Array4f rdiv = refl * vt.a + vt.remainder; // r_i = a_i * r + w_i makes for a nice rewrite
         back = (rdiv > 0.0001f).select(back / rdiv, back); // we ignore small values to prevent fireflies from mucking up a measurement
       }
       
       // We them iterate all permutations of the current constraint vertices
       // and collapse reflectances into a simple power number, and multiply
       // energy against the remainder reflectances
-      for (uint i = 0; i < std::pow(2u, static_cast<uint>(verts.size())); ++i) {
+      for (uint i = 0; i < std::pow(2u, static_cast<uint>(reconstruction.size())); ++i) {
         auto bits = std::bitset<32>(i);
-        SeparationRecord sr = { .power = 0, .wvls = path.wvls, .values = back };
-        for (uint j = 0; j < verts.size(); ++j) {
+        PowerSeriesSample sr = { .power = 0, .wvls = path.wvls, .values = back };
+        for (uint j = 0; j < reconstruction.size(); ++j) {
           if (bits[j]) {
             sr.power++;
-            sr.values *= verts[j].r_weight;  // a_i
+            sr.values *= reconstruction[j].a;          // a_i
           } else {
-            sr.values *= verts[j].remainder; // w_i
+            sr.values *= reconstruction[j].remainder; // w_i
           }
         }
 
         #pragma omp critical
         {
-          paths_finalized.push_back(sr);
+          power_series_samples.push_back(sr);
         }
       }
     }
 
-    // Copy tbb over to single vector block
-    // std::vector<SeparationRecord> paths_finalized(range_iter(tbb_paths));
-    fmt::print("Query: separated into {} permutations\n", paths_finalized.size());
+    fmt::print("Path query resulted in {} reflectance permutations\n", power_series_samples.size());
 
-    // Make space in constraint available, up to maximum power
-    // and set everything to zero for now
-    cstr.powr_j.resize(1 + rng::max_element(paths_finalized, {}, &SeparationRecord::power)->power);
+    // Make space in constraint available, up to maximum power and set everything to zero for now
+    cstr.powr_j.resize(1 + rng::max_element(power_series_samples, {}, &PowerSeriesSample::power)->power);
     rng::fill(cstr.powr_j, Spec(0));
 
-    // Reduce spectral data into its respective power bracket and divide by sample count
-    for (const auto &path : paths_finalized)
+    // Reduce power series samples into their respective power bracket and divide by sample count
+    for (const auto &path : power_series_samples)
       accumulate_spectrum(cstr.powr_j[path.power], path.wvls, path.values);
     for (auto &power : cstr.powr_j) {
       power *= .25f * static_cast<float>(wavelength_samples) / static_cast<float>(indirect_query_spp);
@@ -178,9 +134,9 @@ namespace met {
         power = 0.f;
     }
 
-    // Generate a default color value by passing through the current known constraint reflectance
+    // Generate a default color value by passing through the newly generated power series constraint
     IndirectColrSystem csys = { .cmfs = e_scene.primary_observer(), .powers = cstr.powr_j };
-    cstr.colr_j = csys(constraint_refl);
+    cstr.colr_j = csys(spec);
   }
 
   bool ViewportEditorInputTask::is_active(SchedulerHandle &info) {
@@ -318,7 +274,7 @@ namespace met {
       m_ray_result = eval_ray_query(info, e_arcball.generate_ray(p_screen));
       auto gizmo_cast_p 
          = (m_ray_result.record.is_valid() && m_ray_result.record.is_object())
-         ? e_scene.get_surface_info(m_ray_result.get_position(), m_ray_result.record)
+         ? detail::query_surface_info(e_scene, m_ray_result)
          : SurfaceInfo { .p = m_gizmo_curr_p.p };
 
       // Store surface data and extracted color in  constraint
@@ -336,7 +292,7 @@ namespace met {
       m_ray_result = eval_ray_query(info, e_arcball.generate_ray(p_screen));
       auto gizmo_cast_p 
          = (m_ray_result.record.is_valid() && m_ray_result.record.is_object())
-         ? e_scene.get_surface_info(m_ray_result.get_position(), m_ray_result.record)
+         ? detail::query_surface_info(e_scene, m_ray_result)
          : SurfaceInfo { .p = m_gizmo_curr_p.p };
 
       // Right at the end, we build the indirect surface constraint HERE

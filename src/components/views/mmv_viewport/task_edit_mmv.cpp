@@ -22,19 +22,15 @@ namespace met {
     using ComponentType = detail::Component<Uplifting>;
 
     // Get shared resources
-    const auto &e_window  = info.global("window").getr<gl::Window>();
-    const auto &e_scene   = info.global("scene").getr<Scene>();
-    const auto &e_cs      = info.parent()("selection").getr<ConstraintRecord>();
-    const auto &e_uplift  = e_scene.components.upliftings[e_cs.uplifting_i].value;
-    const auto &e_basis   = e_scene.resources.bases[e_uplift.basis_i].value();
-    auto uplf_handle      = info.task(fmt::format("gen_upliftings.gen_uplifting_{}", e_cs.uplifting_i)).mask(info);
-    const auto &e_spectra = uplf_handle("constraint_samples").getr<std::vector<MismatchSample>>();
-    const auto &e_hulls   = uplf_handle("mismatch_hulls").getr<std::vector<ConvexHull>>();
-    const auto &e_hull    = e_hulls[e_cs.vertex_i];
+    const auto &e_window = info.global("window").getr<gl::Window>();
+    const auto &e_scene  = info.global("scene").getr<Scene>();
+    const auto &e_cs     = info.parent()("selection").getr<ConstraintRecord>();
 
-    // Select constraint spectrum
-    Spec spec = e_spectra[e_cs.vertex_i].spec;
-    
+    // Obtain the generated spectrum for this uplifting/vertex combination
+    const Spec &spec = e_scene.components.upliftings
+                              .gl.uplifting_data[e_cs.uplifting_i]
+                              .interior[e_cs.vertex_i].spec;
+
     // Encapsulate editable data, so changes are saved in an undoable manner
     detail::encapsulate_scene_data<ComponentType>(info, e_cs.uplifting_i, [&](auto &info, uint i, ComponentType &uplf) {
       // Return value for coming lambda captures
@@ -356,54 +352,7 @@ namespace met {
       // Last parts before mismatch volume editor is spawned
       if (vert.has_mismatching(e_scene, uplf.value)) {
         // Visual separator from editing components drawn in previous tasks
-        ImGui::SeparatorText("Mismatching");
-        
-        /* if (ImGui::SmallButton("Save image")) {
-          if (fs::path path; detail::save_dialog(path, "exr")) {
-            // Get shared texture resource
-            const auto &e_txtr = info.relative("viewport_image")("lrgb_target").getr<gl::Texture2d4f>();
-            debug::check_expr(e_txtr.is_init());
-
-            // Create cpu-side rgba image matching gpu-side film format
-            Image image = {{
-              .pixel_frmt = Image::PixelFormat::eRGBA,
-              .pixel_type = Image::PixelType::eFloat,
-              .size       = e_txtr.size()
-            }};
-
-            // Copy over to cpu-side
-            e_txtr.get(cast_span<float>(image.data()));
-
-            // Save to exr; no gamma correction
-            image.save_exr(path);
-          }
-        }
-        ImGui::SameLine();
-        if (ImGui::SmallButton("Print hull data")) {
-          fmt::print("verts\n{}\n\n", e_hull.hull.verts);
-          fmt::print("elems\n{}\n\n", e_hull.hull.elems);
-        }
-        ImGui::SameLine();
-        if (ImGui::SmallButton("Print reflectance")) {
-          fmt::print("{}\n", spec);
-        }
-        
-        vert.constraint | visit_single([&](IndirectSurfaceConstraint &cstr) { 
-          if (ImGui::SmallButton("Print power series")) {
-            for (uint i = 0; i < cstr.cstr_j.size(); ++i) {
-              fmt::print("cstr {}\n", i);
-              for (uint j = 0; j < cstr.cstr_j[i].powr_j.size(); ++j) {
-                fmt::print("  {} : {}\n", j, cstr.cstr_j[i].powr_j[j]);
-              }
-            }
-          }
-        }); */
-
-        /* // Toggle button for clipping
-        auto &e_clip = info.relative("viewport_guizmo")("clip_point").getw<bool>();
-        ImGui::Checkbox("Clip to volume", &e_clip);
-        if (ImGui::IsItemHovered())
-          ImGui::SetTooltip("Metamers can only be correctly generated inside the volume"); */
+        ImGui::SeparatorText("Mismatch editor");
 
         // Show optional color patches
         const auto &e_patches = info.relative("viewport_gen_patches")("patches")

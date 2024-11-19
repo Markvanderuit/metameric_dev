@@ -31,7 +31,7 @@ namespace met {
     constexpr auto operator<=>(const SurfaceRecord &) const = default;
   };
   static_assert(sizeof(SurfaceRecord) == 4);
-
+  
   // Simple info object describing a surface interaction, without
   // local shading information as it is unnecessary in the struct's
   // limited use case
@@ -65,6 +65,20 @@ namespace met {
              tx.isApprox(o.tx) &&
              record.data == o.record.data;
     }
+  };
+
+  // A queried spectral uplifting tetrahedron component surrounding a specific color
+  // Contains lookup information for querying or finding a specific tetrahedron's
+  // spectral information
+  struct UpliftingInfo {
+    // Uplifting/tetrahedron indices
+    uint uplifting_i;
+    uint tetrahedron_i;
+
+    // Reconstruction data
+    eig::Array4f        weights; // Barycentric weights combining tetrahedron
+    std::array<Spec, 4> spectra; // Associated spectra at the vertices
+    std::array<int,  4> indices; // Index of constraint, if vertex spectrum originated from a constraint; -1 otherwise
   };
 
   // JSON (de)serialization of surface info
@@ -125,15 +139,6 @@ namespace met {
     alignas(16) std::array<VertexRecord, path_max_depth> data;
   };
   static_assert(sizeof(PathRecord) == (3 + PathRecord::path_max_depth) * 16);
-
-  // A queried spectral uplifting tetrahedron component surrounding a specific color
-  // Contains lookup information for querying or finding a specific tetrahedron's
-  // spectral information
-  struct TetrahedronRecord {
-    eig::Array4f        weights; // Barycentric weights combining tetrahedron
-    std::array<Spec, 4> spectra; // Associated spectra at the vertices
-    std::array<int,  4> indices; // Index of constraint, if vertex spectrum originated from a constraint; -1 otherwise
-  };
   
   // Helper object for handling selection of a specific 
   // uplifting/vertex/constraint in the scene data
