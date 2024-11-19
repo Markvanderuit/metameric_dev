@@ -102,8 +102,8 @@ namespace met {
 
   private: 
     // Handle to program shader cache, accessible to gl-side data builders;
-    ResourceHandle m_cache_handle;
-    template <typename> friend class SceneGLHandler;
+    mutable ResourceHandle m_cache_handle;
+    friend class detail::SceneGLHandler<Uplifting>::ObjectData;
   };
 
   // Component/Resource test helpers; check if Ty instantiates Component<>/Resource<>

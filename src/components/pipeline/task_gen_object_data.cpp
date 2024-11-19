@@ -80,7 +80,7 @@ namespace met {
     const auto &e_uplifting = e_scene.components.upliftings[e_object.uplifting_i];
 
     // Handle coefficient texture baking
-    { 
+    /* { 
       // Find relevant patch in the texture atlas
       const auto &e_coef  = e_scene.components.upliftings.gl.texture_coef;
       const auto &e_patch = e_coef.patch(m_object_i);
@@ -113,7 +113,7 @@ namespace met {
       program.bind("b_buff_uplift_data", e_tesselation_data);
       program.bind("b_buff_uplift_pack", e_tesselation_pack);
       program.bind("b_buff_uplift_coef", e_tesselation_coef);
-      program.bind("b_buff_object_info",     e_scene.components.objects.gl.object_info);
+      program.bind("b_buff_object_info", e_scene.components.objects.gl.object_info);
       program.bind("b_buff_atlas",       e_coef.buffer());
       if (!e_scene.resources.images.empty()) {
         program.bind("b_txtr_3f",        e_scene.resources.images.gl.texture_atlas_3f.texture());
@@ -175,7 +175,7 @@ namespace met {
         .draw_op        = gl::DrawOp::eLine,
         .bindable_array = &e_scene.resources.meshes.gl.mesh_array
       });
-    }
+    } */
 
     // Handle brdf parameter baking
     {

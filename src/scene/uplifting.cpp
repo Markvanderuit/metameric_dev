@@ -1,6 +1,7 @@
 #include <metameric/scene/scene.hpp>
 #include <metameric/core/metamer.hpp>
 #include <metameric/core/ranges.hpp>
+#include <small_gl/dispatch.hpp>
 
 namespace met {
   namespace detail {
@@ -382,7 +383,7 @@ namespace met {
       for (uint i = uplifting_data.size(); i > scene.components.upliftings.size(); --i)
         uplifting_data.pop_back();
       for (uint i = object_data.size(); i < scene.components.objects.size(); ++i)
-        object_data.push_back(i);
+        object_data.push_back({ scene, i });
       for (uint i = object_data.size(); i > scene.components.objects.size(); --i)
         object_data.pop_back();
 
@@ -522,6 +523,10 @@ namespace met {
       const auto &observer   = scene.resources.observers[uplifting->observer_i];
       const auto &illuminant = scene.resources.illuminants[uplifting->illuminant_i];
       
+      // Announce first run
+      if (m_is_first_update)
+        fmt::print("Uplifting {} just woke up\n", m_uplifting_i);
+
       // Flag 1; test if color system has, in any way/shape/form, been modified
       bool is_color_system_stale = m_is_first_update
         || uplifting->basis_i      || basis
@@ -588,7 +593,6 @@ namespace met {
       if (is_color_system_stale || is_tessellation_stale || is_spectrum_stale) {
         // Updated buffer size values to the nr. of tetrahedra
         m_buffer_bary_map->size = tessellation.elems.size();
-        m_buffer_coef_map->size = tessellation.elems.size();
 
         // Per tetrahedron, emplace packed matrix representation of vertex barycentric weights
         std::transform(
@@ -618,19 +622,150 @@ namespace met {
           });
         
         // Flush buffer up to relevant used range
-        buffer_bary.flush(sizeof(uint) + sizeof(BufferBaryBlock) * tessellation.elems.size());
-        buffer_coef.flush(sizeof(uint) + sizeof(BufferCoefBlock) * tessellation.elems.size());
+        buffer_bary.flush();
+        buffer_coef.flush();
+        // buffer_bary.flush(sizeof(uint) + sizeof(BufferBaryBlock) * tessellation.elems.size());
+        // buffer_coef.flush(sizeof(uint) + sizeof(BufferCoefBlock) * tessellation.elems.size());
       }
+
+      // Finally; set state to false
+      m_is_first_update = false;
     }
 
-    SceneGLHandler<met::Uplifting>::ObjectData::ObjectData(uint object_i)
+    SceneGLHandler<met::Uplifting>::ObjectData::ObjectData(const Scene &scene, uint object_i)
     : m_object_i(object_i) {
-      met_trace();
-      // ...
+      met_trace_full();
+
+      // Build shader in program cache, if it is not loaded already
+      auto &cache = scene.m_cache_handle.getw<gl::detail::ProgramCache>();
+      std::tie(m_program_key, std::ignore) = cache.set(
+        {{ .type       = gl::ShaderType::eVertex,
+            .spirv_path = "shaders/scene/gen_texture.vert.spv",
+            .cross_path = "shaders/scene/gen_texture.vert.json" },
+          { .type       = gl::ShaderType::eFragment,
+            .spirv_path = "shaders/scene/gen_texture_coef.frag.spv",
+            .cross_path = "shaders/scene/gen_texture_coef.frag.json" }});
+
+      // Initialize uniform buffers and writeable, flushable mappings
+      std::tie(m_buffer, m_buffer_map) = gl::Buffer::make_flusheable_object<BlockLayout>();
+      m_buffer_map->object_i = m_object_i;
+      m_buffer.flush();
+
+      // Linear texture sampler
+      m_sampler = {{ .min_filter = gl::SamplerMinFilter::eLinear, .mag_filter = gl::SamplerMagFilter::eLinear }};
     }
 
     void SceneGLHandler<met::Uplifting>::ObjectData::update(const Scene &scene) {
-      // ...
+      met_trace_full();
+
+      // Get handles to relevant scene data
+      const auto &object       = scene.components.objects[m_object_i];
+      const auto &settings     = scene.components.settings;
+      const auto &mesh         = scene.resources.meshes[object->mesh_i];
+      const auto &uplifting    = scene.components.upliftings[object->uplifting_i];
+      const auto &uplifting_gl = scene.components.upliftings.gl.uplifting_data[object->uplifting_i];
+
+      // Find relevant patch in the texture atlas
+      const auto &atlas = scene.components.upliftings.gl.texture_coef;
+      const auto &patch = atlas.patch(m_object_i);
+
+      // We continue only after careful checking of internal state, as the bake
+      // is relatively expensive and doesn't always need to happen. Careful in
+      // this case means "ewwwwwww"
+      bool is_active 
+         = m_is_first_update            // First run, demands render anyways
+        || atlas.is_invalitated()       // Texture atlas re-allocated, demands re-render
+        || object.state.diffuse         // Diifferent albedo value set on object
+        || object.state.mesh_i          // Diifferent mesh attached to object
+        || object.state.uplifting_i     // Different uplifting attached to object
+        || uplifting                    // Uplifting was changed
+        || scene.resources.meshes       // User loaded/deleted a mesh;
+        || scene.resources.images       // User loaded/deleted a image;
+        || settings.state.texture_size; // Texture size setting changed
+      guard(is_active);
+
+      // Rebuild framebuffer if necessary
+      if (m_is_first_update || atlas.is_invalitated() || m_atlas_layer_i != patch.layer_i) {
+        m_atlas_layer_i = patch.layer_i;
+        m_fbo = {{ .type       = gl::FramebufferType::eColor,
+                   .attachment = &atlas.texture(),
+                   .layer      = m_atlas_layer_i }};
+      }
+
+      // Get relevant program handle, bind, then bind resources to corresponding targets
+      auto &cache = scene.m_cache_handle.getw<gl::detail::ProgramCache>();
+      auto &program = cache.at(m_program_key);
+      program.bind();
+      program.bind("b_buff_unif",        m_buffer);
+      program.bind("b_buff_atlas",       atlas.buffer());
+      program.bind("b_buff_uplift_bary", uplifting_gl.buffer_bary);
+      program.bind("b_buff_uplift_coef", uplifting_gl.buffer_coef);
+      program.bind("b_buff_object_info", scene.components.objects.gl.object_info);
+      if (!scene.resources.images.empty()) {
+        program.bind("b_buff_textures",  scene.resources.images.gl.texture_info);
+        program.bind("b_txtr_3f",        scene.resources.images.gl.texture_atlas_3f.texture());
+        program.bind("b_txtr_3f",        m_sampler);  
+        program.bind("b_txtr_1f",        scene.resources.images.gl.texture_atlas_1f.texture());
+        program.bind("b_txtr_1f",        m_sampler);  
+      }
+
+      // Set relevant scoped gl state;
+      // Viewport addresses the full atlas texture, while we enable a scissor 
+      // test to restrict all operations in this scope to the relevant texture patch
+      gl::state::ScopedSet scope(gl::DrawCapability::eScissorTest, true);
+      gl::state::set(gl::DrawCapability::eScissorTest, true);
+      gl::state::set(gl::DrawCapability::eDither,     false);
+      gl::state::set_scissor(patch.size, patch.offs);
+      gl::state::set_viewport(atlas.texture().size().head<2>());
+      gl::state::set_line_width(4.f);
+
+      // Prepare framebuffer, clear relevant patch (not actually necessary)
+      m_fbo.bind();
+      m_fbo.clear(gl::FramebufferType::eColor, 0u);
+
+      // Find relevant draw command to map mesh UVs;
+      // if no UVs are present or diffuse color is specified,
+      // we fall back on rectangle UVs to simply fill the patch
+      gl::MultiDrawInfo::DrawCommand command;
+      if (mesh->has_txuvs() && object->diffuse.index() == 1) {
+        command = scene.resources.meshes.gl.mesh_draw[object->mesh_i];
+      } else {
+        command = scene.resources.meshes.gl.mesh_draw[0]; // Draw full ectangle
+      }
+
+      // Insert relevant barriers
+      gl::sync::memory_barrier(gl::BarrierFlags::eFramebuffer        | 
+                               gl::BarrierFlags::eTextureFetch       |
+                               gl::BarrierFlags::eClientMappedBuffer |
+                               gl::BarrierFlags::eStorageBuffer      | 
+                               gl::BarrierFlags::eUniformBuffer      );
+                     
+      // Triangle fill for most data
+      gl::dispatch_draw({
+        .type           = gl::PrimitiveType::eTriangles,
+        .vertex_count   = command.vertex_count,
+        .vertex_first   = command.vertex_first,
+        .capabilities   = {{ gl::DrawCapability::eDepthTest, false },
+                           { gl::DrawCapability::eCullOp,    false },
+                           { gl::DrawCapability::eBlendOp,   false }},
+        .draw_op        = gl::DrawOp::eFill,
+        .bindable_array = &scene.resources.meshes.gl.mesh_array
+      });
+      
+      // Line fill to overlap boundaries
+      gl::dispatch_draw({
+        .type           = gl::PrimitiveType::eTriangles,
+        .vertex_count   = command.vertex_count,
+        .vertex_first   = command.vertex_first,
+        .capabilities   = {{ gl::DrawCapability::eDepthTest, false },
+                           { gl::DrawCapability::eCullOp,    false },
+                           { gl::DrawCapability::eBlendOp,   false }},
+        .draw_op        = gl::DrawOp::eLine,
+        .bindable_array = &scene.resources.meshes.gl.mesh_array
+      });
+
+      // Finally; set entry state to false
+      m_is_first_update = false;
     }
   } // namespace detail
 } // namespace met

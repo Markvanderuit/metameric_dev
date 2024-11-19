@@ -5,8 +5,10 @@
 #include <metameric/core/constraints.hpp>
 #include <metameric/core/convex.hpp>
 #include <metameric/scene/detail/utility.hpp>
+#include <small_gl/framebuffer.hpp>
 #include <small_gl/buffer.hpp>
 #include <small_gl/program.hpp>
+#include <small_gl/sampler.hpp>
 #include <small_gl/texture.hpp>
 #include <deque>
 
@@ -174,7 +176,6 @@ namespace met {
 
         // All-object block layout for std430 storage buffer, mapped for write
         struct BufferCoefLayout {
-          alignas(4) uint size;
           std::array<BufferCoefBlock, met_max_constraints> data;
         } *m_buffer_coef_map;
         
@@ -208,17 +209,28 @@ namespace met {
       // - generates per-object spectral texture data
       // - writes this data to the scene texture atlas
       struct ObjectData {
-        // Key to program handle in cache
-        std::string m_program_key;
+        // std140 layout for data written to buffer
+        struct BlockLayout {
+          uint object_i;
+        };
 
-        // Index of current object
+        // Objects for texture bake
+        uint            m_atlas_layer_i;
+        std::string     m_program_key;
+        gl::Framebuffer m_fbo;
+        gl::Sampler     m_sampler;
+        gl::Buffer      m_buffer;
+        BlockLayout    *m_buffer_map;
+
+        // Small private state
         uint m_object_i;
+        bool m_is_first_update;
       
       public:
-        ObjectData(uint object_i);
+        ObjectData(const Scene &scene, uint object_i);
         void update(const Scene &scene);
       };
-    
+
     private:
       // Generate per-uplifting data necessary for spectral texture generation
       void generate_uplifting_data(const Scene &scene, uint uplifting_i);

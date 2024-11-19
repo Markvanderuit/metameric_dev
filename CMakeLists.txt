@@ -22,7 +22,7 @@ set(MET_SUPPORTED_MESHES        32) # Maximum supported scene meshes
 set(MET_SUPPORTED_OBJECTS       32) # Maximum supported scene objects
 set(MET_SUPPORTED_EMITTERS      32) # Maximum supported scene emitters
 set(MET_SUPPORTED_UPLIFTINGS     8) # Maximum supported uplifting structures; multiple objects can share an uplifting
-set(MET_SUPPORTED_CONSTRAINTS 1024) # Maximum supported boundary spectra + constraint spectra
+set(MET_SUPPORTED_CONSTRAINTS  512) # Maximum supported boundary spectra + interior spectra
 set(MET_SUPPORTED_TEXTURES     128) # Maximum supported scene textures
 
 # TODO remove; inserted in code/shaders as preprocessor defines
