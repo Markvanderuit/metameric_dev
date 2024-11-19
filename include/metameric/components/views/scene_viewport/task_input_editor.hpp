@@ -25,8 +25,13 @@ namespace met {
     PixelSensor        m_path_sensor;
 
   private:
-    RayRecord                   eval_ray_query(SchedulerHandle &info, const Ray &ray);
+    // Helper; shoot a ray and return hiti data
+    RayRecord eval_ray_query(SchedulerHandle &info, const Ray &ray);
+
+    // Helper; shoot n paths and return cached path data
     std::span<const PathRecord> eval_path_query(SchedulerHandle &info, uint spp);
+
+    // Helper; shoot n paths, reduce to a power series, and build an indirect constraint from this
     void build_indirect_constraint(SchedulerHandle &info, const ConstraintRecord &is, NLinearConstraint &cstr);
 
   public:

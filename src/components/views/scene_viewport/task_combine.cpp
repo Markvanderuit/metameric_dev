@@ -1,5 +1,5 @@
 #include <metameric/scene/scene.hpp>
-#include <metameric/components/views/scene_viewport/task_draw_combine.hpp>
+#include <metameric/components/views/scene_viewport/task_combine.hpp>
 #include <metameric/components/views/detail/arcball.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
 #include <metameric/render/primitives_render.hpp>
@@ -8,25 +8,25 @@
 #include <small_gl/dispatch.hpp>
 
 namespace met {
-  bool ViewportDrawCombineTask::is_active(SchedulerHandle &info) {
+  bool ViewportCombineTask::is_active(SchedulerHandle &info) {
     return info.parent()("is_active").getr<bool>();
   }
   
-  void ViewportDrawCombineTask::init(SchedulerHandle &info) {
+  void ViewportCombineTask::init(SchedulerHandle &info) {
     met_trace_full();
 
     // Initialize program object in cache
     std::tie(m_program_key, std::ignore) = info.global("cache").getw<gl::detail::ProgramCache>().set({{ 
       .type       = gl::ShaderType::eCompute,
-      .spirv_path = "shaders/views/scene_viewport/draw_combine.comp.spv",
-      .cross_path = "shaders/views/scene_viewport/draw_combine.comp.json"
+      .spirv_path = "shaders/views/scene_viewport/combine.comp.spv",
+      .cross_path = "shaders/views/scene_viewport/combine.comp.json"
     }});
 
     // Initialize uniform buffers and corresponding mappings
     std::tie(m_unif_buffer, m_unif_buffer_map) = gl::Buffer::make_flusheable_object<UnifLayout>();
   }
     
-  void ViewportDrawCombineTask::eval(SchedulerHandle &info) {
+  void ViewportCombineTask::eval(SchedulerHandle &info) {
     met_trace_full();
 
     // Get shared resources 

@@ -2,8 +2,8 @@
 #include <metameric/components/views/task_scene_viewport.hpp>
 #include <metameric/components/views/scene_viewport/task_input_editor.hpp>
 #include <metameric/components/views/scene_viewport/task_render.hpp>
-#include <metameric/components/views/scene_viewport/task_draw_overlay.hpp>
-#include <metameric/components/views/scene_viewport/task_draw_combine.hpp>
+#include <metameric/components/views/scene_viewport/task_overlay.hpp>
+#include <metameric/components/views/scene_viewport/task_combine.hpp>
 #include <metameric/components/views/detail/arcball.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
 #include <metameric/components/views/detail/task_viewport.hpp>
@@ -55,18 +55,18 @@ namespace met {
     // Get handle to lrgb target
     auto lrgb_target = info.child("viewport_image")("lrgb_target");
 
-    // Subtasks handle arcball camera and other user input
+    // Subtasks handle arcball camera and user input
     info.child_task("viewport_input_camera").init<detail::ArcballInputTask>(lrgb_target, arcball_info);
     info.child_task("viewport_input_editor").init<ViewportEditorInputTask>();
 
     // Subtask spawns and manages render primitive 
     info.child_task("viewport_render").init<MeshViewportRenderTask>();
 
-    // Subtask manages several overlays; uplifting constraints, camera frustrum, etc 
-    info.child_task("viewport_draw_overlay").init<ViewportDrawOverlayTask>();
+    // Subtask draws several overlays; uplifting constraints, camera frustra, light paths, etc 
+    info.child_task("viewport_draw_overlay").init<ViewportOverlayTask>();
 
     // Subtask draws render output and overlays into lrgb image target
-    info.child_task("viewport_draw_combine").init<ViewportDrawCombineTask>();
+    info.child_task("viewport_combine").init<ViewportCombineTask>();
 
     // Subtask copies from lrgb to srgb image target, and closes the viewport
     info.child_task("viewport_end").init<detail::ViewportEndTask>(viewport_info);

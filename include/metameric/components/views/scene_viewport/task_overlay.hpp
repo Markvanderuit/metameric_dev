@@ -7,7 +7,7 @@
 #include <small_gl/program.hpp>
 
 namespace met {
-  class ViewportDrawOverlayTask : public detail::TaskNode {
+  class ViewportOverlayTask : public detail::TaskNode {
     using Depthbuffer = gl::Renderbuffer<gl::DepthComponent, 1>;
 
     std::string     m_program_key; 

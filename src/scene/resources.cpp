@@ -398,95 +398,95 @@ namespace met::detail {
   SceneGLHandler<met::Scene>::SceneGLHandler() {
     met_trace_full();
 
-    // Obtain writeable/flushable mapping for scene layout
-    std::tie(tlas_info, m_tlas_info_map) = gl::Buffer::make_flusheable_object<TLASInfoBufferLayout>();
+    // // Obtain writeable/flushable mapping for scene layout
+    // std::tie(tlas_info, m_tlas_info_map) = gl::Buffer::make_flusheable_object<TLASInfoBufferLayout>();
   }
 
   void SceneGLHandler<met::Scene>::update(const Scene &scene) {
     met_trace_full();
 
-    const auto &objects = scene.components.objects;
-    const auto &emitters = scene.components.emitters;
-    guard(objects || emitters);
+    // const auto &objects = scene.components.objects;
+    // const auto &emitters = scene.components.emitters;
+    // guard(objects || emitters);
 
-    // Collect bounding boxes for active scene emitters and objects as one shared type
-    struct PrimitiveData {
-      bool is_object;
-      uint i;
-      AABB aabb;
-    };
-    std::vector<PrimitiveData> prims;
+    // // Collect bounding boxes for active scene emitters and objects as one shared type
+    // struct PrimitiveData {
+    //   bool is_object;
+    //   uint i;
+    //   AABB aabb;
+    // };
+    // std::vector<PrimitiveData> prims;
 
-    // Collect object data and AABB
-    for (int i = 0; i < objects.size(); ++i) {
-      const auto &[object, state] = objects[i];
-      guard_continue(object.is_active);
+    // // Collect object data and AABB
+    // for (int i = 0; i < objects.size(); ++i) {
+    //   const auto &[object, state] = objects[i];
+    //   guard_continue(object.is_active);
 
-      const auto &mesh = scene.resources.meshes[object.mesh_i].value();
+    //   const auto &mesh = scene.resources.meshes[object.mesh_i].value();
 
-      // Get mesh transform, incorporate into object transform
-      auto object_trf = object.transform.affine().matrix().eval();
-      auto mesh_trf   = scene.resources.meshes.gl.mesh_cache[object.mesh_i].unit_trf;
-      auto trf        = (object_trf * mesh_trf).eval();
+    //   // Get mesh transform, incorporate into object transform
+    //   auto object_trf = object.transform.affine().matrix().eval();
+    //   auto mesh_trf   = scene.resources.meshes.gl.mesh_cache[object.mesh_i].unit_trf;
+    //   auto trf        = (object_trf * mesh_trf).eval();
 
-      prims.push_back({ .is_object = true, 
-                        .i         = static_cast<uint>(i), 
-                        .aabb      = generate_rotated_aabb(trf) });
-    }
+    //   prims.push_back({ .is_object = true, 
+    //                     .i         = static_cast<uint>(i), 
+    //                     .aabb      = generate_rotated_aabb(trf) });
+    // }
 
-    // Collect emitter data and AABB
-    for (int i = 0; i < emitters.size(); ++i) {
-      const auto &[emitter, state] = emitters[i];
-      guard_continue(emitter.is_active);
-      guard_continue(emitter.type != Emitter::Type::eConstant && emitter.type != Emitter::Type::ePoint);
+    // // Collect emitter data and AABB
+    // for (int i = 0; i < emitters.size(); ++i) {
+    //   const auto &[emitter, state] = emitters[i];
+    //   guard_continue(emitter.is_active);
+    //   guard_continue(emitter.type != Emitter::Type::eConstant && emitter.type != Emitter::Type::ePoint);
             
-      // Get emitter transform
-      auto trf = emitter.transform.affine();
+    //   // Get emitter transform
+    //   auto trf = emitter.transform.affine();
       
-      // Get AABB dependent on emitter shape
-      AABB aabb;
-      if (emitter.type == Emitter::Type::eRect) {
-        aabb.minb = (trf * eig::Vector4f(-.5f, -.5f, 0.f, 1.f)).head<3>().eval();
-        aabb.maxb = (trf * eig::Vector4f(0.5f, 0.5f, 0.f, 1.f)).head<3>().eval();
-      } else if (emitter.type == Emitter::Type::eSphere) {
-        auto transl = eig::Affine3f(eig::Translation3f(eig::Vector3f { -.5f, -.5f, -.5f })).matrix().eval();
-        aabb = generate_rotated_aabb((trf.matrix() * transl).matrix().eval());
-      }
+    //   // Get AABB dependent on emitter shape
+    //   AABB aabb;
+    //   if (emitter.type == Emitter::Type::eRect) {
+    //     aabb.minb = (trf * eig::Vector4f(-.5f, -.5f, 0.f, 1.f)).head<3>().eval();
+    //     aabb.maxb = (trf * eig::Vector4f(0.5f, 0.5f, 0.f, 1.f)).head<3>().eval();
+    //   } else if (emitter.type == Emitter::Type::eSphere) {
+    //     auto transl = eig::Affine3f(eig::Translation3f(eig::Vector3f { -.5f, -.5f, -.5f })).matrix().eval();
+    //     aabb = generate_rotated_aabb((trf.matrix() * transl).matrix().eval());
+    //   }
 
-      prims.push_back({ .is_object = false,
-                        .i         = static_cast<uint>(i), 
-                        .aabb      = aabb });
-    }
+    //   prims.push_back({ .is_object = false,
+    //                     .i         = static_cast<uint>(i), 
+    //                     .aabb      = aabb });
+    // }
 
-    // Get vector of AABBs only
-    auto prim_aabbs = vws::transform(prims, &PrimitiveData::aabb) | view_to<std::vector<AABB>>();
+    // // Get vector of AABBs only
+    // auto prim_aabbs = vws::transform(prims, &PrimitiveData::aabb) | view_to<std::vector<AABB>>();
 
-    // Generate scene-enclosing bounding box
-    AABB scene_aabb = std::reduce(
-      std::execution::par_unseq,
-      range_iter(prim_aabbs),
-      prim_aabbs[0],
-      [](const auto& a, const auto &b) {
-        return AABB { a.minb.cwiseMin(b.minb).eval(), a.maxb.cwiseMax(b.maxb).eval() };
-      });
+    // // Generate scene-enclosing bounding box
+    // AABB scene_aabb = std::reduce(
+    //   std::execution::par_unseq,
+    //   range_iter(prim_aabbs),
+    //   prim_aabbs[0],
+    //   [](const auto& a, const auto &b) {
+    //     return AABB { a.minb.cwiseMin(b.minb).eval(), a.maxb.cwiseMax(b.maxb).eval() };
+    //   });
     
-    // Generate transformation to cap scene to a [0, 1] bbox
-    auto scale = (scene_aabb.maxb - scene_aabb.minb).eval();
-    scale = (scale.array().abs() > 0.00001f).select(1.f / scale, eig::Array3f(1));
-    auto trf = (eig::Scaling((scale).matrix().eval()) * eig::Translation3f(-scene_aabb.minb)).matrix().eval();
+    // // Generate transformation to cap scene to a [0, 1] bbox
+    // auto scale = (scene_aabb.maxb - scene_aabb.minb).eval();
+    // scale = (scale.array().abs() > 0.00001f).select(1.f / scale, eig::Array3f(1));
+    // auto trf = (eig::Scaling((scale).matrix().eval()) * eig::Translation3f(-scene_aabb.minb)).matrix().eval();
 
-    // Apply transformation to interior AABBs
-    std::for_each(
-      std::execution::par_unseq,
-      range_iter(prim_aabbs),
-      [trf](AABB &aabb) {
-        aabb.minb = (trf * (eig::Vector4f() << aabb.minb, 1).finished()).head<3>().eval();
-        aabb.maxb = (trf * (eig::Vector4f() << aabb.maxb, 1).finished()).head<3>().eval();
-      });
+    // // Apply transformation to interior AABBs
+    // std::for_each(
+    //   std::execution::par_unseq,
+    //   range_iter(prim_aabbs),
+    //   [trf](AABB &aabb) {
+    //     aabb.minb = (trf * (eig::Vector4f() << aabb.minb, 1).finished()).head<3>().eval();
+    //     aabb.maxb = (trf * (eig::Vector4f() << aabb.maxb, 1).finished()).head<3>().eval();
+    //   });
     
-    // Push transformations to buffer
-    m_tlas_info_map->trf = trf;
-    tlas_info.flush();
+    // // Push transformations to buffer
+    // m_tlas_info_map->trf = trf;
+    // tlas_info.flush();
     
     /* // Create top-level BVH over AABBS
     BVH<8> bvh = {{ .aabb = prim_aabbs, .n_leaf_children = 1 }};

@@ -5,7 +5,7 @@
 #include <small_gl/program.hpp>
 
 namespace met {
-  class ViewportDrawCombineTask : public detail::TaskNode {
+  class ViewportCombineTask : public detail::TaskNode {
     struct UnifLayout {
       eig::Vector2u viewport_size;
       uint          sample_checkerboard;

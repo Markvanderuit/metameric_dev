@@ -45,7 +45,7 @@ namespace met {
     uint object_i;
     uint uplifting_i;
 
-    // Umderlying object material data
+    // Sampled object material data
     Colr diffuse;
     
     // Underlying record used to build SurfaceInfo object

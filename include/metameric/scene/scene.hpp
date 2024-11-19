@@ -89,16 +89,15 @@ namespace met {
     const Uplifting::Vertex &uplifting_vertex(ConstraintRecord cs) const;
     Uplifting::Vertex &uplifting_vertex(ConstraintRecord cs);
 
-    // Run update check of stale (gl-side) components and state-trackers
+    // Extract scene surface information from ray hit data
+    SurfaceInfo get_surface_info(const eig::Array3f p, const SurfaceRecord &rc) const;
+
+    // Run update of state tracking and gl-side data
     void update();
 
   public: // Serialization
     void to_stream(std::ostream &str) const;
     void from_stream(std::istream &str);
-  
-  public: // Scene-wide GL data, like the TLAS. Updated on update()
-    using gl_type = detail::SceneGLHandler<Scene>;
-    mutable gl_type gl;
   };
 
   // Component/Resource test helpers; check if Ty instantiates Component<>/Resource<>
@@ -138,6 +137,6 @@ namespace met {
     else if constexpr (std::is_same_v<value_type, Image>)     return scene.resources.images;
     else if constexpr (std::is_same_v<value_type, CMFS>)      return scene.resources.observers;
     else if constexpr (std::is_same_v<value_type, Spec>)      return scene.resources.illuminants;
-    debug::check_expr(false, "scene_data_by_type<Ty> exhausted implemented options");
+    else debug::check_expr(false, "scene_data_by_type<Ty> exhausted implemented options");
   }
 } // namespace met

@@ -10,97 +10,6 @@ namespace met {
   static constexpr float selector_near_distance = 12.f;
   static constexpr uint  indirect_query_spp     = 8192; // 65536;
 
-  namespace detail {
-    // From a trio of vertex positions forming a triangle, and a center position,
-    // compute barycentric coordinate representation
-    eig::Vector3f get_barycentric_coords(eig::Vector3f p, eig::Vector3f a, eig::Vector3f b, eig::Vector3f c) {
-      met_trace();
-
-      eig::Vector3f ab = b - a, ac = c - a;
-
-      float a_tri = std::abs(.5f * ac.cross(ab).norm());
-      float a_ab  = std::abs(.5f * (p - a).cross(ab).norm());
-      float a_ac  = std::abs(.5f * ac.cross(p - a).norm());
-      float a_bc  = std::abs(.5f * (c - p).cross(b - p).norm());
-
-      return (eig::Vector3f(a_bc, a_ac, a_ab) / a_tri).eval();
-    }
-
-    // Helper object; SurfaceInfo with references to relevant underlying objects
-    struct SurfaceInfo : public met::SurfaceInfo {
-      const Object    &object;
-      const Uplifting &uplifting;
-    };
-
-    // From a RayRecord, recover underlying surface information in the scene
-    SurfaceInfo get_surface_info(const Scene &scene, const eig::Array3f &p, const SurfaceRecord &rc) {
-      // Get relevant resources; mostly caches of gl-side resources
-      const auto &object    = *scene.components.objects[rc.object_i()];
-      const auto &uplifting = *scene.components.upliftings[object.uplifting_i];
-      const auto &mesh_data = scene.resources.meshes.gl.mesh_cache[object.mesh_i];
-
-      // Get object*mesh transform and inverse
-      auto object_trf = object.transform.affine().matrix().eval();
-      auto mesh_trf   = mesh_data.unit_trf;
-      auto trf        = (object_trf * mesh_trf).eval();
-
-      // Assemble SurfaceInfo object
-      SurfaceInfo si = { .object = object, .uplifting = uplifting  };
-      si.record = rc;
-
-      // Assemble relevant primitive data from mesh cache
-      std::array<Vertex, 3> prim;
-      {
-        // Extract element indices, un-scattering data from the weird BVH leaf node order
-        const Mesh &mesh = mesh_data.mesh;
-        const auto &blas = mesh_data.bvh;
-        const auto &elem = mesh.elems[blas.prims[rc.primitive_i() - mesh_data.prims_offs]]; 
-        
-        // Iterate element indices, building primitive vertices
-        for (uint i = 0; i < 3; ++i) {
-          uint j = elem[i];
-          
-          // Get vertex data, and force UV to [0, 1]
-          auto vert = mesh.verts[j];
-          auto norm = mesh.has_norms() ? mesh.norms[j] : eig::Array3f(0, 0, 1);
-          auto txuv = mesh.has_txuvs() ? mesh.txuvs[j] : eig::Array2f(0.5);
-          txuv = txuv.unaryExpr([](float f) {
-            int   i = static_cast<int>(f);
-            float a = f - static_cast<float>(i);
-            return (i % 2) ? 1.f - a : a;
-          });
-
-          // Assemble primitive vertex
-          prim[i] = { .p = vert, .n = norm, .tx = txuv };
-        }
-      }
-
-      // Generate barycentric coordinates
-      eig::Vector3f pinv = (trf.inverse() * eig::Vector4f(p.x(), p.y(), p.z(), 1.f)).head<3>();
-      eig::Vector3f bary = get_barycentric_coords(pinv, prim[0].p, prim[1].p, prim[2].p);
-
-      // Recover surface geometric data
-      si.p  = bary.x() * prim[0].p  + bary.y() * prim[1].p  + bary.z() * prim[2].p;
-      si.n  = bary.x() * prim[0].n  + bary.y() * prim[1].n  + bary.z() * prim[2].n;
-      si.tx = bary.x() * prim[0].tx + bary.y() * prim[1].tx + bary.z() * prim[2].tx;
-      si.p  = (trf * eig::Vector4f(si.p.x(), si.p.y(), si.p.z(), 1.f)).head<3>();
-      si.n  = (trf * eig::Vector4f(si.n.x(), si.n.y(), si.n.z(), 0.f)).head<3>();
-      si.n.normalize();
-
-      // Recover surface diffuse data based on underlying object material
-      si.diffuse = object.diffuse | visit {
-        [&](uint i) -> Colr { 
-          return scene.resources.images[i]->sample(si.tx, Image::ColorFormat::eLRGB).head<3>(); 
-        },
-        [&](Colr c) -> Colr { 
-          return c; 
-        }
-      };
-
-      return si;
-    }
-  } // namespace detail
-
   RayRecord ViewportEditorInputTask::eval_ray_query(SchedulerHandle &info, const Ray &ray) {
     met_trace_full();
 
@@ -143,7 +52,7 @@ namespace met {
   void ViewportEditorInputTask::build_indirect_constraint(SchedulerHandle &info, const ConstraintRecord &cs, NLinearConstraint &cstr) {
     met_trace_full();
 
-    // Get handles, shared resources, modified resources
+    // Get scene handle
     const auto &e_scene = info.global("scene").getr<Scene>();
 
     // Perform path query and obtain path samples
@@ -156,8 +65,7 @@ namespace met {
     }
     fmt::print("Query: sampled {} light paths\n", paths.size());
 
-    // Collect handle to relevant uplifting task
-    // const auto &e_uplf_task = uplf_handles[cs.uplifting_i].realize<GenUpliftingDataTask>();
+    // Collect handle to relevant uplifting task; we use this to query underlying tetrahedron data
     const auto &e_uplf_task = info.task(fmt::format("gen_upliftings.gen_uplifting_{}", cs.uplifting_i))
                                   .realize<GenUpliftingDataTask>();
     
@@ -174,10 +82,9 @@ namespace met {
 
     // Helper struct
     // Definition for a path vertex; reflectance equals r_weight x our constraint reflectance + remainder
-    struct CompactTetrRecord {
-      Object::BRDFType brdf_type; // Ref. to brdf type; we treat principled diffenently than diffuse
-      float            r_weight;  // Barycentric weight of reflectance at one of four vertices
-      eig::Array4f     remainder; // Remainder of reflectances, premultiplied and summed
+    struct TetrahedronRecord {
+      float        r_weight;  // Barycentric weight of reflectance at one of four vertices
+      eig::Array4f remainder; // Remainder of reflectances, premultiplied and summed
     };
 
     // Compact paths into R^P + aR', which likely means separating them instead
@@ -188,27 +95,38 @@ namespace met {
       const PathRecord &path = paths[i];
 
       // Filter to find vertices along path for which the uplifting data is relevant to the constraint
-      auto verts_view = vws::take(std::max(static_cast<int>(path.path_depth) - 1, 0))                                       // 1. drop padded parts of path data
-                      | vws::transform([&](const auto &vt) { return detail::get_surface_info(e_scene, vt.p, vt.record); })  // 2. generate surface info at path vertex
-                      | vws::filter([&](const auto &si) { return si.object.uplifting_i == cs.uplifting_i; })                // 3. drop path vertices unrelated to current uplifting object
-                      | vws::transform([&](const auto &si) { return e_uplf_task.query_tetrahedron(si.diffuse); })           // 4. generate uplifting tetrahedron describing surface reflectance
-                      | vws::transform([&](const auto &tetr) {                                                              // 5. find index of tetrahedron vertex linked to our constraint
-                          uint i = std::distance(tetr.indices.begin(), rng::find(tetr.indices, cs.vertex_i));               //    and return both tetr. and index
-                          return std::pair { tetr, i }; })                                        
-                      | vws::filter([&](const auto &pair) { return pair.second < 4; })                                      // 6. drop tetrahedra unrelated to current uplifting vertex
-                      | vws::transform([&](const auto &pair) {                                                              // 7. return compact representation, see CompactTetrRecord
+      auto verts_view = vws::take(std::max(static_cast<int>(path.path_depth) - 1, 0))                           // 1. drop padded parts of path data
+                      | vws::transform([&](const auto &vt) { 
+                        return e_scene.get_surface_info(vt.p, vt.record);                                       // 2. sample surface info at path vertex
+                      })           
+                      | vws::filter([&](const auto &si) { 
+                        return si.uplifting_i == cs.uplifting_i;                                                // 3. drop path vertices unrelated to current uplifting object
+                      })               
+                      | vws::transform([&](const auto &si) { 
+                        return e_uplf_task.query_tetrahedron(si.diffuse);                                       // 4. obtain the uplifting tetrahedron that describes the surface reflectance
+                      })           
+                      | vws::transform([&](const auto &tetr) {                                                  // 5. find index of tetrahedron vertex linked to our constraint
+                          uint i = std::distance(tetr.indices.begin(), rng::find(tetr.indices, cs.vertex_i));   //    and return both tetr. and index
+                          return std::pair { tetr, i }; 
+                      })                                        
+                      | vws::filter([&](const auto &pair) { return pair.second < 4; })                          // 6. filter out tetrahedra unrelated to current uplifting vertex
+                      | vws::transform([&](const auto &pair) {                                                  // 7. return a compact representation, see TetrahedronRecord
+                          // We now have four vertex weights, and the index of the constraint-associated vertex
                           auto [tetr, i] = pair;
-                          CompactTetrRecord rc = { .r_weight = tetr.weights[i], .remainder = 0.f };
+                          TetrahedronRecord rc = { .r_weight = tetr.weights[i], .remainder = 0.f };
+
+                          // For each vertex that isn't the constraint, we add theiir spectrum into the remainder
                           for (uint j = 0; j < 4; ++j) {
                             guard_continue(j != i);
                             rc.remainder += tetr.weights[j] 
                                           * sample_spectrum(path.wvls, tetr.spectra[j]);
                           }
+
                           return rc; 
                         });
       
       // Apply filter and return selected vertices
-      auto verts = path.data | verts_view | view_to<std::vector<CompactTetrRecord>>();
+      auto verts = path.data | verts_view | view_to<std::vector<TetrahedronRecord>>();
       
       // Get the "fixed" part of the path's throughput, by taking the constraint's current refl.
       // and dividing it out of the assembled energy (note; this data is from last frame)
@@ -400,7 +318,7 @@ namespace met {
       m_ray_result = eval_ray_query(info, e_arcball.generate_ray(p_screen));
       auto gizmo_cast_p 
          = (m_ray_result.record.is_valid() && m_ray_result.record.is_object())
-         ? detail::get_surface_info(e_scene, m_ray_result.get_position(), m_ray_result.record)
+         ? e_scene.get_surface_info(m_ray_result.get_position(), m_ray_result.record)
          : SurfaceInfo { .p = m_gizmo_curr_p.p };
 
       // Store surface data and extracted color in  constraint
@@ -418,7 +336,7 @@ namespace met {
       m_ray_result = eval_ray_query(info, e_arcball.generate_ray(p_screen));
       auto gizmo_cast_p 
          = (m_ray_result.record.is_valid() && m_ray_result.record.is_object())
-         ? detail::get_surface_info(e_scene, m_ray_result.get_position(), m_ray_result.record)
+         ? e_scene.get_surface_info(m_ray_result.get_position(), m_ray_result.record)
          : SurfaceInfo { .p = m_gizmo_curr_p.p };
 
       // Right at the end, we build the indirect surface constraint HERE
