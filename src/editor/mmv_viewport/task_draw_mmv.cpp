@@ -72,10 +72,13 @@ namespace met {
     m_sensor.film_size = e_trgt.size();
     m_sensor.flush();
 
-    // Bind relevant resources
-    m_program.bind();
-    m_program.bind("b_buff_sensor_info",   m_sensor.buffer());
-    m_program.bind("b_buff_settings", m_unif_buffer);
+    // Draw relevant program from cache
+    auto &program = info.global("cache").getw<gl::detail::ProgramCache>().at(m_program_key);
+
+    // Prepare program state
+    program.bind();
+    program.bind("b_buff_sensor_info",   m_sensor.buffer());
+    program.bind("b_buff_settings", m_unif_buffer);
 
     // Prepare draw state
     gl::state::set_depth_range(0.f, 1.f);
@@ -109,13 +112,16 @@ namespace met {
   void DrawMMVTask::init(SchedulerHandle &info) {
     met_trace_full();
     
-    // Generate program object
-    m_program = {{ .type       = gl::ShaderType::eVertex,   
-                   .spirv_path = "shaders/editor/mmv_viewport/draw_mmv_hull.vert.spv",
-                   .cross_path = "shaders/editor/mmv_viewport/draw_mmv_hull.vert.json" },
-                 { .type       = gl::ShaderType::eFragment, 
-                   .spirv_path = "shaders/editor/mmv_viewport/draw_mmv_hull.frag.spv",
-                   .cross_path = "shaders/editor/mmv_viewport/draw_mmv_hull.frag.json" }};
+    // Initialize program object in cache
+    std::tie(m_program_key, std::ignore) = info.global("cache").getw<gl::detail::ProgramCache>().set({{ 
+      .type       = gl::ShaderType::eVertex,
+      .spirv_path = "shaders/editor/mmv_viewport/draw_mmv_hull.vert.spv",
+      .cross_path = "shaders/editor/mmv_viewport/draw_mmv_hull.vert.json"
+    }, {
+      .type       = gl::ShaderType::eFragment,
+      .spirv_path = "shaders/editor/mmv_viewport/draw_mmv_hull.frag.spv",
+      .cross_path = "shaders/editor/mmv_viewport/draw_mmv_hull.frag.json"
+    }});
     
     // Generate and set mapped uniform buffer
     std::tie(m_unif_buffer, m_unif_buffer_map) = gl::Buffer::make_flusheable_object<UnifLayout>();

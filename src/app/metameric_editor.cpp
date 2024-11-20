@@ -63,7 +63,7 @@ namespace met {
     // Initialize scene data as resources owned by the scheduler
     // load from file if a path is specified
     scheduler.global("scene").set<Scene>(scheduler.global("cache"));
-    if (!info.scene_path.empty() && (info.scene_fail_safe || fs::exists(info.scene_path)))
+    if (!info.scene_path.empty() && (!info.scene_fail_safe || fs::exists(info.scene_path)))
       scheduler.global("scene").getw<Scene>().load(info.scene_path);
 
     // Load appropriate set of schedule tasks, then start the runtime loop

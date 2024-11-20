@@ -12,10 +12,10 @@ namespace met {
   class DrawMMVTask : public detail::TaskNode {
     struct UnifLayout {  float alpha; };
 
+    std::string  m_program_key;
     Sensor       m_sensor;
     gl::Buffer   m_unif_buffer;
     UnifLayout  *m_unif_buffer_map;
-    gl::Program  m_program;
     gl::DrawInfo m_dispatch;
 
     void eval_draw_constraint(SchedulerHandle &info);
