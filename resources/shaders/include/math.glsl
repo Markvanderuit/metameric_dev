@@ -132,7 +132,7 @@ SWAP_T(vec2);
 SWAP_T(vec3);
 SWAP_T(vec4);
 
-// Multiple importance sampling heuristics
+// Miscellaneous
 
 float mis_balance(in float pdf_a, in float pdf_b) {
   return pdf_a / (pdf_a + pdf_b);
@@ -151,29 +151,9 @@ vec4 schlick_fresnel(in vec4 f0, in vec4 f90, in float cos_theta) {
   return clamp(f0 + (f90 - f0) * c5, vec4(0), vec4(1));
 }
 
-// Fresnel according to schlick's model
 vec4 schlick_fresnel(in vec4 f0, in float cos_theta) {
   return schlick_fresnel(f0, vec4(1), cos_theta);
 }
-
-float fresnel_dielectric(float eta, float cos_theta) {
-  float c = abs(cos_theta);
-  float g = eta * eta - 1.0 + c * c;
-  if (g > 0.0) {
-    g = sqrt(g);
-    float A = (g - c) / (g + c);
-    float B = (c * (g + c) - 1.0) / (c * (g - c) + 1.0);
-    return 0.5 * A * A * (1.0 + B * B);
-  }
-  return 1.0;
-}
-
-/* Fresnel color blend base on fresnel factor */
-// vec3 F_color_blend(float eta, float fresnel, vec4 F0_refl) { // F)_refl should be white
-//   float F0 = F0_from_ior(eta);
-//   float fac = clamp((fresnel - F0) / (1.0 - F0), 0.f, 1.f);
-//   return mix(F0_refl, vec3(1.0), fac);
-// }
 
 // Convert between eta and principled specular
 float eta_to_specular(in float eta) {
@@ -187,28 +167,4 @@ float specular_to_eta(in float spec) {
   return 2.f / (1.f - div) - 1.f;
 }
 
-// Implementation of unpolarized complex fresnel reflection coefficient;
-// yarr-de-harred from Mitsuba 1.3
-/* vec4 fresnel_conductor(in float cos_theta_i, in vec2 eta) {
-  float cos_theta_i_2 = cos_theta_i * cos_theta_i,
-        sin_theta_i_2 = 1.f - cos_theta_i_2,
-        sin_theta_i_4 = sin_theta_i_2 * sin_theta_i_2;
-  
-  float temp_1   = eta.x * eta.x - eta.y * eta.y - sin_theta_i_2,
-        a_2_pb_2 = dr::safe_sqrt(temp_1*temp_1 + 4.f * eta.y * eta.y * eta.x * eta.x),
-        a        = dr::safe_sqrt(.5f * (a_2_pb_2 + temp_1));
-        
-  float term_1 = a_2_pb_2 + cos_theta_i_2,
-        term_2 = 2.f * cos_theta_i * a;
-
-  float r_s = (term_1 - term_2) / (term_1 + term_2);
-
-  float term_3 = a_2_pb_2 * cos_theta_i_2 + sin_theta_i_4,
-        term_4 = term_2 * sin_theta_i_2;
-
-  float r_p = r_s * (term_3 - term_4) / (term_3 + term_4);
-
-  return 0.5f * (r_s + r_p);
-}
- */
 #endif // MATH_GLSL_GUARD

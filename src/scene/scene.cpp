@@ -300,6 +300,8 @@ namespace met {
     save_path  = "";
     save_state = SaveState::eNew;
     clear_mods();
+
+    fmt::print("Scene: created scene\n");
   }
 
   void Scene::unload() {
@@ -312,6 +314,8 @@ namespace met {
     save_path  = "";
     save_state = SaveState::eUnloaded;
     clear_mods();
+    
+    fmt::print("Scene: unloaded scene\n");
   }
 
   void Scene::save(const fs::path &path) {
@@ -333,6 +337,8 @@ namespace met {
     // Set state to fresh save
     save_path  = io::path_with_ext(path, ".json");
     save_state = SaveState::eSaved;
+    
+    fmt::print("Scene: saved \"{}\"\n", path.string());
   }
 
   void Scene::load(const fs::path &path) {
@@ -358,6 +364,8 @@ namespace met {
     save_path  = io::path_with_ext(path, ".json");
     save_state = SaveState::eSaved;
     clear_mods();
+
+    fmt::print("Scene: loaded \"{}\"\n", path.string());
   }
 
   void Scene::import_scene(const fs::path &path) {
@@ -365,6 +373,8 @@ namespace met {
     Scene other = { m_cache_handle };
     other.load(path);
     import_scene(std::move(other));
+
+    fmt::print("Scene: imported \"{}\"\n", path.string());
   }
 
   void Scene::import_scene(Scene &&other) {

@@ -490,7 +490,7 @@ namespace met {
       
       // Announce first run
       if (m_is_first_update)
-        fmt::print("Spectral uplifting {} just woke up\n", m_uplifting_i);
+        fmt::print("Uplifting {}: just woke up\n", m_uplifting_i);
 
       // Flag 1; test if color system has, in any way/shape/form, been modified
       bool is_color_system_stale = m_is_first_update
@@ -509,7 +509,7 @@ namespace met {
       // Step 1; generate a color system boundary; spectra, coefficients, and colors
       if (is_color_system_stale) {
         boundary = uplifting->sample_color_solid(scene, 4, n_uplifting_boundary_samples);
-        fmt::print("Spectral uplifting {} sampled {} color system boundary points\n", m_uplifting_i, boundary.size());
+        fmt::print("Uplifting {}: sampled {} color system boundary points\n", m_uplifting_i, boundary.size());
       }
 
       // Step 2; generate the interior spectra, coefficients, and colors for uplifting constraints.
@@ -637,12 +637,10 @@ namespace met {
       // Build shader in program cache, if it is not loaded already
       auto &cache = scene.m_cache_handle.getw<gl::detail::ProgramCache>();
       std::tie(m_program_key, std::ignore) = cache.set(
-        {{ .type       = gl::ShaderType::eVertex,
-            .spirv_path = "shaders/scene/gen_texture.vert.spv",
-            .cross_path = "shaders/scene/gen_texture.vert.json" },
-          { .type       = gl::ShaderType::eFragment,
-            .spirv_path = "shaders/scene/gen_texture_coef.frag.spv",
-            .cross_path = "shaders/scene/gen_texture_coef.frag.json" }});
+        {{ .type       = gl::ShaderType::eCompute,
+           .spirv_path = "shaders/scene/bake_texture_coef.comp.spv",
+           .cross_path = "shaders/scene/bake_texture_coef.comp.json",
+           .spec_const = {{ 0u, 16u }, { 1u, 16u }} }});
 
       // Initialize uniform buffers and writeable, flushable mappings
       std::tie(m_buffer, m_buffer_map) = gl::Buffer::make_flusheable_object<BlockLayout>();
@@ -650,7 +648,8 @@ namespace met {
       m_buffer.flush();
 
       // Linear texture sampler
-      m_sampler = {{ .min_filter = gl::SamplerMinFilter::eLinear, .mag_filter = gl::SamplerMagFilter::eLinear }};
+      m_sampler = {{ .min_filter = gl::SamplerMinFilter::eLinear, 
+                     .mag_filter = gl::SamplerMagFilter::eLinear }};
     }
 
     void SceneGLHandler<met::Uplifting>::ObjectData::update(const Scene &scene) {
@@ -681,25 +680,18 @@ namespace met {
         || scene.resources.images       // User loaded/deleted a image;
         || settings.state.texture_size; // Texture size setting changed
       guard(is_active);
-      fmt::print("Spectral texture bake for object {}, uplifting {}\n", m_object_i, object->uplifting_i);
-
-      // Rebuild framebuffer if necessary
-      if (m_is_first_update || atlas.is_invalitated() || m_atlas_layer_i != patch.layer_i) {
-        m_atlas_layer_i = patch.layer_i;
-        m_fbo = {{ .type       = gl::FramebufferType::eColor,
-                   .attachment = &atlas.texture(),
-                   .layer      = m_atlas_layer_i }};
-      }
+      fmt::print("Uplifting {}: baked object {}\n", object->uplifting_i, m_object_i);
 
       // Get relevant program handle, bind, then bind resources to corresponding targets
       auto &cache = scene.m_cache_handle.getw<gl::detail::ProgramCache>();
       auto &program = cache.at(m_program_key);
       program.bind();
       program.bind("b_buff_unif",        m_buffer);
+      program.bind("b_buff_objects",     scene.components.objects.gl.object_info);
       program.bind("b_buff_atlas",       atlas.buffer());
-      program.bind("b_buff_uplift_bary", uplifting_gl.buffer_bary);
+      program.bind("b_atlas",            atlas.texture());
       program.bind("b_buff_uplift_coef", uplifting_gl.buffer_coef);
-      program.bind("b_buff_object_info", scene.components.objects.gl.object_info);
+      program.bind("b_buff_uplift_bary", uplifting_gl.buffer_bary);
       if (!scene.resources.images.empty()) {
         program.bind("b_buff_textures",  scene.resources.images.gl.texture_info);
         program.bind("b_txtr_3f",        scene.resources.images.gl.texture_atlas_3f.texture());
@@ -708,60 +700,16 @@ namespace met {
         program.bind("b_txtr_1f",        m_sampler);  
       }
 
-      // Set relevant scoped gl state;
-      // Viewport addresses the full atlas texture, while we enable a scissor 
-      // test to restrict all operations in this scope to the relevant texture patch
-      gl::state::ScopedSet scope(gl::DrawCapability::eScissorTest, true);
-      gl::state::set(gl::DrawCapability::eScissorTest, true);
-      gl::state::set(gl::DrawCapability::eDither,     false);
-      gl::state::set_scissor(patch.size, patch.offs);
-      gl::state::set_viewport(atlas.texture().size().head<2>());
-      gl::state::set_line_width(4.f);
-
-      // Prepare framebuffer, clear relevant patch (not actually necessary)
-      m_fbo.bind();
-      m_fbo.clear(gl::FramebufferType::eColor, 0u);
-
-      // Find relevant draw command to map mesh UVs;
-      // if no UVs are present or diffuse color is specified,
-      // we fall back on rectangle UVs to simply fill the patch
-      gl::MultiDrawInfo::DrawCommand command;
-      if (mesh->has_txuvs() && object->diffuse.index() == 1) {
-        command = scene.resources.meshes.gl.mesh_draw[object->mesh_i];
-      } else {
-        command = scene.resources.meshes.gl.mesh_draw[0]; // Draw full ectangle
-      }
-
       // Insert relevant barriers
-      gl::sync::memory_barrier(gl::BarrierFlags::eFramebuffer        | 
-                               gl::BarrierFlags::eTextureFetch       |
+      gl::sync::memory_barrier(gl::BarrierFlags::eTextureFetch       |
                                gl::BarrierFlags::eClientMappedBuffer |
                                gl::BarrierFlags::eStorageBuffer      | 
                                gl::BarrierFlags::eUniformBuffer      );
-                     
-      // Triangle fill for most data
-      gl::dispatch_draw({
-        .type           = gl::PrimitiveType::eTriangles,
-        .vertex_count   = command.vertex_count,
-        .vertex_first   = command.vertex_first,
-        .capabilities   = {{ gl::DrawCapability::eDepthTest, false },
-                           { gl::DrawCapability::eCullOp,    false },
-                           { gl::DrawCapability::eBlendOp,   false }},
-        .draw_op        = gl::DrawOp::eFill,
-        .bindable_array = &scene.resources.meshes.gl.mesh_array
-      });
-      
-      // Line fill to overlap boundaries
-      gl::dispatch_draw({
-        .type           = gl::PrimitiveType::eTriangles,
-        .vertex_count   = command.vertex_count,
-        .vertex_first   = command.vertex_first,
-        .capabilities   = {{ gl::DrawCapability::eDepthTest, false },
-                           { gl::DrawCapability::eCullOp,    false },
-                           { gl::DrawCapability::eBlendOp,   false }},
-        .draw_op        = gl::DrawOp::eLine,
-        .bindable_array = &scene.resources.meshes.gl.mesh_array
-      });
+
+      // Dispatch compute region of patch size
+      auto dispatch_ndiv = ceil_div(patch.size, 16u);
+      gl::dispatch_compute({ .groups_x = dispatch_ndiv.x(),
+                             .groups_y = dispatch_ndiv.y() });
 
       // Finally; set entry state to false
       m_is_first_update = false;

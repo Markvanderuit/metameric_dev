@@ -20,6 +20,9 @@ vec3 si_to_coef_atlas_tx(in SurfaceInfo si) {
   tx3.xy *= scene_texture_coef_size(); // Scale [0,1] to texture size
   tx3.xy -= 0.5f;                      // Offset by half a pixel
 
+  // Clamp to texture atlas patch
+  tx3.xy = clamp(tx3.xy, vec2(atlas_info.offs), vec2(atlas_info.offs + atlas_info.size - 1));
+
   return tx3;
 }
 
@@ -36,6 +39,9 @@ vec3 si_to_brdf_atlas_tx(in SurfaceInfo si) {
   vec3 tx3 = vec3(atlas_info.uv0 + atlas_info.uv1 * tx2, atlas_info.layer);
   tx3.xy *= scene_texture_brdf_size(); // Scale [0,1] to texture size
   tx3.xy -= 0.5f;                      // Offset by half a pixel
+
+  // Clamp to texture atlas patch
+  tx3.xy = clamp(tx3.xy, vec2(atlas_info.offs), vec2(atlas_info.offs + atlas_info.size - 1));
 
   return tx3;
 }

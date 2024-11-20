@@ -124,14 +124,15 @@ namespace met::detail {
     // Set appropriate mesh count in buffer
     m_blas_info_map->size = static_cast<uint>(meshes.size());
 
-    // For each mesh, we simplify the mesh, fit it to a [0, 1] cube, and finally
-    // compute a BVH over the result. The result is cached cpu-side
+    // For each mesh, we simplify the mesh to a hardcoded maximum, 
+    // fit it to a [0, 1] cube, and finally compute a BVH over the result.
+    // The result is cached cpu-side
     #pragma omp parallel for
     for (int i = 0; i < meshes.size(); ++i) {
       const auto &[value, state] = meshes[i];
       guard_continue(state);
       MeshData &data = mesh_cache[i];
-      data.mesh     = fixed_degenerate_uvs<met::Mesh>(simplified_mesh<met::Mesh>(value, 262144, 5e-3));
+      data.mesh     = fixed_degenerate_uvs<met::Mesh>(simplified_mesh<met::Mesh>(value, 131072, 5e-3));
       data.unit_trf = unitize_mesh<met::Mesh>(data.mesh);
       data.bvh      = {{ .mesh = data.mesh, .n_leaf_children = 1 }};
     }
@@ -298,20 +299,22 @@ namespace met::detail {
       bool is_3f 
          = img.pixel_frmt() == Image::PixelFormat::eRGB
         || img.pixel_frmt() == Image::PixelFormat::eRGBA;
-      auto size  = is_3f 
-                 ? texture_atlas_3f.capacity() 
-                 : texture_atlas_1f.capacity();
-      auto resrv = is_3f 
-                 ? texture_atlas_3f.patch(indices[i]) 
-                 : texture_atlas_1f.patch(indices[i]);
+      auto size = is_3f ? texture_atlas_3f.capacity() : texture_atlas_1f.capacity();
+      auto resrv = is_3f ? texture_atlas_3f.patch(indices[i]) : texture_atlas_1f.patch(indices[i]);
 
       // Determine UV coordinates of the texture inside the full atlas
       eig::Array2f uv0 = resrv.offs.cast<float>() / size.head<2>().cast<float>(),
                    uv1 = resrv.size.cast<float>() / size.head<2>().cast<float>();
 
       // Fill in info object in mapped buffer
-      m_texture_info_map->data[i] = { .is_3f = is_3f, .layer = resrv.layer_i,
-                                      .uv0   = uv0,   .uv1   = uv1 };
+      m_texture_info_map->data[i] = { 
+        .is_3f = is_3f, 
+        .layer = resrv.layer_i,
+        .offs  = resrv.offs, 
+        .size  = resrv.size, 
+        .uv0   = uv0,   
+        .uv1   = uv1 
+      };
 
       // Flush change to buffer; most changes to objects are local,
       // so we flush specific regions instead of the whole

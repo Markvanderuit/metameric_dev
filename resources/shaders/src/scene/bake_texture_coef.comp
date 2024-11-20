@@ -1,0 +1,110 @@
+#include <preamble.glsl>
+#include <math.glsl>
+#include <render/record.glsl>
+#include <render/load/defaults.glsl>
+
+// Wrapper data representing tetrahedron data [x, y, z, w]
+struct BarycentricData {
+  mat3 inv; // Inverse of 3x3 matrix [x - w, y - w, z - w]
+  vec3 sub; // Subtractive component w
+};
+
+// General layout rule declarations
+layout(local_size_x_id = 0, local_size_y_id = 1) in;
+layout(std430) buffer;
+layout(std140) uniform;
+
+// Uniform buffer declarations
+layout(binding = 0) uniform b_buff_unif {
+  uint object_i;
+} buff_unif;
+layout(binding = 1) uniform b_buff_atlas {
+  uint n;
+  AtlasInfo data[met_max_textures];
+} buff_atlas;
+layout(binding = 2) uniform b_buff_objects {
+  uint n;
+  ObjectInfo data[met_max_objects];
+} buff_objects;
+layout(binding = 3) uniform b_buff_textures {
+  uint n;
+  TextureInfo data[met_max_textures];
+} buff_textures;
+layout(binding = 4) uniform b_buff_uplift_bary { 
+  uint n;
+  BarycentricData data[met_max_constraints]; 
+} buff_uplift_bary;
+
+// Storage buffer declarations
+layout(binding = 0) restrict readonly buffer b_buff_uplift_coef { 
+  float[met_max_constraints][4][wavelength_bases] data;
+} buff_uplift_coef;
+
+// Image/sampler declarations
+layout(binding = 0)           uniform sampler2DArray                   b_txtr_3f; // Input 3-component textures
+layout(binding = 1)           uniform sampler2DArray                   b_txtr_1f; // Input 1-component textures
+layout(binding = 0, rgba32ui) uniform restrict writeonly uimage2DArray b_atlas;   // Output coefficient texture atlas
+
+void main() {
+  // Load relevant object/patch data
+  ObjectInfo object = buff_objects.data[buff_unif.object_i];
+  AtlasInfo  atlas  = buff_atlas.data[buff_unif.object_i];
+  
+  // Determine pixel location in padded patch, then clamp invocations to
+  // relevant region; the atlas patch plus a 2px padding border for oversampling
+  const uvec2 px_out = gl_GlobalInvocationID.xy + atlas.offs;
+  guard(clamp(px_out, atlas.offs, atlas.offs + atlas.size - 1) == px_out);
+
+  // First, sample color value from object
+  vec3 p;
+  if (record_is_sampled(object.albedo_data)) {
+    // Determine pixel location in texture atlas
+    TextureInfo txtr  = buff_textures.data[record_get_sampler_index(object.albedo_data)];
+    const uvec2 px_in = clamp(gl_GlobalInvocationID.xy + txtr.offs, txtr.offs, txtr.offs + txtr.size - 1);
+
+    // Color value is supplied by scene texture; could be b_txtr_3f or b_txtr_1f
+    if (txtr.is_3f) {
+      const vec2 tx_in = clamp((vec2(px_in) + 0.5f)
+                       / textureSize(b_txtr_3f, 0).xy, vec2(0), vec2(1));
+      p = texture(b_txtr_3f, vec3(tx_in, txtr.layer)).xyz;
+    } else {
+      const vec2 tx_in = clamp((vec2(px_in) + 0.5f)
+                       / textureSize(b_txtr_1f, 0).xy, vec2(0), vec2(1));
+      p = vec3(texture(b_txtr_1f, vec3(tx_in, txtr.layer)).x);
+    }
+  } else {
+    // Color value is specified directly
+    p = record_get_direct_value(object.albedo_data);
+  }
+  
+  // Next, brute-force search for the corresponding barycentric weights and tetrahedron's index
+  float result_err = FLT_MAX;
+  vec4  result_bary = vec4(0);
+  uint  result_indx = 0;
+  for (uint j = 0; j < buff_uplift_bary.n; ++j) {
+    // Compute barycentric weights using packed element data
+    vec3 xyz  = buff_uplift_bary.data[j].inv * (p - buff_uplift_bary.data[j].sub);
+    vec4 bary = vec4(xyz, 1.f - hsum(xyz));
+
+    // Compute error of potentially unbounded barycentric weights
+    float err = sdot(bary - clamp(bary, 0, 1));
+
+    // Store better result if error is improved
+    if (err > result_err)
+      continue;
+    result_err  = err;
+    result_bary = bary;
+    result_indx = j;
+  } // for (uint j)
+
+  // Then, gather basis coefficients representing tetrahedron's spectra and mix them
+  float[wavelength_bases] coef;
+  for (uint i = 0; i < wavelength_bases; ++i) {
+    coef[i] = 0.f;
+    for (uint j = 0; j < 4; ++j)
+      coef[i] += result_bary[j] * buff_uplift_coef.data[result_indx][j][i];
+  } // for (uint i)
+
+  // Finally, write result out to atlas
+  imageStore(b_atlas, ivec3(px_out, atlas.layer), pack_basis_coeffs(coef));
+}

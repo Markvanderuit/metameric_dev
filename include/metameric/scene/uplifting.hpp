@@ -213,18 +213,14 @@ namespace met {
       // - generates per-object spectral texture data
       // - writes this data to the scene texture atlas
       struct ObjectData {
-        // std140 layout for data written to buffer
-        struct BlockLayout {
-          uint object_i;
-        };
+        // Layout for data written to std140 buffer
+        struct BlockLayout { uint object_i; };
 
         // Objects for texture bake
-        uint            m_atlas_layer_i;
-        std::string     m_program_key;
-        gl::Framebuffer m_fbo;
-        gl::Sampler     m_sampler;
-        gl::Buffer      m_buffer;
-        BlockLayout    *m_buffer_map;
+        std::string  m_program_key;
+        gl::Sampler  m_sampler;
+        gl::Buffer   m_buffer;
+        BlockLayout *m_buffer_map;
 
         // Small private state
         uint m_object_i;

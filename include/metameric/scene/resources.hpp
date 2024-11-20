@@ -72,9 +72,10 @@ namespace met::detail {
     struct alignas(16) BlockLayout {
       alignas(4) bool         is_3f;
       alignas(4) uint         layer;
+      alignas(8) eig::Array2u offs, size;
       alignas(8) eig::Array2f uv0, uv1;
     };
-    static_assert(sizeof(BlockLayout) == 32);
+    static_assert(sizeof(BlockLayout) == 48);
 
     // All-texture block layout for std140 uniform buffer, mapped for write
     struct BufferLayout {

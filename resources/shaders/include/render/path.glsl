@@ -18,7 +18,7 @@ vec4 Li_debug(in SensorSample ss, in SamplerState state) {
   if (!is_valid(si) || !is_object(si))
     return vec4(0);
     
-  return vec4(si.tx, 0, 1);
+  return vec4(si.n, 1);
 }
 
 vec4 Li(in SensorSample ss, in SamplerState state, out float alpha) {
