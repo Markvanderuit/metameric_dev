@@ -74,10 +74,8 @@ namespace met {
       guard(!objects.empty());
 
       // Set appropriate object count, then flush change to buffer
-      if (objects.is_resized()) {
+      if (objects)
         m_object_info_map->size = static_cast<uint>(objects.size());
-        object_info.flush(sizeof(uint));
-      }
 
       // Write updated objects to mapping
       for (uint i = 0; i < objects.size(); ++i) {
@@ -100,12 +98,12 @@ namespace met {
           .metallic_data  = pack_material_1f(object.metallic),
           .roughness_data = pack_material_1f(object.roughness),
         };
-
-        // Flush change to buffer; most changes to objects are local,
-        // so we flush specific regions instead of the whole
-        object_info.flush(sizeof(BlockLayout), sizeof(BlockLayout) * i + sizeof(uint));
       } // for (uint i)
 
+      // Write out changes to buffer
+      if (objects)
+        object_info.flush();
+      
       // Flag that the atlas' internal texture has **not** been invalidated by internal resize
       if (texture_brdf.is_init())
         texture_brdf.set_invalitated(false);
