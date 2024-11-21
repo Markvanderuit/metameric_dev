@@ -42,9 +42,18 @@ namespace met {
       const auto &e_settings = e_scene.components.settings;
       const auto &e_view     = e_scene.components.views[e_settings->view_i];
       
-      // If the view settings were edited, we reset the arcball to the view's data
-      if (is_first_eval() || e_settings.state.view_i || e_view)
-        info.relative("viewport_input_camera")("arcball").set<detail::Arcball>({ arcball_info, *e_view });
+      // If the view settings were edited, we reset the arcball to the view's data, but override
+      // the specified aspect with the viewport aspect
+      if (is_first_eval() || e_settings.state.view_i || e_view) {
+        // Get handle to lrgb target
+        const auto &lrgb = info.relative("viewport_image")("lrgb_target").getr<gl::Texture2d4f>();
+        
+        // Initiate arcball from view; override aspect ratio with viewport size
+        detail::Arcball arcball = { arcball_info, *e_view };
+        arcball.set_aspect(static_cast<float>(lrgb.size().x()) / static_cast<float>(lrgb.size().y()));
+        
+        info.relative("viewport_input_camera")("arcball").set<detail::Arcball>(std::move(arcball));
+      }
     });
 
     // Subtasks opens a viewport and creates lrgb/srgb image targets; the srgb target
@@ -60,7 +69,7 @@ namespace met {
     info.child_task("viewport_input_editor").init<ViewportEditorInputTask>();
 
     // Subtask spawns and manages render primitive 
-    info.child_task("viewport_render").init<MeshViewportRenderTask>();
+    info.child_task("viewport_render").init<ViewportRenderTask>();
 
     // Subtask draws several overlays; uplifting constraints, camera frustra, light paths, etc 
     info.child_task("viewport_draw_overlay").init<ViewportOverlayTask>();

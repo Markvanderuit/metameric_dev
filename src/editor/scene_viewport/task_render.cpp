@@ -11,14 +11,14 @@
 namespace met {
   constexpr static uint render_spp_per_iter = 1u;
 
-  bool MeshViewportRenderTask::is_active(SchedulerHandle &info) {
+  bool ViewportRenderTask::is_active(SchedulerHandle &info) {
     met_trace();
     const auto &e_scene = info.global("scene").getr<Scene>();
     guard(!e_scene.components.objects.empty(), false); 
     return info.parent()("is_active").getr<bool>();
   }
 
-  void MeshViewportRenderTask::init(SchedulerHandle &info) {
+  void ViewportRenderTask::init(SchedulerHandle &info) {
     met_trace_full(); 
 
     // Get handles, shared resources, modified resources, shorthands
@@ -28,7 +28,7 @@ namespace met {
     info("sensor").set<Sensor>({ /* ... */ }).getw<Sensor>().flush();
   }
     
-  void MeshViewportRenderTask::eval(SchedulerHandle &info) {
+  void ViewportRenderTask::eval(SchedulerHandle &info) {
     met_trace_full();
 
     // Get handles, shared resources, modified resources, shorthands

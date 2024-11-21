@@ -22,7 +22,6 @@ namespace met::detail {
   : m_is_mutated(true),
     m_near_z(info.near_z),
     m_far_z(info.far_z),
-    m_aspect(info.aspect),
     m_up(info.e_up),
     m_zoom_delta_mult(info.zoom_delta_mult),
     m_ball_delta_mult(info.ball_delta_mult),
@@ -39,6 +38,7 @@ namespace met::detail {
     m_zoom   = 1.f;
     m_eye    = -dir; 
     m_center = view.camera_trf.position + dir;
+    m_aspect = static_cast<float>(view.film_size.x()) / static_cast<float>(view.film_size.y());
     
     update();
   }
