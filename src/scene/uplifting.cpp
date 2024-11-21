@@ -421,6 +421,9 @@ namespace met {
         m_did_sample   = true;
       }
 
+      // Return all black if the vertex is not active
+      guard(vert.is_active, { Colr(0), Spec(0), Basis::vec_type(0) });
+
       // Next, deal with generating a spectral output
       if (hull.has_delaunay()) {
         // We use the convex hull to quickly find a metamer, instead of doing costly
@@ -535,6 +538,7 @@ namespace met {
 
           // Generate a new sample from the builder
           auto new_sample = builder.realize(scene, m_uplifting_i, i);
+          fmt::print("OUTPUT: {}\n", new_sample.coef);
 
           // Check if the color output of this sample is different from the previous sample;
           // if so, we denote the tessellation as stale

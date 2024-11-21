@@ -122,7 +122,7 @@ namespace met {
         std::deque<MismatchSample> m_samples      = { };
         uint                       m_samples_curr = 0;
         uint                       m_samples_prev = 0;
-        cnstr_type                 m_cnstr_cache;
+        cnstr_type                 m_cnstr_cache  = DirectColorConstraint();
 
         // Insert newly generated MMV boundary samples, and retire old ones
         void insert_samples(std::span<const MismatchSample> new_samples);
