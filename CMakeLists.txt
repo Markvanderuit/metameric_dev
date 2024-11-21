@@ -175,7 +175,11 @@ add_shader_target(shaders shaders.bin)
 add_dependencies(render shaders)
 add_dependencies(editor shaders)
 
-# Copy ./resources/misc to bin/resources
+# Copy ./resources/data and ./scenes/cornell_box to bin/data
+add_folder_copy_target(scene_copy 
+  ${CMAKE_CURRENT_SOURCE_DIR}/scenes/cornell_box
+  ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/data
+)
 add_folder_copy_target(data_copy 
   ${CMAKE_CURRENT_SOURCE_DIR}/resources/data
   ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/data
@@ -185,7 +189,7 @@ add_folder_copy_target(data_copy
 add_executable(metameric_editor src/app/metameric_editor.cpp)
 target_compile_features(metameric_editor PUBLIC cxx_std_23)
 target_link_libraries(metameric_editor PRIVATE core scene render editor)
-add_dependencies(metameric_editor data_copy embree_copy)
+add_dependencies(metameric_editor scene_copy data_copy embree_copy)
 
 # Setup render executable
 find_package(avcpp CONFIG REQUIRED)
