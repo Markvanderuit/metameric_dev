@@ -48,7 +48,6 @@ option(gl_enable_tracy       "" ${MET_ENABLE_TRACY})
 add_subdirectory(third_party/autodiff)
 add_subdirectory(third_party/rapidobj)
 add_subdirectory(third_party/small_gl)
-# add_subdirectory(third_party/xatlas) # disabled for now
 add_subdirectory(third_party/embree)
 
 # Include third party libraries
@@ -98,7 +97,6 @@ endif()
 set(thrp_includes ${STB_INCLUDE_DIRS} ${ZSTR_INCLUDE_DIRS})
 set(core_dependencies
   autodiff::autodiff
-  # xatlas
   Eigen3::Eigen
   fmt::fmt-header-only
   nlohmann_json::nlohmann_json
