@@ -61,21 +61,26 @@ namespace met {
                                - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
 
     // Generate view over surface points that are stored in all active scene constraints
-    auto all_surfaces_
+    auto all_vert_surfaces
       = e_active_constraints
-      | vws::transform([&](ConstraintRecord cs) { return e_scene.uplifting_vertex(cs); })
+      | vws::transform([&](ConstraintRecord cs) -> const Uplifting::Vertex& { 
+        return e_scene.uplifting_vertex(cs); 
+      })
       | vws::filter([](const auto &v) { return v.has_surface(); })
-      | vws::transform([](const auto &v) { return v.surfaces(); })
-      | vws::join;
+      | vws::transform([](const auto &v) -> std::span<const SurfaceInfo> { return v.surfaces(); })
+      | view_to<std::vector<std::span<const SurfaceInfo>>>();
     std::vector<SurfaceInfo> all_surfaces;
-    rng::copy(all_surfaces_, std::back_inserter(all_surfaces));
+    for (auto vert_surfaces : all_vert_surfaces)
+      rng::copy(vert_surfaces, std::back_inserter(all_surfaces));
 
     // Generate view over surface points that are "free variables" in all active scene constraints
     auto active_surfaces
       = e_active_constraints
-      | vws::transform([&](ConstraintRecord cs) { return e_scene.uplifting_vertex(cs); })
+      | vws::transform([&](ConstraintRecord cs) -> const Uplifting::Vertex& { 
+        return e_scene.uplifting_vertex(cs); 
+      })
       | vws::filter([](const auto &v) { return v.has_surface(); })
-      | vws::transform([](const auto &v) { return v.surface(); })
+      | vws::transform([](const auto &v) -> const SurfaceInfo& { return v.surface(); })
       | view_to<std::vector<SurfaceInfo>>();
 
     // Draw vertex for each vertex at its surface
