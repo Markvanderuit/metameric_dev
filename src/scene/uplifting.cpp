@@ -539,7 +539,6 @@ namespace met {
 
           // Generate a new sample from the builder
           auto new_sample = builder.realize(scene, m_uplifting_i, i);
-          fmt::print("OUTPUT: {}\n", new_sample.coef);
 
           // Check if the color output of this sample is different from the previous sample;
           // if so, we denote the tessellation as stale
