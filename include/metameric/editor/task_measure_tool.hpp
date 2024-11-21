@@ -16,7 +16,7 @@
 namespace met {
   class PathMeasureToolTask : public detail::TaskNode {
     PixelSensor m_query_sensor;
-    uint        m_query_spp = 0;
+    uint        m_query_spp = 4096;
 
   public:
     bool is_active(SchedulerHandle &info) override {
@@ -107,7 +107,7 @@ namespace met {
       
       bool is_open = true;
       if (ImGui::Begin("Path measure tool", &is_open)) {
-        uint min_v = 0, max_v = 4096;
+        uint min_v = 0, max_v = 65536;
         ImGui::SliderScalar("Sample count", ImGuiDataType_U32, &m_query_spp, &min_v, &max_v);
       }
       ImGui::End();
