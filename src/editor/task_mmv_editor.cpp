@@ -33,7 +33,7 @@ namespace met {
         e_vert.name, e_cs.uplifting_i, e_cs.vertex_i);  
       
       // Define window size on first open
-      ImGui::SetNextWindowSize({ 300, 512 }, ImGuiCond_Appearing);
+      ImGui::SetNextWindowSize({ 384, 768 }, ImGuiCond_Appearing);
 
       // Open main viewport window, and forward window activity to "is_active" flag
       // Note: window end is post-pended in ViewportEndTask so subtasks can do stuff with imgui state
@@ -344,7 +344,7 @@ namespace met {
     info.child_task("viewport_edit_mmv").init<EditMMVTask>();
     info.child_task("viewport_image").init<MMVEditorImageTask>();
     info.child_task("viewport_camera").init<detail::ArcballInputTask>(info.child("viewport_image")("lrgb_target"), 
-      detail::ArcballInputTask::InfoType { .dist            = 1.f, 
+      detail::ArcballInputTask::InfoType { .dist            = 2.f, 
                                            .e_center        = .5f, 
                                            .zoom_delta_mult = 0.025f });
     info.child_task("viewport_gen_mmv").init<GenMMVTask>();
