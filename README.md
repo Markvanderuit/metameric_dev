@@ -5,9 +5,10 @@
 
 This repository contains the source code of our spectral uplifting editor, which accompanies our recent paper "**Controlled Spectral Uplifting for Indirect-Light-Metamerism**" (link to [proceedings](https://dx.doi.org/https://doi.org/10.1145/3680528.3687698), [university page](http://graphics.tudelft.nl/Publications-new/2024/RE24), [author page](https://markvanderuit.nl/publications/2024-11-19-paper-spectral)), presented at Siggraph Asia 2024.
 
-With this editor, we provide an example of how artist-controllable spectral uplifting might be a great addition to the artist toolbox. Our method allows us to use (and, frankly, misuse) spectral metamerism. In a spectral renderer with spectral uplifting, color occurs at the camera, while the actual color behavior of objects can be extremely underdetermined. We happily use this problem to control the color appearance of objects under indirect illumination, while keeping the RGB input data intact. For complete details on how this works, check out our paper, and feel free to contact one of the authors ([Mark van de Ruit](https://www.markvanderuit.nl), [Elmar Eisemann](https://graphics.tudelft.nl/~eisemann/)) if you have questions.
+With this demo editor, we show how artist-controllable spectral uplifting might be a great addition to the artist toolbox. Our method allows us to use (and misuse) spectral metamerism. In a spectral renderer with spectral uplifting, color occurs at the camera. The actual color behavior of objects is extremely underdetermined. We happily use this property to change the uplifted appearance of objects under complex indirect illumination, while keeping the RGB input intact.
+We include several [example scenes](./tree/main/scenes) with different spectral behaviors, and provide windows/linux builds (that might even work sometimes!) on the [releases page](./releases/latest).
 
-We include several [example scenes](./tree/main/scenes), and provide windows/linux builds (that might even work sometimes!) on the [releases page](./releases/latest).
+For full details on how our method works, check out the paper, and feel free to contact one of the authors ([Mark van de Ruit](https://www.markvanderuit.nl), [Elmar Eisemann](https://graphics.tudelft.nl/~eisemann/)) if you have questions.
 
 ![teaser_2](/resources//assets/teaser_2.png)
 
