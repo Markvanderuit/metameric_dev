@@ -1067,7 +1067,7 @@
             1.0
           ]
         },
-        "draw_frustrum": false,
+        "draw_frustrum": true,
         "film_size": [
           1024,
           1024
