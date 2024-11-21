@@ -33,7 +33,7 @@ namespace met {
         e_vert.name, e_cs.uplifting_i, e_cs.vertex_i);  
       
       // Define window size on first open
-      ImGui::SetNextWindowSize({ 256, 384 }, ImGuiCond_Appearing);
+      ImGui::SetNextWindowSize({ 300, 512 }, ImGuiCond_Appearing);
 
       // Open main viewport window, and forward window activity to "is_active" flag
       // Note: window end is post-pended in ViewportEndTask so subtasks can do stuff with imgui state
