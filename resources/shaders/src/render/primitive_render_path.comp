@@ -1,7 +1,6 @@
 #include <preamble.glsl>
 #include <sampler/uniform.glsl>
 #include <render/load/blas.glsl>
-// #include <render/load/tlas.glsl>
 #include <render/load/emitter.glsl>
 #include <render/load/object.glsl>
 #include <render/load/cmfs.glsl>
@@ -92,42 +91,12 @@ layout(binding = 3)          uniform usampler2DArray  b_coef_4f; // Texture atla
 layout(binding = 4)          uniform usampler2DArray  b_brdf_2f; // Texture atlas storing packed secondary brdf data
 layout(binding = 0, rgba32f) uniform restrict image2D b_film;    // Target film, averaged over frames
 
-// Shared memory declarations
-// shared EmitterInfo      s_emtr_info[met_max_emitters];
-// shared ObjectInfo       s_objc_info[met_max_objects];
-// shared BLASInfo         s_mesh_info[met_max_meshes];
-// shared AtlasInfo s_coef_info[met_max_textures];
 
-// sensor.glsl will know not to take wavelength samples; we 
-// pull these from the below buckets for now
-// #define WAVELENGTH_SAMPLING_BUCKETED
-
-// buckets to preload and presample about 4kb of spectral data for the entire workgroup
-/* const uint n_wvl_buckets = 4;
-      uint bucket_i; // sampled per-invocation index of a selected bucket 
-shared vec4   s_bucket_wvls[n_wvl_buckets];                    // Bucket of n wavelength samples
-shared vec4   s_bucket_pdfs[n_wvl_buckets];                    // Bucket of n wavelength sample pdfs
-shared vec4   s_bucket_basis[n_wvl_buckets][wavelength_bases]; // Bucket of basis coeffs
-shared vec4   s_bucket_illm[n_wvl_buckets][met_max_emitters];
-shared mat4x3 s_bucket_cmfs[n_wvl_buckets]; */
-
-// Per 256 invocs; 256b
+// BLAS info and stack live in shared memory
+// per 256 invocs; 256b _ 6kb
 shared BLASInfo _blas_info[met_max_meshes];
-
-// per 256 invocs; 64b
-shared TLASInfo _tlas_info;
-
-// BLAS stacks live in shared memory
-// per 256 invocs; 6kb
-shared uint _blas_stack[gl_WorkGroupSize.x * gl_WorkGroupSize.y * gl_WorkGroupSize.z][5];
+shared uint     _blas_stack[gl_WorkGroupSize.x * gl_WorkGroupSize.y * gl_WorkGroupSize.z][5];
 #define blas_stck _blas_stack[gl_LocalInvocationIndex]
-// shared uint _leaf_stack[gl_WorkGroupSize.x * gl_WorkGroupSize.y * gl_WorkGroupSize.z];
-// #define leaf_stck _leaf_stack[gl_LocalInvocationIndex]
-
-// TLAS stack lives in shared memory
-// per 256 invocs; 3kb
-// shared uint _tlas_stack[gl_WorkGroupSize.x * gl_WorkGroupSize.y * gl_WorkGroupSize.z][2];
-// #define tlas_stck _tlas_stack[gl_LocalInvocationIndex]
 
 // Declare scene data; creates functions to access and interact with
 // scene data without knowing the exact names of buffers, textures, etc
@@ -139,7 +108,6 @@ declare_scene_emitter_data(buff_emitter_info.data, buff_emitter_info.n, buff_env
 declare_scene_object_data(buff_objects.data, buff_objects.n);
 declare_scene_texture_data(buff_coef_info.data, buff_brdf_info.data, b_coef_4f, b_brdf_2f, b_bsis_1f);
 declare_scene_blas_data(buff_blas_prim.data, buff_blas_node.data, _blas_info);
-// declare_scene_tlas_data(buff_tlas_prim.data, buff_tlas_node.data, _tlas_info);
 
 // All includes from here on out require scene data to be declared above;
 // scene data that was not declared is default-set in defaults.glsl
@@ -148,81 +116,11 @@ declare_scene_blas_data(buff_blas_prim.data, buff_blas_node.data, _blas_info);
 // Preload object/mesh/emitter/texture info objects into shared memory
 void load_shared() {
   const uint iter = hprod(gl_WorkGroupSize.xyz);
-
   for (uint i = gl_LocalInvocationIndex; i < buff_blas_info.n; i += iter)
     _blas_info[i] = buff_blas_info.data[i];
-  if (gl_LocalInvocationIndex == 0)
-    _tlas_info = buff_tlas_info.data;
-
   memoryBarrierShared();
   barrier();
 }
-
-// Pre-sample set of n wavelength datas into shared memory
-/* void load_wvl_buckets(in vec2 sample_2d) {
-  // Step size for the coming loads
-  const uint iter = hprod(gl_WorkGroupSize.xyz);
-  
-  // Sample wavelengths; stratified sample through invercse cdf, if available
-  for (uint i = gl_LocalInvocationIndex; i < n_wvl_buckets; i += iter) {
-    for (uint j = 0; j < 4; ++j) {
-      DistributionSampleContinuous ds 
-        = sample_wavelength_continuous(rotate_sample_1d(sample_2d.x, j, 4));
-      s_bucket_wvls[i][j] = ds.f;
-      s_bucket_pdfs[i][j] = ds.pdf;
-    } // for (uint j)
-  } // for (uint i)
-
-  memoryBarrierShared();
-  barrier();
-
-  // We pre-handle basis function sampling across the workgroup
-  const uint n_basis_samples = n_wvl_buckets *  wavelength_bases;
-  for (uint i = gl_LocalInvocationIndex; i < n_basis_samples; i += iter) {
-    uint bucket_i = i / wavelength_bases;
-    uint basis_i  = i % wavelength_bases; 
-
-    for (uint j = 0; j < 4; ++j) {
-      s_bucket_basis[bucket_i][basis_i][j]
-        = texture(b_bsis_1f, vec2(s_bucket_wvls[bucket_i][j], basis_i)).x;
-    } // for (uint j)
-  } // for (uint i)
-  
-  // We pre-handle emission spectrum sampling across the workgroup
-  const uint n_emitter_samples = n_wvl_buckets * buff_emitter_info.n;
-  for (uint i = gl_LocalInvocationIndex; i < n_emitter_samples; i += iter) {
-    uint bucket_i  = i / buff_emitter_info.n;
-    uint emitter_i = i % buff_emitter_info.n; 
-
-    EmitterInfo em = s_emtr_info[emitter_i];
-
-    // Sample illuminant matching this emitter
-    vec4 v;
-    for (uint j = 0; j < 4; ++j) 
-      v[j] = texture(b_illm_1f, vec2(s_bucket_wvls[bucket_i][j], em.illuminant_i)).x;
-    s_bucket_illm[bucket_i][emitter_i] = v;
-
-    // We set illuminant_i to the emitter index itself; this shared memory load
-    // essentially compacts away any spectra that we don't use on an illuminant
-    em.illuminant_i = emitter_i;
-    s_emtr_info[emitter_i] = em;
-  } // for (uint i)
-
-  // We pre-handle cmfs sampling across the workgroup
-  const uint n_cmfs_samples = n_wvl_buckets * 4;
-  for (uint i = gl_LocalInvocationIndex; i < n_cmfs_samples; i += iter) {
-    uint bucket_i = i / 4;
-    uint wvl_i    = i % 4; 
-
-    s_bucket_cmfs[bucket_i][wvl_i] = texture(b_cmfs_3f, vec2(s_bucket_wvls[bucket_i][wvl_i], 0)).xyz;
-  }
-
-  memoryBarrierShared();
-  barrier();
-
-  // Finally, select your own bucket
-  bucket_i = uint(float(n_wvl_buckets) * sample_2d.y) % n_wvl_buckets;
-} */
 
 // Initial sample state is seeded from pixel index, and rotated by multiplication
 SamplerState get_sampler_state(ivec2 xy, uint i) {
@@ -256,14 +154,6 @@ void main() {
       FilmSensor(buff_sensor_info.proj_trf, buff_sensor_info.view_trf, buff_sensor_info.film_size), 
       xy(), i, next_3d(state));
 
-    // Handle bucketed wavelength data load into shared memory
-    // Set sensor sample wavelength data from a sampled bucket
-#ifdef WAVELENGTH_SAMPLING_BUCKETED
-    load_wvl_buckets(next_2d(state));
-    sensor_sample.wvls = s_bucket_wvls[bucket_i];
-    sensor_sample.pdfs = s_bucket_pdfs[bucket_i];
-#endif
-    
     vec4 L;
     float alpha;
     if (!use_debug) {      

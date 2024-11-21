@@ -64,17 +64,12 @@ vec4 texture_reflectance(in SurfaceInfo si, in vec4 wvls, in vec2 sample_2d) {
 
   // Iterate the bases
   for (uint k = 0; k < wavelength_bases; ++k) {
-#ifdef SCENE_DATA_REFLECTANCE_BUCKETED
-      // Extract k'th basis coefficient, multiply with presampled basis
-      r += extract_basis_coeff(pack, k) * scene_basis_func(k);
-#else // SCENE_DATA_REFLECTANCE_BUCKETED
-      // Extract k'th coefficient, multiply by texel mixing weight
-      float a = extract_basis_coeff(pack, k);
+    // Extract k'th coefficient, multiply by texel mixing weight
+    float a = extract_basis_coeff(pack, k);
 
-      // Iterate 4 wavelengths and perform matrix product with basis
-      for (uint j = 0; j < 4; ++j)
-        r[j] += a * scene_texture_basis_sample(wvls[j], k);
-#endif // SCENE_DATA_REFLECTANCE_BUCKETED
+    // Iterate 4 wavelengths and perform matrix product with basis
+    for (uint j = 0; j < 4; ++j)
+      r[j] += a * scene_texture_basis_sample(wvls[j], k);
   } // for (uint k)
 
   return r;

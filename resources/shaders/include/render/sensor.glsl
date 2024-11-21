@@ -58,13 +58,11 @@ SensorSample sample_sensor(in RaySensor sensor, in float sample_1d) {
   ss.ray = init_ray(sensor.o, sensor.d);
 
   // Sample wavelengths; stratified sample through invercse cdf, if available
-#ifndef WAVELENGTH_SAMPLING_BUCKETED
   for (uint i = 0; i < 4; ++i) {
     DistributionSampleContinuous ds = sample_wavelength_continuous(rotate_sample_1d(sample_1d, i, 4));
     ss.wvls[i] = ds.f;
     ss.pdfs[i] = ds.pdf;
   }
-#endif
 
   return ss;
 }
@@ -89,13 +87,11 @@ SensorSample sample_sensor(in PixelSensor sensor, in vec3 sample_3d) {
   );
 
   // Sample wavelengths; stratified sample through invercse cdf, if available
-#ifndef WAVELENGTH_SAMPLING_BUCKETED
   for (uint i = 0; i < 4; ++i) {
     DistributionSampleContinuous ds = sample_wavelength_continuous(rotate_sample_1d(sample_3d.z, i, 4));
     ss.wvls[i] = ds.f;
     ss.pdfs[i] = ds.pdf;
   }
-#endif
 
   return ss;
 }
@@ -126,13 +122,11 @@ SensorSample sample_sensor(in FilmSensor sensor, in ivec2 px, in uint sample_i, 
   );
 
   // Sample wavelengths; stratified sample through invercse cdf, if available
-#ifndef WAVELENGTH_SAMPLING_BUCKETED
   for (uint i = 0; i < 4; ++i) {
     DistributionSampleContinuous ds = sample_wavelength_continuous(rotate_sample_1d(sample_3d.z, i, 4));
     ss.wvls[i] = ds.f;
     ss.pdfs[i] = ds.pdf;
   }
-#endif
 
   return ss;
 }
