@@ -112,7 +112,7 @@ namespace met {
   };
 
   // Helper view; pass an index and extract a reference to item inside a range
-  inline constexpr auto index_into_view = [](rng::viewable_range auto &&r) {
-    return vws::transform([r = rng::ref_view { r }](unsigned i) { return r[i]; });
+  inline constexpr auto index_into_view = [](rng::viewable_range auto &&rr) {
+    return vws::transform([r = rng::ref_view { rr }](unsigned i) { return r[i]; });
   };
 } // namespace met

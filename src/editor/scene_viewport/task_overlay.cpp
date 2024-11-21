@@ -64,15 +64,17 @@ namespace met {
     auto all_surfaces_
       = e_active_constraints
       | vws::transform([&](ConstraintRecord cs) { return e_scene.uplifting_vertex(cs); })
+      | vws::filter([](const auto &v) { return v.has_surface(); })
       | vws::transform([](const auto &v) { return v.surfaces(); })
       | vws::join;
     std::vector<SurfaceInfo> all_surfaces;
     rng::copy(all_surfaces_, std::back_inserter(all_surfaces));
-    
+
     // Generate view over surface points that are "free variables" in all active scene constraints
     auto active_surfaces
       = e_active_constraints
       | vws::transform([&](ConstraintRecord cs) { return e_scene.uplifting_vertex(cs); })
+      | vws::filter([](const auto &v) { return v.has_surface(); })
       | vws::transform([](const auto &v) { return v.surface(); })
       | view_to<std::vector<SurfaceInfo>>();
 

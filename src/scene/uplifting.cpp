@@ -376,6 +376,7 @@ namespace met {
 
       // Add new samples to the end of the queue
       rng::copy(new_samples, std::back_inserter(m_samples));
+      m_samples_curr += new_samples.size();
 
       // Extract point data into range, and determine AABB of this full point set
       auto points = m_samples | vws::transform(&MismatchSample::colr) | view_to<std::vector<Colr>>();
@@ -409,7 +410,6 @@ namespace met {
         if (m_did_sample = !is_converged(); m_did_sample) {
           auto new_samples = vert.realize_mismatch(scene, *uplifting, m_samples_curr, n_uplifting_mismatch_samples_iter);
           insert_samples(new_samples);
-          m_samples_curr += new_samples.size();
         }
       } else {
         // Vertex data does not support metamer mismatching; 
@@ -421,19 +421,15 @@ namespace met {
         m_did_sample   = true;
       }
 
-      // Return all black if the vertex is not active
-      guard(vert.is_active, { Colr(0), Spec(0), Basis::vec_type(0) });
-
       // Next, deal with generating a spectral output
       if (hull.has_delaunay()) {
         // We use the convex hull to quickly find a metamer, instead of doing costly
         // solver runs. Find the best enclosing simplex, and then mix the
         // attached coefficients to generate a spectrum at said position
         auto [bary, elem] = hull.find_enclosing_elem(vert.get_mismatch_position());
-        auto coeffs       = elem 
-                          | index_into_view(m_samples) 
-                          | vws::transform(&MismatchSample::coef)
-                          | view_to<std::vector<Basis::vec_type>>();
+        auto coeffs = elem 
+                    | index_into_view(m_samples | vws::transform(&MismatchSample::coef)) 
+                    | view_to<std::vector<Basis::vec_type>>();
 
         // Linear combination reconstructs coefficients for this metamer
         auto coef =(bary[0] * coeffs[0] + bary[1] * coeffs[1]
@@ -455,10 +451,15 @@ namespace met {
 
     bool MetamerBuilder::supports_vertex(const Scene &scene, uint uplifting_i, uint vertex_i) {
       met_trace();
-
-      // Forward to vertex
-      const auto &uplifting = scene.components.upliftings[uplifting_i];
-      return uplifting->verts[vertex_i].has_equal_mismatching(m_cnstr_cache);
+      if (m_cnstr_cache) {
+        // Forward to vertex
+        const auto &cstr_cache = *m_cnstr_cache;
+        const auto &uplifting = scene.components.upliftings[uplifting_i];
+        return uplifting->verts[vertex_i].has_equal_mismatching(cstr_cache);
+        return true;
+      } else {
+        return false;
+      }
     }
     
     void MetamerBuilder::set_vertex(const Scene &scene, uint uplifting_i, uint vertex_i) {
@@ -474,7 +475,7 @@ namespace met {
 
     SceneGLHandler<met::Uplifting>::UpliftingData::UpliftingData(uint uplifting_i)
     : m_uplifting_i(uplifting_i), m_is_first_update(true) {
-      met_trace_full();
+      met_trace();
 
       // Instantiate mapped buffer objects; these'll hold packed barycentric and spectral coefficient
       // data, which is used by ObjectData::update below to bake spectral textures per object
@@ -483,7 +484,7 @@ namespace met {
     }
 
     void SceneGLHandler<met::Uplifting>::UpliftingData::update(const Scene &scene) {
-      met_trace_full();
+      met_trace();
 
       // Get handles to uplifting and linked resources
       const auto &uplifting  = scene.components.upliftings[m_uplifting_i];
