@@ -25,7 +25,7 @@ As a first step, clone the repository and any submodules.
 Next, simply configure and compile the project using CMake:
 
 ```bash
-  cmake -S . -B build
+  cmake -S metameric_dev -B build
   cmake --build build --config Release --target metameric_editor
 ```
 
