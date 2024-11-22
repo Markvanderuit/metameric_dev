@@ -7,40 +7,15 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/resources/cmake"
 # Specify project name, languages
 project(Metameric LANGUAGES CXX)
 
-# Build options
+# Build options; see resources/cmake/conf.cmake for the editor's spectral layout
 option(MET_ENABLE_EXCEPTIONS "Enable exceptions on release"  ON)
 option(MET_ENABLE_TRACY      "Enable Tracy support"         OFF)
-
-# Spectral layout; inserted in code/shaders as preprocessor defines
-set(MET_WAVELENGTH_MIN     380) # Minimum wavelength of spectral range
-set(MET_WAVELENGTH_MAX     780) # Maximum wavelength of spectral range
-set(MET_WAVELENGTH_SAMPLES  64) # Nr. of bins used in discrete spectral representations
-set(MET_WAVELENGTH_BASES    12) # Maximum nr. of bases used in generative functions
-
-# Some object limits for renderer; inserted in code/shaders as preprocessor defines
-set(MET_SUPPORTED_MESHES        32) # Maximum supported scene meshes
-set(MET_SUPPORTED_OBJECTS       32) # Maximum supported scene objects
-set(MET_SUPPORTED_EMITTERS      32) # Maximum supported scene emitters
-set(MET_SUPPORTED_TEXTURES     128) # Maximum supported scene textures
-set(MET_SUPPORTED_CONSTRAINTS  512) # Maximum supported boundary + interior spectra per uplifting
-
-# Print configuration info
-message(STATUS "Metameric : Enabling exceptions = ${MET_ENABLE_EXCEPTIONS}")
-message(STATUS "Metameric : Enabling Tracy      = ${MET_ENABLE_TRACY}")
-message(STATUS "Metameric : Wavelength min.     = ${MET_WAVELENGTH_MIN}")
-message(STATUS "Metameric : Wavelength max.     = ${MET_WAVELENGTH_MAX}")
-message(STATUS "Metameric : Wavelength samples  = ${MET_WAVELENGTH_SAMPLES}")
-message(STATUS "Metameric : Wavelength bases    = ${MET_WAVELENGTH_BASES}")
 
 # Specify output directories as /bin, /lib, /out
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_INSTALL_PREFIX           ${CMAKE_BINARY_DIR}/out)
-
-# Ensure these are available for third parties
-find_package(OpenMP REQUIRED)
-find_package(Threads REQUIRED)
 
 # Include the following with source
 option(gl_enable_exceptions  "" ${MET_ENABLE_EXCEPTIONS})
@@ -59,6 +34,7 @@ find_package(implot    CONFIG REQUIRED)
 find_package(meshoptimizer CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
 find_package(NLopt     CONFIG REQUIRED)
+find_package(OpenMP    REQUIRED)
 find_package(Qhull     CONFIG REQUIRED)
 find_package(tinyexr   CONFIG REQUIRED)
 find_package(tinyfiledialogs CONFIG REQUIRED)
@@ -69,127 +45,75 @@ find_package(ZLIB      REQUIRED)
 find_path(STB_INCLUDE_DIRS "stb_c_lexer.h")
 find_path(ZSTR_INCLUDE_DIRS "zstr.hpp")
 
-# Specify cmake modules/finds
-include(CTest)
+# Enable modules in resources/cmake
 include(spirv)
 include(dependency)
+include(metameric_conf)
 
-# Gather all preprocessor values into one list; these are passed to cxx and glsl
-set(preprocessor_defines
-  -DMET_WAVELENGTH_MIN=${MET_WAVELENGTH_MIN} 
-  -DMET_WAVELENGTH_MAX=${MET_WAVELENGTH_MAX} 
-  -DMET_WAVELENGTH_SAMPLES=${MET_WAVELENGTH_SAMPLES} 
-  -DMET_WAVELENGTH_BASES=${MET_WAVELENGTH_BASES} 
-  -DMET_SUPPORTED_MESHES=${MET_SUPPORTED_MESHES}
-  -DMET_SUPPORTED_OBJECTS=${MET_SUPPORTED_OBJECTS}
-  -DMET_SUPPORTED_EMITTERS=${MET_SUPPORTED_EMITTERS}
-  -DMET_SUPPORTED_CONSTRAINTS=${MET_SUPPORTED_CONSTRAINTS}
-  -DMET_SUPPORTED_TEXTURES=${MET_SUPPORTED_TEXTURES}
+# Compile and copy resources/shaders to bin/shaders
+met_add_shader_target(metameric_shaders 
+  ${CMAKE_CURRENT_SOURCE_DIR}/resources/shaders
+  ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/shaders
 )
-if(MET_ENABLE_EXCEPTIONS)
-  list(APPEND preprocessor_defines -DMET_ENABLE_EXCEPTIONS)
-endif()
-if(MET_ENABLE_TRACY)
-  list(APPEND preprocessor_defines -DMET_ENABLE_TRACY)
-endif()
 
-# Gather list of third party libraries
-set(thrp_includes ${STB_INCLUDE_DIRS} ${ZSTR_INCLUDE_DIRS})
-set(core_dependencies
-  autodiff::autodiff
-  Eigen3::Eigen
-  fmt::fmt-header-only
-  nlohmann_json::nlohmann_json
-  NLopt::nlopt
-  meshoptimizer::meshoptimizer
-  Qhull::qhullcpp Qhull::qhull_r
-  unofficial::tinyexr::tinyexr
-  rapidobj
-  small_gl
-  Tracy::TracyClient
-  ZLIB::ZLIB
-)
-set(scene_dependencies
-  embree
-)
-set(editor_dependencies
-  imgui::imgui
-  imguizmo::imguizmo
-  implot::implot
-  tinyfiledialogs::tinyfiledialogs
-)
-if(OpenMP_CXX_FOUND)
-  list(APPEND core_dependencies OpenMP::OpenMP_CXX)
-endif()
-
-# Specify precompiled header file
-function(add_library_pch target)
-  file(GLOB_RECURSE incls ${CMAKE_CURRENT_SOURCE_DIR}/include/*.hpp)
-  target_precompile_headers(${target}
-    PUBLIC ${incls}
-    PRIVATE <array> <algorithm> <deque> <iostream> <filesystem> <vector> <ranges> <unordered_map> <unordered_set>
-  )
-endfunction()
-
-# Simple function to add a library with consistent settings
-function(add_library_r target dir)
-  # Gather source files recursively
-  file(GLOB_RECURSE srcs ${CMAKE_CURRENT_SOURCE_DIR}/src/${dir}/*.cpp)
-
-  # Specify target
-  add_library(${target} ${srcs})
-
-  # Specify target includes/features/defines
-  target_include_directories(${target} PUBLIC include ${thrp_includes})
-  target_compile_features(${target} PUBLIC cxx_std_23)
-  target_compile_definitions(${target} PUBLIC _USE_MATH_DEFINES ${preprocessor_defines})
-
-  # Enable /bigobj to make MSVC stop complaining about its restricted object sizes
-  if (MSVC)
-    target_compile_options(${target} PRIVATE /bigobj)
-  endif()
-endfunction()
-
-# Set up core library
-add_library_r(core core)
-target_link_libraries(core PUBLIC ${core_dependencies})
-add_library_pch(core)
-
-# Set up scene library
-add_library_r(scene scene)
-target_link_libraries(scene PUBLIC core ${scene_dependencies})
-target_precompile_headers(scene REUSE_FROM core)
-
-# Set up render library
-add_library_r(render render)
-target_link_libraries(render PUBLIC scene)
-target_precompile_headers(render REUSE_FROM core)
-
-# Set up editor library
-add_library_r(editor editor)
-target_link_libraries(editor PUBLIC render ${editor_dependencies})
-target_precompile_headers(editor REUSE_FROM core)
-
-# Specify shader/resource targets, link these as dependencies for preprocessing
-add_shader_target(shaders shaders.bin)
-add_dependencies(render shaders)
-add_dependencies(editor shaders)
-
-# Copy ./resources/data and ./scenes/cornell_box to bin/data
-add_folder_copy_target(scene_copy 
-  ${CMAKE_CURRENT_SOURCE_DIR}/scenes/cornell_box
-  ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/data
-)
-add_folder_copy_target(data_copy 
+# Copy resources/data to bin/data
+met_add_folder_copy_target(metameric_data_copy 
   ${CMAKE_CURRENT_SOURCE_DIR}/resources/data
   ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/data
 )
+
+# Copy scenes/cornell_box to bin/data; this scene is used as a default by the demo
+met_add_folder_copy_target(metameric_scene_copy 
+  ${CMAKE_CURRENT_SOURCE_DIR}/scenes/cornell_box
+  ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/data
+)
+
+# Set up core library; precompile core headers
+met_add_library(core ${STB_INCLUDE_DIRS} ${ZSTR_INCLUDE_DIRS})
+met_add_pch(core)
+target_link_libraries(core 
+  PUBLIC autodiff::autodiff
+         Eigen3::Eigen
+         fmt::fmt-header-only
+         nlohmann_json::nlohmann_json
+         NLopt::nlopt
+         meshoptimizer::meshoptimizer
+         Qhull::qhullcpp Qhull::qhull_r
+         unofficial::tinyexr::tinyexr
+         rapidobj
+         small_gl # move over to scene dependencies!!!
+         Tracy::TracyClient
+         OpenMP::OpenMP_CXX
+         ZLIB::ZLIB
+)
+
+# Set up scene library
+met_add_library(scene "")
+met_add_pch(scene)
+met_reuse_pch(scene "core")
+target_link_libraries(scene PUBLIC core embree small_gl)
+
+# Set up render library
+met_add_library(render "")
+met_add_pch(render)
+met_reuse_pch(render "core;scene")
+target_link_libraries(render 
+  PUBLIC scene)
+add_dependencies(render metameric_shaders)
+
+# Set up editor library
+met_add_library(editor "")
+met_add_pch(editor)
+met_reuse_pch(editor "core;scene;render")
+target_link_libraries(editor 
+  PUBLIC render imgui::imgui imguizmo::imguizmo implot::implot tinyfiledialogs::tinyfiledialogs)
+add_dependencies(editor metameric_shaders)
 
 # Setup editor executable
 add_executable(metameric_editor src/app/metameric_editor.cpp)
 target_compile_features(metameric_editor PUBLIC cxx_std_23)
 target_link_libraries(metameric_editor PRIVATE core scene render editor)
-add_dependencies(metameric_editor scene_copy data_copy embree_copy)
+add_dependencies(metameric_editor metameric_scene_copy metameric_data_copy embree_copy)
 
 # Setup render executable
 find_package(avcpp CONFIG REQUIRED)

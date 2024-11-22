@@ -1,11 +1,11 @@
 cmake_minimum_required(VERSION 3.22)
 
-function(add_folder_copy_target target_name input_dir output_dir)
+function(met_add_folder_copy_target target_name input_dir output_dir)
   # Specify target with attached commands
   add_custom_target(
     ${target_name}
     
-    COMMENT "Directory copy:\n\tfrom: ${input_dir}\n\tto:  ${output_dir}"
+    COMMENT "Directory copy: from ${input_dir} to ${output_dir}"
 
     # Ensure target directory exists
     COMMAND ${CMAKE_COMMAND}
@@ -17,7 +17,7 @@ function(add_folder_copy_target target_name input_dir output_dir)
   )
 endfunction()
 
-function(add_file_copy_target target_name output_dir inputs)
+function(met_add_file_copy_target target_name output_dir inputs)
   # Iterate inputs
   foreach(input ${inputs})
     # Build target path
@@ -26,7 +26,7 @@ function(add_file_copy_target target_name output_dir inputs)
 
     # Register copy command
     add_custom_command(
-      COMMENT "File copy:\n\tfrom: ${input}\n\tto:  ${output}"
+      COMMENT "File copy: from ${input} to ${output}"
       OUTPUT  ${output}
       COMMAND ${CMAKE_COMMAND} -E copy ${input} ${output}
       DEPENDS ${input}
