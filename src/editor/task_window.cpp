@@ -177,7 +177,7 @@ namespace met {
           if (ImGui::MenuItem("Wavefront (.obj)")) {
             if (fs::path path; detail::load_dialog(path, { "*.obj" })) {
               auto &e_scene = info.global("scene").getw<Scene>();
-              e_scene.import_scene(io::load_obj(path));
+              e_scene.import_obj(path);
             }
           }
 

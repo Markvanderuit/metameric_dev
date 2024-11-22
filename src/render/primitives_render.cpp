@@ -6,6 +6,16 @@
 
 namespace met {
   namespace detail {
+    inline
+    gl::Buffer to_std140(const Distribution &d) {
+      met_trace_full();
+      std::vector<eig::Array4f> data;
+      data.push_back(eig::Array4f(d.inv_sum()));
+      rng::copy(d.data_func(), std::back_inserter(data));
+      rng::copy(d.data_cdf(), std::back_inserter(data));
+      return gl::Buffer {{ .data = cnt_span<const std::byte>(data) }};    
+    }
+
     IntegrationRenderPrimitive::IntegrationRenderPrimitive()
     : m_sampler_state_i(0) {
       met_trace_full();
@@ -65,7 +75,7 @@ namespace met {
       }
       
       // Push sampling distribution to buffer
-      m_wavelength_distr_buffer = Distribution(cnt_span<float>(m_wavelength_distr)).to_buffer_std140();
+      m_wavelength_distr_buffer = to_std140(Distribution(cnt_span<float>(m_wavelength_distr)));
     }
 
     void IntegrationRenderPrimitive::advance_sampler_state() {

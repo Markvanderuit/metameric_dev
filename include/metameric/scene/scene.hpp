@@ -55,7 +55,9 @@ namespace met {
     void save(const fs::path &path);  // Save scene data to path
     void unload();                    // Reset to an empty scene
 
-    // Import an existing scene, adding its components into the loaded scene
+    // Import an existing scene or .obj file, 
+    // adding its components into the loaded scene
+    void import_obj(const fs::path path, bool load_materials = true, bool flip_uvs = true);
     void import_scene(const fs::path &path);
     void import_scene(Scene &&other);
 

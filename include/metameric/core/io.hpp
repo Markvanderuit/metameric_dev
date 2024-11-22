@@ -30,10 +30,6 @@ namespace met {
     CMFS load_cmfs(const fs::path &path);
     void save_cmfs(const fs::path &path, const CMFS &s);
 
-    // Load scene data; meshes, objects, materials, textures
-    // from a .obj file and optional accompanying .mtl file
-    Scene load_obj(const fs::path &path, bool load_materials = true, bool flip_uvs = true);
-
     // Simple basis function load from file
     // Input should be a text file, containing a single wavelength and 'm' values per line, and
     // optional comments marked with '#'. This is similar to the spectrum format described above.

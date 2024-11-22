@@ -10,6 +10,16 @@ namespace met {
       met_trace_full();
       std::tie(m_query, m_query_map) = gl::Buffer::make_flusheable_object<QueryUnifLayout>();
     }
+
+    inline
+    gl::Buffer to_std140(const Distribution &d) {
+      met_trace_full();
+      std::vector<eig::Array4f> data;
+      data.push_back(eig::Array4f(d.inv_sum()));
+      rng::copy(d.data_func(), std::back_inserter(data));
+      rng::copy(d.data_cdf(), std::back_inserter(data));
+      return gl::Buffer {{ .data = cnt_span<const std::byte>(data) }};    
+    }
   } // namespace detail
 
   PathQueryPrimitive::PathQueryPrimitive(PathQueryPrimitiveInfo info)
@@ -84,7 +94,7 @@ namespace met {
       m_wavelength_distr += (Spec(1) - m_wavelength_distr) * 0.01f;
       
       // Push sampling distribution to buffer
-      m_wavelength_distr_buffer = Distribution(cnt_span<float>(m_wavelength_distr)).to_buffer_std140();
+      m_wavelength_distr_buffer = detail::to_std140(Distribution(cnt_span<float>(m_wavelength_distr)));
     }
 
     // Clear output data, specifically the buffer's head

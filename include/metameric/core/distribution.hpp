@@ -2,7 +2,6 @@
 
 #include <metameric/core/fwd.hpp>
 #include <metameric/core/utility.hpp>
-#include <small_gl/fwd.hpp>
 #include <random>
 
 namespace met {
@@ -113,12 +112,12 @@ namespace met {
       return m_cdf[i];
     }
 
-    float sum() const {
-      return 1.f / m_func_sum;  
+    float inv_sum() const {
+      return m_func_sum;  
     }
 
-    float inv_sum() const {
-      return sum() == 0.f ? 0.f : 1.f / sum();
+    float sum() const {
+      return m_func_sum == 0.f ? 0.f : 1.f / m_func_sum;
     }
 
     size_t size() const {
@@ -161,9 +160,9 @@ namespace met {
         return std::lerp(m_func[i], m_func[i + 1], a);
       }
     }
-
-    // Dump to opengl buffer with required padding
-    gl::Buffer to_buffer_std140() const;
-    gl::Buffer to_buffer_std430() const;
+    
+    // Data accessors
+    std::span<const float> data_func() const { return m_func; }
+    std::span<const float> data_cdf()  const { return m_cdf;  }
   };
 } // namespace met

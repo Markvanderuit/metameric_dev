@@ -3,7 +3,17 @@
 #include <metameric/core/ranges.hpp>
 #include <numbers>
 
-namespace met::detail {
+namespace met::detail {  
+  inline
+  gl::Buffer to_std140(const Distribution &d) {
+    met_trace_full();
+    std::vector<eig::Array4f> data;
+    data.push_back(eig::Array4f(d.inv_sum()));
+    rng::copy(d.data_func(), std::back_inserter(data));
+    rng::copy(d.data_cdf(), std::back_inserter(data));
+    return gl::Buffer {{ .data = cnt_span<const std::byte>(data) }};    
+  }
+  
   SceneGLHandler<met::Emitter>::SceneGLHandler() {
     met_trace_full();
 
@@ -73,7 +83,7 @@ namespace met::detail {
       }
 
       auto distr = Distribution(cnt_span<float>(emitter_distr));   
-      emitter_distr_buffer = distr.to_buffer_std140();
+      emitter_distr_buffer = to_std140(distr);
 
       // Store information on first co  nstant emitter, if one is present and active;
       // we don't support multiple environment emitters

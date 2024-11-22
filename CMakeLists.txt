@@ -11,13 +11,18 @@ project(Metameric LANGUAGES CXX)
 option(MET_ENABLE_EXCEPTIONS "Enable exceptions on release"  ON)
 option(MET_ENABLE_TRACY      "Enable Tracy support"         OFF)
 
+# Enable all modules in resources/cmake
+include(spirv)
+include(dependency)
+include(metameric_conf)
+
 # Specify output directories as /bin, /lib, /out
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_INSTALL_PREFIX           ${CMAKE_BINARY_DIR}/out)
 
-# Include the following with source
+# Include the packages in /third_party
 option(gl_enable_exceptions  "" ${MET_ENABLE_EXCEPTIONS})
 option(gl_enable_tracy       "" ${MET_ENABLE_TRACY})
 add_subdirectory(third_party/autodiff)
@@ -25,7 +30,7 @@ add_subdirectory(third_party/rapidobj)
 add_subdirectory(third_party/small_gl)
 add_subdirectory(third_party/embree)
 
-# Include third party libraries
+# Include the packages in vcpkg or system
 find_package(Eigen3    CONFIG REQUIRED)
 find_package(fmt       CONFIG REQUIRED)
 find_package(imgui     CONFIG REQUIRED)
@@ -41,28 +46,25 @@ find_package(tinyfiledialogs CONFIG REQUIRED)
 find_package(Tracy     CONFIG REQUIRED)
 find_package(ZLIB      REQUIRED)
 
-# Include third party header-only libraries provided through vcpkg
+# Include third party header-only packages in vcpkg
 find_path(STB_INCLUDE_DIRS "stb_c_lexer.h")
 find_path(ZSTR_INCLUDE_DIRS "zstr.hpp")
 
-# Enable modules in resources/cmake
-include(spirv)
-include(dependency)
-include(metameric_conf)
-
-# Compile and copy resources/shaders to bin/shaders
+# Add target metameric_shaders; compiles and copies glsl to spirv 
+# from /resources/shaders to /bin/shaders
 met_add_shader_target(metameric_shaders 
   ${CMAKE_CURRENT_SOURCE_DIR}/resources/shaders
   ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/shaders
 )
 
-# Copy resources/data to bin/data
+# Add target metameric_data_copy; copies contents of /resources/data to /bin/data
 met_add_folder_copy_target(metameric_data_copy 
   ${CMAKE_CURRENT_SOURCE_DIR}/resources/data
   ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/data
 )
 
-# Copy scenes/cornell_box to bin/data; this scene is used as a default by the demo
+# Add target metameric_scene_copy; copies contents  of /scene/cornell_box to /bin/data. 
+# This scene is loaded on program startup for demo purposes
 met_add_folder_copy_target(metameric_scene_copy 
   ${CMAKE_CURRENT_SOURCE_DIR}/scenes/cornell_box
   ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/data
@@ -80,8 +82,6 @@ target_link_libraries(core
          meshoptimizer::meshoptimizer
          Qhull::qhullcpp Qhull::qhull_r
          unofficial::tinyexr::tinyexr
-         rapidobj
-         small_gl # move over to scene dependencies!!!
          Tracy::TracyClient
          OpenMP::OpenMP_CXX
          ZLIB::ZLIB
@@ -90,30 +90,34 @@ target_link_libraries(core
 # Set up scene library
 met_add_library(scene "")
 met_add_pch(scene)
-met_reuse_pch(scene "core")
-target_link_libraries(scene PUBLIC core embree small_gl)
+met_reuse_pch(scene "core;small_gl")
+target_link_libraries(scene PUBLIC core embree small_gl rapidobj)
 
 # Set up render library
 met_add_library(render "")
 met_add_pch(render)
 met_reuse_pch(render "core;scene")
-target_link_libraries(render 
-  PUBLIC scene)
 add_dependencies(render metameric_shaders)
+target_link_libraries(render PUBLIC scene)
 
 # Set up editor library
 met_add_library(editor "")
 met_add_pch(editor)
 met_reuse_pch(editor "core;scene;render")
-target_link_libraries(editor 
-  PUBLIC render imgui::imgui imguizmo::imguizmo implot::implot tinyfiledialogs::tinyfiledialogs)
 add_dependencies(editor metameric_shaders)
+target_link_libraries(editor 
+  PUBLIC render 
+         imgui::imgui
+         imguizmo::imguizmo
+         implot::implot
+         tinyfiledialogs::tinyfiledialogs
+)
 
 # Setup editor executable
 add_executable(metameric_editor src/app/metameric_editor.cpp)
+add_dependencies(metameric_editor metameric_scene_copy metameric_data_copy embree_copy)
 target_compile_features(metameric_editor PUBLIC cxx_std_23)
 target_link_libraries(metameric_editor PRIVATE core scene render editor)
-add_dependencies(metameric_editor metameric_scene_copy metameric_data_copy embree_copy)
 
 # Setup render executable
 find_package(avcpp CONFIG REQUIRED)
