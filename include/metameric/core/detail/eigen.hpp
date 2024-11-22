@@ -1,10 +1,21 @@
 #pragma once
 
 // Extensions to Eigen's existing classes are inserted through header files
-#define EIGEN_ARRAYBASE_PLUGIN  "metameric/core/detail/eigen_arraybase.ext"
-#define EIGEN_MATRIXBASE_PLUGIN "metameric/core/detail/eigen_matrixbase.ext"
-#define EIGEN_ARRAY_PLUGIN      "metameric/core/detail/eigen_array.ext"
-#define EIGEN_MATRIX_PLUGIN     "metameric/core/detail/eigen_matrix.ext"
+#ifndef EIGEN_ARRAYBASE_PLUGIN
+  #define EIGEN_ARRAYBASE_PLUGIN  "metameric/core/detail/eigen_arraybase.ext"
+#endif
+
+#ifndef EIGEN_MATRIXBASE_PLUGIN
+  #define EIGEN_MATRIXBASE_PLUGIN "metameric/core/detail/eigen_matrixbase.ext"
+#endif
+
+#ifndef EIGEN_ARRAY_PLUGIN
+  #define EIGEN_ARRAY_PLUGIN "metameric/core/detail/eigen_array.ext"
+#endif
+
+#ifndef EIGEN_MATRIX_PLUGIN
+  #define EIGEN_MATRIX_PLUGIN "metameric/core/detail/eigen_matrix.ext"
+#endif
 
 #include <Eigen/Dense>
 #include <Eigen/Geometry>

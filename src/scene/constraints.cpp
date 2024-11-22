@@ -1,6 +1,7 @@
-#include <metameric/core/constraints.hpp>
 #include <metameric/core/ranges.hpp>
 #include <metameric/core/utility.hpp>
+#include <metameric/scene/scene.hpp>
+#include <metameric/scene/constraints.hpp>
 #include <nlohmann/json.hpp>
 #include <algorithm>
 

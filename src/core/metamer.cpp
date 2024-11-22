@@ -165,12 +165,12 @@ namespace met {
       S.block<wavelength_samples, 3>(0, 3 * i) = info.linear_objectives[i].finalize(false);
     
     // Construct orthonormal matrix U instead, following listing 9 of Mackiewicz et al.
-    {
+    /* {
       eig::JacobiSVD<eig::MatrixXf> svd;
       svd.compute(S, eig::ComputeFullV);
       auto U = (S * svd.matrixV() * svd.singularValues().asDiagonal().inverse()).eval();
       S = U;
-    }
+    } */
     
     // Output data structure 
     std::vector<Basis::vec_type> output;

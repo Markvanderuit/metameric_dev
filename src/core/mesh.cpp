@@ -1,8 +1,8 @@
+#include <metameric/core/distribution.hpp>
 #include <metameric/core/mesh.hpp>
 #include <metameric/core/ranges.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/core/detail/trace.hpp>
-// #include <xatlas.h>
 #include <meshoptimizer.h>
 #include <libqhullcpp/Qhull.h>
 #include <libqhullcpp/QhullVertexSet.h>

@@ -1,7 +1,7 @@
 #pragma once
 
 #include <metameric/core/fwd.hpp>
-#include <metameric/core/constraints.hpp>
+#include <metameric/scene/constraints.hpp>
 #include <metameric/core/convex.hpp>
 #include <metameric/scene/detail/atlas.hpp>
 #include <metameric/scene/detail/utility.hpp>

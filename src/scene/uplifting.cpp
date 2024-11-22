@@ -2,6 +2,8 @@
 #include <metameric/core/metamer.hpp>
 #include <metameric/core/ranges.hpp>
 #include <small_gl/dispatch.hpp>
+#include <algorithm>
+#include <execution>
 
 namespace met {
   namespace detail {

@@ -1,5 +1,7 @@
 #include <metameric/scene/scene.hpp>
+#include <metameric/core/distribution.hpp>
 #include <metameric/core/ranges.hpp>
+#include <numbers>
 
 namespace met::detail {
   SceneGLHandler<met::Emitter>::SceneGLHandler() {
