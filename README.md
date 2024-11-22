@@ -26,7 +26,7 @@ Next, simply configure and compile the project using CMake:
 
 ```bash
   cmake -S . -B build
-  cmake --build build --target metameric_editor
+  cmake --build build --config Release --target metameric_editor
 ```
 
 If compilation succeeds without any errors, you should find an executable at `build/bin/metameric_editor`.
