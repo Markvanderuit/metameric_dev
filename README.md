@@ -19,7 +19,7 @@ To build the project, you'll need a recent C++23 compiler (e.g. MSVC **17.12** o
 As a first step, clone the repository and any submodules.
 
 ```bash
-  git clone --recurse-submodules https://github.com/markvanderuit/metameric
+  git clone --recurse-submodules https://github.com/markvanderuit/metameric_dev
 ```
 
 Next, simply configure and compile the project using CMake:
