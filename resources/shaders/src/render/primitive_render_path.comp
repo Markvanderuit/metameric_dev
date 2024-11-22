@@ -51,28 +51,25 @@ layout(binding = 3) uniform b_buff_blas_info {
   uint n;
   BLASInfo data[met_max_meshes];
 } buff_blas_info;
-layout(binding = 4) uniform b_buff_tlas_info {
-  TLASInfo data;
-} buff_tlas_info;
-layout(binding = 5) uniform b_buff_emitter_info {
+layout(binding = 4) uniform b_buff_emitter_info {
   uint n;
   EmitterInfo data[met_max_emitters];
 } buff_emitter_info;
-layout(binding = 6) uniform b_buff_wvls_distr {
+layout(binding = 5) uniform b_buff_wvls_distr {
   WavelengthDistribution data;
 } buff_wvls_distr;
-layout(binding = 7) uniform b_buff_emitters_distr {
+layout(binding = 6) uniform b_buff_emitters_distr {
   EmitterDistribution data;
 } buff_emitters_distr;
-layout(binding = 8) uniform b_buff_envmap_info {
+layout(binding = 7) uniform b_buff_envmap_info {
   bool envm_is_present;
   uint envm_i;
 } buff_envmap_info;
-layout(binding = 9) uniform b_buff_coef_info {
+layout(binding = 8) uniform b_buff_coef_info {
   uint n;
   AtlasInfo data[met_max_textures];
 } buff_coef_info;
-layout(binding = 10) uniform b_buff_brdf_info {
+layout(binding = 9) uniform b_buff_brdf_info {
   uint n;
   AtlasInfo data[met_max_textures];
 } buff_brdf_info;

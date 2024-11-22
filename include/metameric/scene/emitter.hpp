@@ -43,8 +43,8 @@ namespace met {
       // Per-object block layout for std140 uniform buffer
       struct alignas(16) EmBlockLayout {
         alignas(16) eig::Matrix4f trf;
-        alignas(4)  uint          type;
         alignas(4)  bool          is_active;
+        alignas(4)  uint          type;
         alignas(4)  uint          illuminant_i;
         alignas(4)  float         illuminant_scale;
       };
@@ -55,6 +55,7 @@ namespace met {
         alignas(4) uint size;
         std::array<EmBlockLayout, met_max_emitters> data;
       } *m_em_info_map;
+      
 
       // Single block layout for std140 uniform buffer, mapped for write
       struct EnvBufferLayout {

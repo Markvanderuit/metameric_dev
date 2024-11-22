@@ -30,26 +30,28 @@ namespace met::detail {
     guard(!emitters.empty());
 
     // Set appropriate component count, then flush change to buffer
-    if (emitters)
+    if (emitters.is_resized())
       m_em_info_map->size = static_cast<uint>(emitters.size());
 
     // Write updated components to mapping
     for (uint i = 0; i < emitters.size(); ++i) {
       const auto &[emitter, state] = emitters[i];
       guard_continue(state);
-
       m_em_info_map->data[i] = {
         .trf              = emitter.transform.affine().matrix(),
-        .type             = static_cast<uint>(emitter.type),
         .is_active        = emitter.is_active,
+        .type             = static_cast<uint>(emitter.type),
         .illuminant_i     = emitter.illuminant_i,
         .illuminant_scale = emitter.illuminant_scale
       };
     } // for (uint i)
 
     // Write out changes to buffer
-    if (emitters)
+    if (emitters) {
       emitter_info.flush();
+      gl::sync::memory_barrier(gl::BarrierFlags::eBufferUpdate | 
+                               gl::BarrierFlags::eUniformBuffer);
+    }
 
     // Build sampling distribution over emitter's relative output
     if (emitters) {
@@ -82,8 +84,8 @@ namespace met::detail {
         emitter_distr[i] = w;
       }
 
-      auto distr = Distribution(cnt_span<float>(emitter_distr));   
-      emitter_distr_buffer = to_std140(distr);
+      // Generate sampling distribution and push to gpu
+      emitter_distr_buffer = to_std140(Distribution(cnt_span<float>(emitter_distr)));
 
       // Store information on first co  nstant emitter, if one is present and active;
       // we don't support multiple environment emitters

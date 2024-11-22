@@ -60,8 +60,8 @@ struct EmitterInfo {
   mat4 trf;                
 
   // Shape data
-  uint type;      // Type of emitter; constant, point, sphere, rect
   bool is_active; // Should the emitter be interacted with?
+  uint type;      // Type of emitter; constant, point, sphere, rect
 
   // Spectral data
   uint  illuminant_i;     // Index of spd
