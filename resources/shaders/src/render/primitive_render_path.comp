@@ -76,9 +76,7 @@ layout(binding = 9) uniform b_buff_brdf_info {
 
 // Storage buffer declarations
 layout(binding = 0) restrict readonly buffer b_buff_blas_node { BVHNodePack   data[]; } buff_blas_node;
-layout(binding = 2) restrict readonly buffer b_buff_blas_prim { PrimitivePack data[]; } buff_blas_prim;
-layout(binding = 3) restrict readonly buffer b_buff_tlas_node { BVHNodePack   data[]; } buff_tlas_node;
-layout(binding = 5) restrict readonly buffer b_buff_tlas_prim { uint          data[]; } buff_tlas_prim;
+layout(binding = 1) restrict readonly buffer b_buff_blas_prim { PrimitivePack data[]; } buff_blas_prim;
 
 // Texture/image units, ergo samplers and output images
 layout(binding = 0)          uniform sampler1DArray   b_illm_1f; // Illuminant function data, 1 component

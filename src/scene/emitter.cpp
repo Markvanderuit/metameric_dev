@@ -19,38 +19,44 @@ namespace met::detail {
 
     // Alllocate up to a number of objects and obtain writeable/flushable mapping
     // for regular emitters and an envmap
-    std::tie(emitter_info, m_em_info_map) = gl::Buffer::make_flusheable_object<EmBufferLayout>();
+    std::tie(emitter_info, m_emitter_info_map) = gl::Buffer::make_flusheable_object<BufferLayout>();
     std::tie(emitter_envm_info, m_envm_info_data) = gl::Buffer::make_flusheable_object<EnvBufferLayout>();
   }
 
   void SceneGLHandler<met::Emitter>::update(const Scene &scene) {
     met_trace_full();
     
+    // Destroy old sync object
+    m_fence = { };
+
+    // Get relevant resources
     const auto &emitters = scene.components.emitters;
+
+    // Skip entirely; no emitters
     guard(!emitters.empty());
-
-    // Set appropriate component count, then flush change to buffer
-    if (emitters.is_resized())
-      m_em_info_map->size = static_cast<uint>(emitters.size());
-
-    // Write updated components to mapping
-    for (uint i = 0; i < emitters.size(); ++i) {
-      const auto &[emitter, state] = emitters[i];
-      guard_continue(state);
-      m_em_info_map->data[i] = {
-        .trf              = emitter.transform.affine().matrix(),
-        .is_active        = emitter.is_active,
-        .type             = static_cast<uint>(emitter.type),
-        .illuminant_i     = emitter.illuminant_i,
-        .illuminant_scale = emitter.illuminant_scale
-      };
-    } // for (uint i)
-
-    // Write out changes to buffer
     if (emitters) {
-      emitter_info.flush();
-      gl::sync::memory_barrier(gl::BarrierFlags::eBufferUpdate | 
-                               gl::BarrierFlags::eUniformBuffer);
+      // Set emitter count
+      m_emitter_info_map->n = static_cast<uint>(emitters.size());
+      
+      // Set per-emitter data
+      for (uint i = 0; i < emitters.size(); ++i) {
+        const auto &[emitter, state] = emitters[i];
+        guard_continue(state);
+
+        m_emitter_info_map->data[i] = {
+          .trf              = emitter.transform.affine().matrix(),
+          .is_active        = emitter.is_active,
+          .type             = static_cast<uint>(emitter.type),
+          .illuminant_i     = emitter.illuminant_i,
+          .illuminant_scale = emitter.illuminant_scale
+        };
+      } // for (uint i)
+
+      // Write out changes to buffer
+      emitter_info.flush(sizeof(eig::Array4u) + emitters.size() * sizeof(BlockLayout));
+      gl::sync::memory_barrier(gl::BarrierFlags::eBufferUpdate       |  
+                                gl::BarrierFlags::eUniformBuffer     |
+                                gl::BarrierFlags::eClientMappedBuffer);
     }
 
     // Build sampling distribution over emitter's relative output
@@ -100,5 +106,9 @@ namespace met::detail {
       }
       emitter_envm_info.flush();
     }
+
+    // Generate sync object for gpu wait
+    if (emitters)
+      m_fence = gl::sync::Fence(gl::sync::time_ns(1));
   }
 } // namespace met::detail

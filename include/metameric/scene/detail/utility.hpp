@@ -2,12 +2,23 @@
 
 #include <metameric/core/fwd.hpp>
 #include <metameric/core/utility.hpp>
+#include <small_gl/utility.hpp>
 
 namespace met::detail {
   // Base class for SceneGLHandler and template specializations; only specifies
   // an interface.
   struct SceneGLHandlerBase {
+  protected:
+    // Sync object (must be set by a template specialization) that can be 
+    // waited on after update() and before any render operations
+    mutable gl::sync::Fence m_fence;
+
+  public:
+    // Children can implement update(), which pushes cpu-to-gpu operations
     virtual void update(const Scene &) = 0;
+    
+    // Wait for any pending cpu-to-gpu operations in update() to complete
+    void wait_for_update() const { m_fence.gpu_wait(); }
   };
 
   // Default template implementation; simply does nothing.
@@ -24,7 +35,7 @@ namespace met::detail {
   class SceneStateHandlerBase {
   protected:
     bool m_mutated = true;
-
+    
   public:
     // Set the component state as mutated
     constexpr void set_mutated(bool b) { m_mutated = b; }

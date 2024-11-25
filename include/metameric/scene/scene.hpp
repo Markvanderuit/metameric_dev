@@ -61,9 +61,13 @@ namespace met {
     void import_scene(const fs::path &path);
     void import_scene(Scene &&other);
 
-    // Run update of state tracking and gl-side data
+  public: // Update of internal; state tracking, gl-side data
+    // Update state-tracking and gl-side data from newest cpu-side data
     void update();
 
+    // Wait for any pending cpu-to-gpu operations in update() to complete
+    void wait_for_update() const;
+    
   public: // History (redo/undo) handling
     struct SceneMod {
       std::string name;

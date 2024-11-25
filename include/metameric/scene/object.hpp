@@ -69,10 +69,10 @@ namespace met {
       std::vector<ObjectData> object_data;
 
     private:
-      // Per-object block layout for std140 uniform buffer
-      struct alignas(16) BlockLayout {
+      // Per-object block layout
+      struct BlockLayout {
         alignas(16) eig::Matrix4f trf;
-        alignas(4)  bool          is_active;
+        alignas(4)  uint          is_active;
         alignas(4)  uint          mesh_i;
         alignas(4)  uint          uplifting_i;
         alignas(4)  uint          brdf_type;
@@ -81,12 +81,15 @@ namespace met {
         alignas(4)  uint          roughness_data;
       };
       static_assert(sizeof(BlockLayout) == 96);
-      
-      // All-object block layout for std140 uniform buffer, mapped for write
+
+      // All-object buffer layout
       struct BufferLayout {
-        alignas(4) uint size;
-        std::array<BlockLayout, met_max_objects> data;
-      } *m_object_info_map;
+        alignas(4)  uint n;
+        alignas(16) std::array<BlockLayout, met_max_objects> data;
+      };
+
+      // Write mapped persistent object data
+      BufferLayout *m_object_info_map;
 
     public:
       // Stores one instance of BlockLayout per object component

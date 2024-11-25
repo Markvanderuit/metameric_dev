@@ -40,22 +40,24 @@ namespace met {
     // is updated based on state tracking.
     template <>
     class SceneGLHandler<met::Emitter> : public SceneGLHandlerBase {
-      // Per-object block layout for std140 uniform buffer
-      struct alignas(16) EmBlockLayout {
+      // Per-object block layout
+      struct BlockLayout {
         alignas(16) eig::Matrix4f trf;
-        alignas(4)  bool          is_active;
+        alignas(4)  uint          is_active;
         alignas(4)  uint          type;
         alignas(4)  uint          illuminant_i;
         alignas(4)  float         illuminant_scale;
       };
-      static_assert(sizeof(EmBlockLayout) == 80);
+      static_assert(sizeof(BlockLayout) == 80);
+
+      // All-object buffer layout
+      struct BufferLayout {
+        alignas(4)  uint n;
+        alignas(16) std::array<BlockLayout, met_max_objects> data;
+      };
       
-      // All-object block layout for std140 uniform buffer, mapped for write
-      struct EmBufferLayout {
-        alignas(4) uint size;
-        std::array<EmBlockLayout, met_max_emitters> data;
-      } *m_em_info_map;
-      
+      // Write mapped persistent emitter data
+      BufferLayout *m_emitter_info_map;
 
       // Single block layout for std140 uniform buffer, mapped for write
       struct EnvBufferLayout {
@@ -64,7 +66,7 @@ namespace met {
       } *m_envm_info_data;
 
     public:
-      // This buffer stores one instance of EmBlockLayout per emitter component
+      // This buffer stores one instance of BlockLayout per emitter component
       gl::Buffer emitter_info;
 
       // This buffer stores information on at most one environment emitter to sample.

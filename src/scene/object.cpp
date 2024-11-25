@@ -66,44 +66,52 @@ namespace met {
     void SceneGLHandler<met::Object>::update(const Scene &scene) {
       met_trace_full();
 
+      // Destroy old sync object
+      m_fence = { };
+
       // Get relevant resources
       const auto &objects  = scene.components.objects;
       const auto &images   = scene.resources.images;
       const auto &settings = scene.components.settings;
 
+      // Skip entirely; no objects, delete buffer
       guard(!objects.empty());
-
-      // Set appropriate object count, then flush change to buffer
-      if (objects)
-        m_object_info_map->size = static_cast<uint>(objects.size());
-
-      // Write updated objects to mapping
-      for (uint i = 0; i < objects.size(); ++i) {
-        const auto &[object, state] = objects[i];
-        guard_continue(state);
+      if (objects) {
+        // Set object count
+        m_object_info_map->n = static_cast<uint>(objects.size());
         
-        // Get mesh transform, incorporate into gl-side object transform
-        auto object_trf = object.transform.affine().matrix().eval();
-        auto mesh_trf   = scene.resources.meshes.gl.mesh_cache[object.mesh_i].unit_trf;
-        auto trf        = (object_trf * mesh_trf).eval();
+        // Set per-object data
+        for (uint i = 0; i < objects.size(); ++i) {
+          const auto &[object, state] = objects[i];
+          guard_continue(state);
+          
+          // Get mesh transform, incorporate into gl-side object transform
+          auto object_trf = object.transform.affine().matrix().eval();
+          auto mesh_trf   = scene.resources.meshes.gl.mesh_cache[object.mesh_i].unit_trf;
+          auto trf        = (object_trf * mesh_trf).eval();
 
-        // Fill in object struct data
-        m_object_info_map->data[i] = {
-          .trf            = trf,
-          .is_active      = object.is_active,
-          .mesh_i         = object.mesh_i,
-          .uplifting_i    = object.uplifting_i,
-          .brdf_type      = static_cast<uint>(object.brdf_type),
-          .albedo_data    = pack_material_3f(object.diffuse),
-          .metallic_data  = pack_material_1f(object.metallic),
-          .roughness_data = pack_material_1f(object.roughness),
-        };
-      } // for (uint i)
+          // Fill in object struct data
+          m_object_info_map->data[i] = {
+            .trf            = trf,
+            .is_active      = object.is_active,
+            .mesh_i         = object.mesh_i,
+            .uplifting_i    = object.uplifting_i,
+            .brdf_type      = static_cast<uint>(object.brdf_type),
+            .albedo_data    = pack_material_3f(object.diffuse),
+            .metallic_data  = pack_material_1f(object.metallic),
+            .roughness_data = pack_material_1f(object.roughness),
+          };
+        } // for (uint i)
+        
+        // Write out changes to buffer
+        object_info.flush(sizeof(eig::Array4u) + objects.size() * sizeof(BlockLayout));
+        gl::sync::memory_barrier(gl::BarrierFlags::eBufferUpdate      |  
+                                 gl::BarrierFlags::eUniformBuffer     |
+                                 gl::BarrierFlags::eClientMappedBuffer);
+        
+        fmt::print("Written object changes\n");
+      }
 
-      // Write out changes to buffer
-      if (objects)
-        object_info.flush();
-      
       // Flag that the atlas' internal texture has **not** been invalidated by internal resize
       if (texture_brdf.is_init())
         texture_brdf.set_invalitated(false);
@@ -122,11 +130,11 @@ namespace met {
         std::vector<eig::Array2u> inputs(objects.size());
         rng::transform(objects, inputs.begin(), [&](const auto &object) -> eig::Array2u {
           auto metallic_size = object->metallic | visit {
-            [&](uint  i) { return images[i]->size(); },
+            [&](uint  i) { return images.gl.m_texture_info_map->data[i].size; },
             [&](float f) { return eig::Array2u { 16, 16 }; },
           };
           auto roughness_size = object->roughness | visit {
-            [&](uint  i) { return images[i]->size(); },
+            [&](uint  i) {  return images.gl.m_texture_info_map->data[i].size; },
             [&](float f) { return eig::Array2u { 16, 16 }; },
           };
           return metallic_size.cwiseMax(roughness_size).eval();
@@ -159,6 +167,10 @@ namespace met {
       // Generate per-object packed brdf data
       for (auto &data : object_data)
         data.update(scene);
+
+      // Generate sync object for gpu wait
+      if (objects)
+        m_fence = gl::sync::Fence(gl::sync::time_ns(1));
     }
 
     SceneGLHandler<met::Object>::ObjectData::ObjectData(const Scene &scene, uint object_i)
@@ -213,10 +225,10 @@ namespace met {
       auto &cache = scene.m_cache_handle.getw<gl::detail::ProgramCache>();
       auto &program = cache.at(m_program_key);
       program.bind();
-      program.bind("b_buff_unif",    m_buffer);
-      program.bind("b_buff_objects", scene.components.objects.gl.object_info);
-      program.bind("b_buff_atlas",   atlas.buffer());
-      program.bind("b_atlas",        atlas.texture());
+      program.bind("b_buff_unif",       m_buffer);
+      program.bind("b_buff_objects",    scene.components.objects.gl.object_info);
+      program.bind("b_buff_atlas",      atlas.buffer());
+      program.bind("b_atlas",           atlas.texture());
       if (!scene.resources.images.empty()) {
         program.bind("b_buff_textures",  scene.resources.images.gl.texture_info);
         program.bind("b_txtr_3f",        scene.resources.images.gl.texture_atlas_3f.texture());

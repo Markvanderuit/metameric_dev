@@ -3,7 +3,7 @@
 ![teaser_1](/resources//assets/teaser_1.png)
 
 
-This repository contains the source code of our spectral uplifting editor, which accompanies our recent paper "**Controlled Spectral Uplifting for Indirect-Light-Metamerism**" (link to [proceedings](https://dx.doi.org/https://doi.org/10.1145/3680528.3687698), [university page](http://graphics.tudelft.nl/Publications-new/2024/RE24), [author page](https://markvanderuit.nl/publications/2024-11-19-paper-spectral)), presented at Siggraph Asia 2024.
+This repository contains the source code of our spectral uplifting editor *Metameric*, which accompanies our recent paper "**Controlled Spectral Uplifting for Indirect-Light-Metamerism**" (link to [proceedings](https://dx.doi.org/https://doi.org/10.1145/3680528.3687698), [university page](http://graphics.tudelft.nl/Publications-new/2024/RE24), [author page](https://markvanderuit.nl/publications/2024-11-19-paper-spectral)), presented at Siggraph Asia 2024.
 
 With this demo editor, we show how artist-controllable spectral uplifting might be a great addition to the artist toolbox. Our method allows us to use (and misuse) spectral metamerism. In a spectral renderer with spectral uplifting, color occurs at the camera. The actual color behavior of objects is extremely underdetermined. We happily use this property to change the uplifted appearance of objects under complex indirect illumination, while keeping the RGB input intact.
 We include several [example scenes](./scenes) with different spectral behaviors, and provide windows/linux builds (that might even work sometimes!) on the [releases page](./releases/latest).
@@ -19,14 +19,14 @@ To build the project, you'll need a recent C++23 compiler (e.g. MSVC **17.12** o
 As a first step, clone the repository and any submodules.
 
 ```bash
-  git clone --recurse-submodules https://github.com/markvanderuit/metameric
+  git clone --recurse-submodules https://github.com/markvanderuit/metameric_dev
 ```
 
 Next, simply configure and compile the project using CMake:
 
 ```bash
-  cmake -S . -B build
-  cmake --build build --target metameric_editor
+  cmake -S metameric_dev -B build
+  cmake --build build --config Release --target metameric_editor
 ```
 
 If compilation succeeds without any errors, you should find an executable at `build/bin/metameric_editor`.

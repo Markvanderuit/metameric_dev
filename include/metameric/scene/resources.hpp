@@ -98,6 +98,11 @@ namespace met::detail {
     // Class constructor and update function handle GL-side data
     SceneGLHandler();
     void update(const Scene &) override;
+
+    // SceneGLHandler<Uplifting> becomes friend as it bakes some texture data per-object
+    // SceneGLHandler<Object> becomes friend as it bakes some texture data per-object
+    friend class detail::SceneGLHandler<Uplifting>;
+    friend class detail::SceneGLHandler<Object>;
   };
   
   // Template specialization of SceneGLHandler.
@@ -140,24 +145,17 @@ namespace met::detail {
 
   template <>
   class SceneGLHandler<met::Scene> : public SceneGLHandlerBase {
-    // // Block layout for std140 uniform buffer
-    // struct alignas(16) BLASInfoBlockLayout {
-    //   alignas(4) uint prims_offs; // Offset/extent into blas_prims buffer
-    //   alignas(4) uint nodes_offs; // Offset/extent into blas_nodes buffer
-    // };
-    // static_assert(sizeof(BLASInfoBlockLayout) == 16);
-
-    // // Block layout for std140 uniform buffer
-    // struct alignas(16) TLASInfoBufferLayout {
-    //   alignas(16) eig::Matrix4f trf; // Transformation into unit cube for TLAS rays
-    // } *m_tlas_info_map;
-    // static_assert(sizeof(TLASInfoBufferLayout) == 64u);
+    // // General scene information
+    // struct BlockLayout {
+    //   alignas(4) uint n_objects;
+    //   alignas(4) uint n_emitters;
+    //   alignas(4) uint n_views;
+    //   alignas(4) uint n_upliftings;
+    // } *m_scene_info_map;
     
   public:
-    // // Packed TLAS BVH data, used in render/ray query primitives
-    // gl::Buffer tlas_info;  // Info object containing ray transforms
-    // gl::Buffer tlas_nodes; // Traversal data, parent AABB, and compressed child AABBS
-    // gl::Buffer tlas_prims; // Indices referring to underlying revelant BLAS structure
+    // // General buffer with scene info; nr of objects/emitters/etc
+    // gl::Buffer scene_info;
 
   public:
     // Class constructor and update function handle GL-side data

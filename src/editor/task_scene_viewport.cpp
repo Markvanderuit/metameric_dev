@@ -68,6 +68,12 @@ namespace met {
     info.child_task("viewport_input_camera").init<detail::ArcballInputTask>(lrgb_target, arcball_info);
     info.child_task("viewport_input_editor").init<ViewportEditorInputTask>();
 
+    // Boilerplate task which triggers scene gpu-side update wait just before render
+    info.child_task("scene_handler").init<detail::LambdaTask>([](auto &info) {
+      met_trace();
+      info.global("scene").template getr<Scene>().wait_for_update();
+    });
+
     // Subtask spawns and manages render primitive 
     info.child_task("viewport_render").init<ViewportRenderTask>();
 
