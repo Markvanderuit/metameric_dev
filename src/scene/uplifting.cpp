@@ -321,7 +321,7 @@ namespace met {
         std::vector<eig::Array2u> inputs(objects.size());
         rng::transform(objects, inputs.begin(), [&](const auto &object) -> eig::Array2u {
           return object->diffuse | visit {
-            [&](uint i) { return images[i]->size(); },
+            [&](uint i) { return images.gl.m_texture_info_map->data[i].size; },
             [&](Colr f) { return eig::Array2u { 16, 16 }; },
           };
         });

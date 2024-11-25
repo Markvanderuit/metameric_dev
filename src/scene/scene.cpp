@@ -694,15 +694,29 @@ namespace met {
   }
 
   void Scene::update() {
-    met_trace();
+    met_trace_full();
 
-    // Force check of scene indices to ensure linked components/resources still exist
+    // Force check of scene indices to ensure linked components/resources still exist,
+    // or reset to indices that we know exist
     for (auto [i, comp] : enumerate_view(components.objects)) {
       auto &obj = comp.value;
       if (obj.mesh_i >= resources.meshes.size())
         obj.mesh_i = 0u;
       if (obj.uplifting_i >= components.upliftings.size())
         obj.uplifting_i = 0u;
+
+      obj.diffuse | visit_single([&](uint i) {
+        if (i >= resources.images.size())
+          obj.diffuse = Colr(0.5f);
+      });
+      obj.roughness | visit_single([&](uint i) {
+        if (i >= resources.images.size())
+          obj.roughness = 0.1f;
+      });
+      obj.metallic | visit_single([&](uint i) {
+        if (i >= resources.images.size())
+          obj.metallic = 0.0f;
+      });
     }
     for (auto [i, comp] : enumerate_view(components.emitters)) {
       auto &emt = comp.value;
@@ -735,5 +749,21 @@ namespace met {
     components.objects.update(*this);
     components.upliftings.update(*this);
     components.views.update(*this);
+  }
+
+  void Scene::wait_for_update() const {
+    met_trace_full();
+
+    // Forcibly wait on all initialized sync objects; most components/resources
+    // never initialize these, and the operation will do nothing
+    resources.meshes.gl.wait_for_update();
+    resources.images.gl.wait_for_update();
+    resources.illuminants.gl.wait_for_update();
+    resources.observers.gl.wait_for_update();
+    resources.bases.gl.wait_for_update();
+    components.emitters.gl.wait_for_update();
+    components.objects.gl.wait_for_update();
+    components.upliftings.gl.wait_for_update();
+    components.views.gl.wait_for_update();
   }
 } // namespace met
