@@ -112,12 +112,15 @@ namespace met {
       }
       ImGui::End();
       
+      // Window closed, kill this task; the scheduler kills the task at the end of this
+      // run, and  we let measure() run one last time to prevent issues with buffer output
+      if (!is_open) {
+        m_query_spp = 0;
+        info.task().dstr();
+      }
+
       // Handle path queries, if m_query_spp != 0
       measure(info);
-
-      // Window closed, kill this task
-      if (!is_open)
-        info.task().dstr();
     }
   };
 } // namespace met
