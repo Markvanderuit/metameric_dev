@@ -108,8 +108,6 @@ namespace met {
         gl::sync::memory_barrier(gl::BarrierFlags::eBufferUpdate      |  
                                  gl::BarrierFlags::eUniformBuffer     |
                                  gl::BarrierFlags::eClientMappedBuffer);
-        
-        fmt::print("Written object changes\n");
       }
 
       // Flag that the atlas' internal texture has **not** been invalidated by internal resize

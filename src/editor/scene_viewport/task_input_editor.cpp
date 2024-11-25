@@ -8,7 +8,7 @@
 
 namespace met {
   static constexpr float selector_near_distance = 12.f;
-  static constexpr uint  indirect_query_spp     = 8192; // 65536;
+  static constexpr uint  indirect_query_spp     = 16384; // 65536;
 
   RayRecord ViewportEditorInputTask::eval_ray_query(SchedulerHandle &info, const Ray &ray) {
     met_trace_full();

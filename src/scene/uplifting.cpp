@@ -500,9 +500,9 @@ namespace met {
 
       // Flag 1; test if color system has, in any way/shape/form, been modified
       bool is_color_system_stale = m_is_first_update
-        || uplifting->basis_i      || basis
-        || uplifting->observer_i   || observer
-        || uplifting->illuminant_i || illuminant;
+        || uplifting.state.basis_i      || basis
+        || uplifting.state.observer_i   || observer
+        || uplifting.state.illuminant_i || illuminant;
       
       // Flag 2; test if the tessellation has, in any way/shape/form, been modified;
       //         note that later steps can set this to true if necessary
