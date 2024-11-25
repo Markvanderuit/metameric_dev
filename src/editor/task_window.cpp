@@ -188,21 +188,21 @@ namespace met {
             }
           }
           
-          if (ImGui::MenuItem("Illuminant spectrum", nullptr, nullptr, false)) {
+          if (ImGui::MenuItem("Illuminant spectrum")) {
             if (fs::path path; detail::load_dialog(path, { })) {
               auto &e_scene = info.global("scene").getw<Scene>();
               e_scene.resources.illuminants.emplace("New illuminant", io::load_spec(path));
             }
           }
 
-          if (ImGui::MenuItem("Observer functions", nullptr, nullptr, false)) {
+          if (ImGui::MenuItem("Observer functions")) {
             if (fs::path path; detail::load_dialog(path, { })) {
               auto &e_scene = info.global("scene").getw<Scene>();
               e_scene.resources.observers.emplace("New observer", io::load_cmfs(path));
             }
           }
 
-          if (ImGui::MenuItem("Basis functions", nullptr, nullptr, false)) {
+          if (ImGui::MenuItem("Basis functions")) {
             if (fs::path path; detail::load_dialog(path, { })) {
               auto &e_scene = info.global("scene").getw<Scene>();
               e_scene.resources.bases.emplace("New basis", io::load_basis(path));
