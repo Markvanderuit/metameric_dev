@@ -142,6 +142,9 @@ namespace met {
         const auto &sensor = info.global("sensor").getr<Sensor>();
         auto &renderer     = info.global("renderer").getw<RenderType>();
 
+        // GPU has to wait for gpu data to be available
+        scene.wait_for_update();
+
         // Reset renderer internal film
         renderer.reset(sensor, scene);
 
