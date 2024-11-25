@@ -191,13 +191,10 @@ namespace met {
     // Bind required resources to their corresponding targets
     program.bind();
     program.bind("b_buff_output",         m_output);
-    program.bind("b_buff_sensor_info",         sensor.buffer());
-    program.bind("b_buff_object_info",        scene.components.objects.gl.object_info);
-    program.bind("b_buff_emitter_info",       scene.components.emitters.gl.emitter_info);
+    program.bind("b_buff_sensor_info",    sensor.buffer());
+    program.bind("b_buff_object_info",    scene.components.objects.gl.object_info);
+    program.bind("b_buff_emitter_info",   scene.components.emitters.gl.emitter_info);
     program.bind("b_buff_envmap_info",    scene.components.emitters.gl.emitter_envm_info);
-    // program.bind("b_buff_scene",          scene.gl.scene_info);
-    // program.bind("b_buff_tlas_node",      scene.gl.tlas_nodes);
-    // program.bind("b_buff_tlas_prim",      scene.gl.tlas_prims);
     if (!scene.resources.meshes.empty()) {
       program.bind("b_buff_blas_info", scene.resources.meshes.gl.blas_info);
       program.bind("b_buff_blas_node", scene.resources.meshes.gl.blas_nodes);

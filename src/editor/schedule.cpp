@@ -39,13 +39,6 @@ namespace met {
     scheduler.task("frame_begin").init<detail::FrameBeginTask>();
     scheduler.task("window").init<WindowTask>();
 
-    // Boilerplate task which triggers scene state updates, filters some edge cases, and
-    // generally keeps everything running nicely.
-    scheduler.task("scene_handler").init<detail::LambdaTask>([](auto &info) {
-      met_trace();
-      info.global("scene").template getw<Scene>().update();
-    });
-
     // Editor task for scene components (objects, emitters, etc)
     scheduler.task("scene_components_editor").init<detail::LambdaTask>([](auto &info) {
       met_trace();
@@ -72,6 +65,13 @@ namespace met {
                                                      .show_dupl   = false });
       }
       ImGui::End();
+    });
+    
+    // Boilerplate task which triggers scene state updates, filters some edge cases, 
+    // and pushes gl-side data
+    scheduler.task("scene_handler").init<detail::LambdaTask>([](auto &info) {
+      met_trace();
+      info.global("scene").template getw<Scene>().update();
     });
 
     // Viewport task which handles camera input, renders scene, and draws to a viewport

@@ -402,15 +402,38 @@ namespace met::detail {
     met_trace_full();
 
     // // Obtain writeable/flushable mapping for scene layout
-    // std::tie(tlas_info, m_tlas_info_map) = gl::Buffer::make_flusheable_object<TLASInfoBufferLayout>();
+    // std::tie(scene_info, m_scene_info_map) = gl::Buffer::make_flusheable_object<BlockLayout>();
   }
 
   void SceneGLHandler<met::Scene>::update(const Scene &scene) {
     met_trace_full();
 
-    // const auto &objects = scene.components.objects;
-    // const auto &emitters = scene.components.emitters;
-    // guard(objects || emitters);
+    // // Destroy old sync object
+    // m_fence = { };
+
+    // // Get relevant resources
+    // const auto &objects    = scene.components.objects;
+    // const auto &emitters   = scene.components.emitters;
+    // const auto &views      = scene.components.views;
+    // const auto &upliftings = scene.components.upliftings;
+
+    // guard(objects || emitters || upliftings || views);
+
+    // *m_scene_info_map = BlockLayout {
+    //   .n_objects    = static_cast<uint>(objects.size()),
+    //   .n_emitters   = static_cast<uint>(emitters.size()),
+    //   .n_views      = static_cast<uint>(views.size()),
+    //   .n_upliftings = static_cast<uint>(upliftings.size())
+    // };
+
+    // // Write out changes to buffer
+    // scene_info.flush();
+    // gl::sync::memory_barrier(gl::BarrierFlags::eBufferUpdate      |  
+    //                           gl::BarrierFlags::eUniformBuffer     |
+    //                           gl::BarrierFlags::eClientMappedBuffer);
+                              
+    // // Generate sync object for gpu wait
+    // m_fence = gl::sync::Fence(gl::sync::time_ns(1));
 
     // // Collect bounding boxes for active scene emitters and objects as one shared type
     // struct PrimitiveData {
