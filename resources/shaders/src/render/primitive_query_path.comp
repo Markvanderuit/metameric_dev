@@ -81,11 +81,11 @@ layout(binding = 3) restrict coherent buffer b_buff_output {
 } buff_output;
 
 // Texture/image units, ergo samplers and output images
-layout(binding = 0) uniform sampler1DArray  b_illm_1f; // Illuminant function data, 1 component
-layout(binding = 1) uniform sampler1DArray  b_cmfs_3f; // Observer function data, 3 components
-layout(binding = 2) uniform sampler1DArray  b_bsis_1f; // Basis function data, 1 component
-layout(binding = 3) uniform usampler2DArray b_coef_4f; // Texture atlas storing packed coefficients for surface reflectance
-layout(binding = 4) uniform usampler2DArray b_brdf_2f; // Texture atlas storing packed secondary brdf data
+layout(binding = 0) uniform sampler1DArray b_illm_1f; // Illuminant function data, 1 component
+layout(binding = 1) uniform sampler1DArray b_cmfs_3f; // Observer function data, 3 components
+layout(binding = 2) uniform sampler1DArray b_bsis_1f; // Basis function data, 1 component
+layout(binding = 3) uniform sampler2DArray b_coef_4f; // Texture atlas storing packed coefficients for surface reflectance
+layout(binding = 4) uniform sampler2DArray b_brdf_2f; // Texture atlas storing packed secondary brdf data
 
 // Declare scene data; creates functions to access and interact with
 // scene data without knowing the exact names of buffers, textures, etc

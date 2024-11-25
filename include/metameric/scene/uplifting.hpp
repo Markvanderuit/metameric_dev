@@ -238,7 +238,7 @@ namespace met {
       std::vector<ObjectData>    object_data;
 
       // Atlas textures; each scene object has a patch in the atlas for some material parameters
-      detail::TextureAtlas2d4ui texture_coef; // Stores packed linear coefficients representing surface spectral reflectances in basis
+      detail::TextureAtlas2d4f texture_coef; // Stores packed linear coefficients representing surface spectral reflectances in basis
 
       // Array texture; each layer holds one of 12 basis function spectra
       gl::TextureArray1d1f texture_basis;

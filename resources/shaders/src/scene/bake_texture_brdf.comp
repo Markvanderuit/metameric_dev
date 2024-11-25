@@ -26,9 +26,9 @@ layout(binding = 3) uniform b_buff_textures {
 } buff_textures;
 
 // Image/sampler declarations
-layout(binding = 0)        uniform sampler2DArray                   b_txtr_3f; // Input 3-component textures
-layout(binding = 1)        uniform sampler2DArray                   b_txtr_1f; // Input 1-component textures
-layout(binding = 0, r32ui) uniform restrict writeonly uimage2DArray b_atlas;   // Output coefficient texture atlas
+layout(binding = 0)        uniform sampler2DArray                 b_txtr_3f; // Input 3-component textures
+layout(binding = 1)        uniform sampler2DArray                 b_txtr_1f; // Input 1-component textures
+layout(binding = 0, r32f) uniform restrict writeonly image2DArray b_atlas;   // Output coefficient texture atlas
 
 void main() {
   // Load relevant object/patch data
@@ -84,5 +84,5 @@ void main() {
   }
 
   // Finally, write packed result out to atlas
-  imageStore(b_atlas, ivec3(px_out, atlas.layer), uvec4(packHalf2x16(p), 1, 1, 1));
+  imageStore(b_atlas, ivec3(px_out, atlas.layer), uintBitsToFloat(uvec4(packHalf2x16(p), 1, 1, 1)));
 }
