@@ -13,7 +13,7 @@ std::queue<RenderTaskInfo> generate_task_queue() {
 
   // VIDEO 1 (opening scene)
   // A bunny is visible. A second bunny falls from the sky
-  queue.push(RenderTaskInfo {
+  /* queue.push(RenderTaskInfo {
     .scene_path   = scene_path  / "opening v2.json",
     .out_path     = render_path / "opening_bunny_fl11_appear.mp4",
     .view_name    = "Default view",
@@ -53,11 +53,11 @@ std::queue<RenderTaskInfo> generate_task_queue() {
         .fps    = info.fps
       });
     }
-  });
+  }); */
 
   // VIDEO 2 (fold scene)
   // A ball falls from the sky, two walls appear
-  queue.push(RenderTaskInfo {
+  /* queue.push(RenderTaskInfo {
     .scene_path   = scene_path  / "fold.json",
     .out_path     = render_path / "opening_fold_appear.mp4",
     .view_name    = "Default view",
@@ -94,6 +94,66 @@ std::queue<RenderTaskInfo> generate_task_queue() {
         .handle = sphere.transform.position.y(),
         .values = { 0.65f, 0.f },
         .times  = { 0.25f, 1.f },
+        .fps    = info.fps
+      });
+    }
+  }); */
+
+  
+  // VIDEO 3 (fold scene)
+  // A gnome andd ball fall from the sky, two walls appear
+  queue.push(RenderTaskInfo {
+    .scene_path   = scene_path  / "result v3.json",
+    .out_path     = render_path / "results_gnome_appear.mp4",
+    .view_name    = "Default",
+    .view_scale   = 1.f,
+    .fps          = 60u,
+    .spp          = 256u,
+    .spp_per_step = 1u,
+    .start_time   = 0.f,
+    .end_time     = 1.f,
+    .init_events  = [](auto &info, Scene &scene) {
+      met_trace();
+      
+      auto &wall1  = *scene.components.objects("wall 1");
+      auto &wall2  = *scene.components.objects("wall 2");
+      auto &sphere = *scene.components.objects("sphere");
+      auto &box    = *scene.components.objects("box");
+      auto &gnome  = *scene.components.objects("safety gnome");
+
+      // Make walls and box come through floor
+      anim::add_twokey<float>(info.events, {
+        .handle = wall1.transform.position.y(),
+        .values = { -0.46f, 0.f },
+        .times  = { 0.f, 1.f },
+        .fps    = info.fps
+      });
+      anim::add_twokey<float>(info.events, {
+        .handle = wall2.transform.position.y(),
+        .values = { -0.46f, 0.f },
+        .times  = { 0.f, 1.f },
+        .fps    = info.fps
+      });
+      anim::add_twokey<float>(info.events, {
+        .handle = box.transform.position.y(),
+        .values = { -0.07f, 0.f },
+        .times  = { 0.f, 1.f },
+        .fps    = info.fps
+      });
+
+      // Make sphere/gnonme fall from above
+      sphere.transform.position.y() = 0.67f;
+      gnome.transform.position.y() = 0.67f;
+      anim::add_twokey<float>(info.events, {
+        .handle = sphere.transform.position.y(),
+        .values = { 0.67f, 0.f },
+        .times  = { 0.25f, 1.f },
+        .fps    = info.fps
+      });
+      anim::add_twokey<float>(info.events, {
+        .handle = gnome.transform.position.y(),
+        .values = { 0.67f, 0.070f },
+        .times  = { 0.25f, 1.f    },
         .fps    = info.fps
       });
     }
@@ -245,9 +305,9 @@ std::queue<RenderTaskInfo> generate_task_queue() {
   // VIDEO 8 (path scene)
   // Perform camera move towards mug
   /* queue.push(RenderTaskInfo {
-    .scene_path   = scene_path  / "path.json",
-    .out_path     = render_path / "8.mp4",
-    .view_name    = "default",
+    .scene_path   = scene_path  / "result v3.json",
+    .out_path     = render_path / "result_zoom.mp4",
+    .view_name    = "Default",
     .view_scale   = 1.f,
     .fps          = 60u,
     .spp          = 256u,
@@ -257,32 +317,20 @@ std::queue<RenderTaskInfo> generate_task_queue() {
     .init_events  = [](auto &info, Scene &scene) {
       met_trace();
 
-      // Get emitters
-      auto &d65l  = *scene.components.emitters("D65 (l)");
-      auto &d65r  = *scene.components.emitters("D65 (r)");
-      auto &fl2   = *scene.components.emitters("FL2");
-      auto &led   = *scene.components.emitters("LED");
-
-      // Set initial emitter config
-      d65l.is_active = false;
-      d65r.is_active = false;
-      fl2.is_active  = true;
-      led.is_active  = true;
-
       // Get views
-      auto &far_view = *scene.components.views("default");
-      auto &mug_view = *scene.components.views("mug");
+      auto &old_view = *scene.components.views("Default");
+      auto &new_view = *scene.components.views("Zoomed");
 
       // Make camera move from far to mug
       anim::add_twokey<eig::Vector3f>(info.events, {
-        .handle = far_view.camera_trf.position,
-        .values = { far_view.camera_trf.position, mug_view.camera_trf.position },
+        .handle = old_view.camera_trf.position,
+        .values = { old_view.camera_trf.position, new_view.camera_trf.position },
         .times  = { 0.f, 1.0f },
         .fps    = info.fps
       });
       anim::add_twokey<eig::Vector3f>(info.events, {
-        .handle = far_view.camera_trf.rotation,
-        .values = { far_view.camera_trf.rotation, mug_view.camera_trf.rotation },
+        .handle = old_view.camera_trf.rotation,
+        .values = { old_view.camera_trf.rotation, new_view.camera_trf.rotation },
         .times  = { 0.f, 1.0f },
         .fps    = info.fps
       });
