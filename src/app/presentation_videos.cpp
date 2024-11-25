@@ -5,7 +5,7 @@
 using namespace met;
 
 const fs::path scene_path = "C:/Users/markv/Documents/Drive/TU Delft/Projects/Indirect uplifting/Siggraph Asia Presentation/scenes";
-const fs::path render_path = "C:/Users/markv/Documents/Drive/TU Delft/Projects/Indirect uplifting/Siggraph Asia Presentation/renders";
+const fs::path render_path = "C:/Users/markv/Documents/Drive/TU Delft/Projects/Indirect uplifting/Siggraph Asia Presentation/renders/rework";
 
 std::queue<RenderTaskInfo> generate_task_queue() {
   // Queue processes all moved info objects
@@ -13,9 +13,9 @@ std::queue<RenderTaskInfo> generate_task_queue() {
 
   // VIDEO 1 (opening scene)
   // A bunny is visible. A second bunny falls from the sky
-  /* queue.push(RenderTaskInfo {
-    .scene_path   = scene_path  / "opening.json",
-    .out_path     = render_path / "1.mp4",
+  queue.push(RenderTaskInfo {
+    .scene_path   = scene_path  / "opening v2.json",
+    .out_path     = render_path / "opening_bunny_fl11_appear.mp4",
     .view_name    = "Default view",
     .view_scale   = 1.f,
     .fps          = 60u,
@@ -26,13 +26,16 @@ std::queue<RenderTaskInfo> generate_task_queue() {
     .init_events  = [](auto &info, Scene &scene) {
       met_trace();
       
-      auto &D65    = *scene.components.emitters("D65 (r)");
+      auto &D65l   = *scene.components.emitters("D65 (l)");
+      auto &D65r   = *scene.components.emitters("D65 (r)");
       auto &FL11   = *scene.components.emitters("FL11 (l)");
       auto &bunny2 = *scene.components.objects("bunny 2");
       auto &cube2  = *scene.components.objects("cube 2");
 
-      // Ensure other light is NOT active
-      scene.components.emitters("D65 (l)")->is_active = false;
+      // Scene setup
+      D65l.is_active = false;
+      FL11.is_active = true;
+      D65r.is_active = true;
 
       // Move objects out of and then slide them into view
       float bunny2_target = bunny2.transform.position.y();
@@ -50,97 +53,13 @@ std::queue<RenderTaskInfo> generate_task_queue() {
         .fps    = info.fps
       });
     }
-  }); */
+  });
 
-  // VIDEO 2 (opening scene)
-  // Two bunnies are visible. FL11 morphs into D65
-  /* queue.push(RenderTaskInfo {
-    .scene_path   = scene_path  / "opening.json",
-    .out_path     = render_path / "2.mp4",
-    .view_name    = "Default view",
-    .view_scale   = 1.f,
-    .fps          = 60u,
-    .spp          = 16u,
-    .spp_per_step = 1u,
-    .start_time   = 0.f,
-    .end_time     = 2.0f,
-    .init_events  = [](auto &info, Scene &scene) {
-      met_trace();
-      
-      auto &D65R   = *scene.components.emitters("D65 (r)");
-      auto &D65L   = *scene.components.emitters("D65 (l)");
-      auto &FL11   = *scene.components.emitters("FL11 (l)");
-      auto &bunny2 = *scene.components.objects("bunny 2");
-      auto &cube2  = *scene.components.objects("cube 2");
-
-      // All lights are active
-      D65R.is_active = true;
-      D65L.is_active = true;
-      FL11.is_active = true;
-      
-      // Morph FL11 from current scalar to 0, and do inverse with D65L
-      anim::add_twokey<float>(info.events, {
-        .handle = D65L.illuminant_scale,
-        .values = { 0.f, D65L.illuminant_scale },
-        .times  = { 0.f, 2.0f },
-        .fps    = info.fps
-      });
-      anim::add_twokey<float>(info.events, {
-        .handle = FL11.illuminant_scale,
-        .values = { FL11.illuminant_scale, 0.f },
-        .times  = { 0.f, 2.0f },
-        .fps    = info.fps
-      });
-    }
-  }); */
-
-  /* // VIDEO 3 (opening scene)
-  // Two bunnies are visible. D65 morphs into FL11
-  queue.push(RenderTaskInfo {
-    .scene_path   = scene_path  / "opening.json",
-    .out_path     = render_path / "3.mp4",
-    .view_name    = "Default view",
-    .view_scale   = 1.f,
-    .fps          = 60u,
-    .spp          = 16u,
-    .spp_per_step = 1u,
-    .start_time   = 0.f,
-    .end_time     = 2.0f,
-    .init_events  = [](auto &info, Scene &scene) {
-      met_trace();
-      
-      auto &D65R   = *scene.components.emitters("D65 (r)");
-      auto &D65L   = *scene.components.emitters("D65 (l)");
-      auto &FL11   = *scene.components.emitters("FL11 (l)");
-      auto &bunny2 = *scene.components.objects("bunny 2");
-      auto &cube2  = *scene.components.objects("cube 2");
-
-      // All lights are active
-      D65R.is_active = true;
-      D65L.is_active = true;
-      FL11.is_active = true;
-      
-      // Morph FL11 from current scalar to 0, and do inverse with D65L
-      anim::add_twokey<float>(info.events, {
-        .handle = D65L.illuminant_scale,
-        .values = { D65L.illuminant_scale, 0.f },
-        .times  = { 0.f, 2.0f },
-        .fps    = info.fps
-      });
-      anim::add_twokey<float>(info.events, {
-        .handle = FL11.illuminant_scale,
-        .values = { 0.f, FL11.illuminant_scale },
-        .times  = { 0.f, 2.0f },
-        .fps    = info.fps
-      });
-    }
-  }); */
-
-  // VIDEO 4 (challenginng scene)
+  // VIDEO 2 (fold scene)
   // A ball falls from the sky, two walls appear
-  /* queue.push(RenderTaskInfo {
-    .scene_path   = scene_path  / "challenging.json",
-    .out_path     = render_path / "4.mp4",
+  queue.push(RenderTaskInfo {
+    .scene_path   = scene_path  / "fold.json",
+    .out_path     = render_path / "opening_fold_appear.mp4",
     .view_name    = "Default view",
     .view_scale   = 1.f,
     .fps          = 60u,
@@ -151,8 +70,6 @@ std::queue<RenderTaskInfo> generate_task_queue() {
     .init_events  = [](auto &info, Scene &scene) {
       met_trace();
       
-      auto &D65R   = *scene.components.emitters("D65 (r)");
-      auto &D65L   = *scene.components.emitters("D65 (l)");
       auto &wall1  = *scene.components.objects("wall 1");
       auto &wall2  = *scene.components.objects("wall 2");
       auto &sphere = *scene.components.objects("sphere");
@@ -172,15 +89,15 @@ std::queue<RenderTaskInfo> generate_task_queue() {
       });
 
       // Make sphere fall from above
-      sphere.transform.position.y() = 0.58f;
+      sphere.transform.position.y() = 0.65f;
       anim::add_twokey<float>(info.events, {
         .handle = sphere.transform.position.y(),
-        .values = { 0.58f, 0.f },
+        .values = { 0.65f, 0.f },
         .times  = { 0.25f, 1.f },
         .fps    = info.fps
       });
     }
-  }); */
+  });
   
   /* 
     challenging scene vertex positions
@@ -415,7 +332,7 @@ std::queue<RenderTaskInfo> generate_task_queue() {
     }
   }); */
 
-  queue.push(RenderTaskInfo {
+  /* queue.push(RenderTaskInfo {
     .scene_path   = scene_path  / "fold.json",
     .out_path     = render_path / "fold_test.mp4",
     .view_name    = "Default view",
@@ -446,7 +363,7 @@ std::queue<RenderTaskInfo> generate_task_queue() {
         });
       }
     }
-  });
+  }); */
 
   return queue;
 };

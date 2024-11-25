@@ -1,15 +1,18 @@
 #pragma once
 
 #include <metameric/core/io.hpp>
-#include <metameric/scene/scene.hpp>
 #include <metameric/core/scheduler.hpp>
 #include <metameric/core/utility.hpp>
+#include <metameric/scene/scene.hpp>
 #include <metameric/render/primitives_render.hpp>
 #include <metameric/editor/detail/arcball.hpp>
+#include <metameric/editor/detail/task_lambda.hpp>
 #include <small_gl/window.hpp>
 #include <small_gl/detail/program_cache.hpp>
 #include <animation.hpp>
 #include <video.hpp>
+#include <algorithm>
+#include <execution>
 
 namespace met {
   struct RenderTaskInfo {
@@ -87,7 +90,7 @@ namespace met {
       }
 
       // Initialize scene as a resource owned by the scheduler
-      m_scene_handle = m_scheduler.global("scene").set<Scene>({ /* ... */ });
+      m_scene_handle = m_scheduler.global("scene").set<Scene>(m_scheduler.global("cache"));
       
       // Load scene data from path and push to gl
       debug::check_expr(fs::exists(m_info.scene_path));

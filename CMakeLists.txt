@@ -119,13 +119,19 @@ add_dependencies(metameric_editor metameric_scene_copy metameric_data_copy embre
 target_compile_features(metameric_editor PUBLIC cxx_std_23)
 target_link_libraries(metameric_editor PRIVATE core scene render editor)
 
-# Setup render executable
+# Ensure AVCPP/FFMPEG are available
 find_package(avcpp CONFIG REQUIRED)
+
+# Setup fast forward render output
 add_executable(ffw_video EXCLUDE_FROM_ALL src/app/ffw_video.cpp)
+add_dependencies(ffw_video metameric_scene_copy metameric_data_copy embree_copy)
 target_compile_features(ffw_video PUBLIC cxx_std_23)
-target_link_libraries(ffw_video PRIVATE core render components avcpp::FFmpeg avcpp::avcpp)
+target_link_libraries(ffw_video PRIVATE core scene render editor avcpp::FFmpeg avcpp::avcpp)
 target_include_directories(ffw_video PRIVATE src/app/include)
+
+# Setup presentation render output
 add_executable(presentation_videos EXCLUDE_FROM_ALL src/app/presentation_videos.cpp)
+add_dependencies(presentation_videos metameric_scene_copy metameric_data_copy embree_copy)
 target_compile_features(presentation_videos PUBLIC cxx_std_23)
-target_link_libraries(presentation_videos PRIVATE core render components avcpp::FFmpeg avcpp::avcpp)
+target_link_libraries(presentation_videos PRIVATE core scene render editor avcpp::FFmpeg avcpp::avcpp)
 target_include_directories(presentation_videos PRIVATE src/app/include)
