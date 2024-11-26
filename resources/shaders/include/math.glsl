@@ -13,6 +13,12 @@
 #define M_EPS     5.9604645e-8
 #define M_RAY_EPS 5e3 * M_EPS
 
+// Guard functions, syntactic sugar
+
+#define guard(expr)          if (!(expr)) { return;   }
+#define guard_continue(expr) if (!(expr)) { continue; }
+#define guard_break(expr)    if (!(expr)) { break;    }
+
 // Rounded-up division functions
 
 #define CEIL_DIV(a, b) ((a + (b - 1)) / b)
