@@ -58,7 +58,7 @@ If you found any of this useful in your research, please cite the following pape
 
 ```bibtex
 @InProceedings { RE24,
-  author       = "Ruit, Mark van de and Eisemann, Elmar",
+  author       = "van de Ruit, Mark and Eisemann, Elmar",
   title        = "Controlled Spectral Uplifting for Indirect-Light-Metamerism",
   booktitle    = "SIGGRAPH Asia 2024 Conference Papers",
   year         = "2024",
