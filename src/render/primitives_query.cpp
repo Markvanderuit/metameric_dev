@@ -31,10 +31,10 @@ namespace met {
     // Initialize program object
     std::tie(m_cache_key, std::ignore) = m_cache_handle.getw<gl::detail::ProgramCache>().set({ 
       .type       = gl::ShaderType::eCompute,
+      .glsl_path  = "shaders/render/primitive_query_path.comp",
       .spirv_path = "shaders/render/primitive_query_path.comp.spv",
       .cross_path = "shaders/render/primitive_query_path.comp.json",
-      .spec_const = {{ 0u, 256u        },
-                     { 1u, m_max_depth }}
+      .spec_const = {{ 0u, m_max_depth }}
     });
   }
 
@@ -166,9 +166,9 @@ namespace met {
     // Initialize program object
     std::tie(m_cache_key, std::ignore) = m_cache_handle.getw<gl::detail::ProgramCache>().set({ 
       .type       = gl::ShaderType::eCompute,
+      .glsl_path  = "shaders/render/primitive_query_ray.comp",
       .spirv_path = "shaders/render/primitive_query_ray.comp.spv",
-      .cross_path = "shaders/render/primitive_query_ray.comp.json",
-      .spec_const = {{ 0u, 1u }} // Tiny workgroup
+      .cross_path = "shaders/render/primitive_query_ray.comp.json"
     });
   }
   

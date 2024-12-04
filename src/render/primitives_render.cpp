@@ -127,13 +127,12 @@ namespace met {
     // Initialize program object, if it doesn't yet exist
     std::tie(m_cache_key, std::ignore) = m_cache_handle.getw<gl::detail::ProgramCache>().set({ 
       .type       = gl::ShaderType::eCompute,
+      .glsl_path  = "shaders/render/primitive_render_path.comp",
       .spirv_path = "shaders/render/primitive_render_path.comp.spv",
       .cross_path = "shaders/render/primitive_render_path.comp.json",
-      .spec_const = {{ 0u, 16u                     },
-                     { 1u, 16u                     },
-                     { 2u, info.max_depth          },
-                     { 3u, info.enable_alpha       },
-                     { 4u, uint(info.enable_debug) }}
+      .spec_const = {{ 0u, info.max_depth          },
+                     { 1u, info.enable_alpha       },
+                     { 2u, uint(info.enable_debug) }}
     });
 
     // Assign sampler configuration

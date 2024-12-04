@@ -177,11 +177,12 @@ namespace met {
 
       // Build shader in program cache, if it is not loaded already
       auto &cache = scene.m_cache_handle.getw<gl::detail::ProgramCache>();
-      std::tie(m_program_key, std::ignore) = cache.set(
-        {{ .type       = gl::ShaderType::eCompute,
-           .spirv_path = "shaders/scene/bake_texture_brdf.comp.spv",
-           .cross_path = "shaders/scene/bake_texture_brdf.comp.json",
-           .spec_const = {{ 0u, 16u }, { 1u, 16u }} }});
+      std::tie(m_program_key, std::ignore) = cache.set({{ 
+        .type       = gl::ShaderType::eCompute,
+        .glsl_path  = "shaders/scene/bake_texture_brdf.comp",
+        .spirv_path = "shaders/scene/bake_texture_brdf.comp.spv",
+        .cross_path = "shaders/scene/bake_texture_brdf.comp.json",
+      }});
 
       // Initialize uniform buffers and writeable, flushable mappings
       std::tie(m_buffer, m_buffer_map) = gl::Buffer::make_flusheable_object<BlockLayout>();

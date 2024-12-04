@@ -16,18 +16,19 @@
  * 4+ : preprocessor arguments
  */
 int main(int argc, char** argv) {
-  if (argc != 4) {
+  if (argc <= 3) {
     std::cerr << "Failed; argc was: " 
              << argc 
-             << ", but should be 3" 
+             << ", but should be >= 3" 
              << std::endl;
     return EXIT_FAILURE;
   }
 
+  char *fp_i = argv[1];
+  char *fp_o = argv[2];
 
-  char *fp_i    = argv[1];
-  char *fp_incl = argv[2];
-  char *fp_o    = argv[3];
+  int    fp_count = argc - 3;
+  char** fp_incls = argv + 3;
 
   try {
     // Load file; test for success
@@ -41,7 +42,7 @@ int main(int argc, char** argv) {
     }
 
     // Preprocess file
-    char *data_prep = stb_include_string(data_load, nullptr, fp_incl, fp_i, error);
+    char *data_prep = stb_include_string(data_load, fp_incls, fp_count, fp_i, error);
     if (!data_prep) {
       std::cerr << "Failed preprocess; stb_include_string error was: " 
                 << error 

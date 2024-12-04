@@ -6,7 +6,7 @@
 #include <render/load/defaults.glsl>
 
 // General layout rule declarations
-layout(local_size_x_id = 0) in;
+layout(local_size_x = 1) in;
 layout(std140) uniform;
 layout(std430) buffer;
 

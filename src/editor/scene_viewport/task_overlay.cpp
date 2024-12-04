@@ -26,10 +26,12 @@ namespace met {
     // Initialize program object in cache
     std::tie(m_program_key, std::ignore) = info.global("cache").getw<gl::detail::ProgramCache>().set({{ 
       .type       = gl::ShaderType::eVertex,
+      .glsl_path  = "shaders/editor/scene_viewport/draw_paths.vert",
       .spirv_path = "shaders/editor/scene_viewport/draw_paths.vert.spv",
       .cross_path = "shaders/editor/scene_viewport/draw_paths.vert.json"
     }, {
       .type       = gl::ShaderType::eFragment,
+      .glsl_path  = "shaders/editor/scene_viewport/draw_paths.frag",
       .spirv_path = "shaders/editor/scene_viewport/draw_paths.frag.spv",
       .cross_path = "shaders/editor/scene_viewport/draw_paths.frag.json"
     }});

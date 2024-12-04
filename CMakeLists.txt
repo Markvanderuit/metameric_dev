@@ -12,9 +12,9 @@ option(MET_ENABLE_EXCEPTIONS "Enable exceptions on release"  ON)
 option(MET_ENABLE_TRACY      "Enable Tracy support"         OFF)
 
 # Enable all modules in resources/cmake
-include(spirv)
-include(dependency)
 include(metameric_conf)
+include(dependency)
+include(spirv)
 
 # Specify output directories as /bin, /lib, /out, and tell MSVC to stuff it
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)

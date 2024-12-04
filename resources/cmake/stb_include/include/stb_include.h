@@ -40,6 +40,9 @@
 // Do include-processing on the string 'str'. To free the return value, pass it to free()
 char *stb_include_string(char *str, char *inject, char *path_to_includes, char *filename_for_line_directive, char error[256]);
 
+// MODIFICATION; stb_include_string with several include paths, no inject feature
+char *stb_include_string(char *str, char** paths_to_includes, int paths_count, char *filename_for_line_directives, char error[256]);
+
 // Concatenate the strings 'strs' and do include-processing on the result. To free the return value, pass it to free()
 char *stb_include_strings(char **strs, int count, char *inject, char *path_to_includes, char *filename_for_line_directive, char error[256]);
 
@@ -230,6 +233,87 @@ char *stb_include_string(char *str, char *inject, char *path_to_includes, char *
          text = stb_include_append(text, &textlen, inc, strlen(inc));
          free(inc);
       }
+      // write out line directive
+      #ifndef STB_INCLUDE_LINE_NONE
+      strcpy(temp, "\n#line ");
+      stb_include_itoa(temp+6, inc_list[i].next_line_after);
+      strcat(temp, " ");
+      #ifdef STB_INCLUDE_LINE_GLSL
+      stb_include_itoa(temp+15, 0);
+      #else
+      strcat(temp, filename != 0 ? filename : "source-file");
+      #endif
+      text = stb_include_append(text, &textlen, temp, strlen(temp));
+      // no newlines, because we kept the #include newlines, which will get appended next
+      #endif
+      last = inc_list[i].end;
+   }
+   text = stb_include_append(text, &textlen, str+last, source_len - last + 1); // append '\0'
+   stb_include_free_includes(inc_list, num);
+   return text;
+}
+
+char *stb_include_string(char *str, char** paths_to_includes, int paths_count, char *filename, char error[256])
+{
+   char temp[4096];
+   include_info *inc_list;
+   int i, num = stb_include_find_includes(str, &inc_list);
+   size_t source_len = strlen(str);
+   char *text=0;
+   size_t textlen=0, last=0;
+
+   // Iterate include statements
+   for (i=0; i < num; ++i) {
+      text = stb_include_append(text, &textlen, str+last, inc_list[i].offset - last);
+
+      // write out line directive for the include
+      #ifndef STB_INCLUDE_LINE_NONE
+      #ifdef STB_INCLUDE_LINE_GLSL
+      if (textlen != 0)  // GLSL #version must appear first, so don't put a #line at the top
+      #endif
+      {
+         strcpy(temp, "#line ");
+         stb_include_itoa(temp+6, 1);
+         strcat(temp, " ");
+         #ifdef STB_INCLUDE_LINE_GLSL
+         stb_include_itoa(temp+15, i+1);
+         #else
+         strcat(temp, "\"");
+         if (inc_list[i].filename == 0)
+            strcmp(temp, "INJECT");
+         else
+            strcat(temp, inc_list[i].filename);
+         strcat(temp, "\"");
+         #endif
+         strcat(temp, "\n");
+         text = stb_include_append(text, &textlen, temp, strlen(temp));
+      }
+      #endif
+      if (inc_list[i].filename == 0) {
+         // ...
+      } else {
+         char *inc = NULL;
+         char j_error[256];
+
+         // Iterate include paths
+         for (int j = 0; j < paths_count; ++j) {
+            char *path_to_includes = paths_to_includes[j];
+            strcpy(temp, path_to_includes);
+            strcat(temp, "/");
+            strcat(temp, inc_list[i].filename);
+            inc = stb_include_file(temp, NULL, path_to_includes, j_error);
+            if (inc != NULL)
+               break;
+         }
+         if (inc == NULL) {
+            strcpy(error, j_error);
+            stb_include_free_includes(inc_list, num);
+            return NULL;
+         }
+         text = stb_include_append(text, &textlen, inc, strlen(inc));
+         free(inc);
+      }
+
       // write out line directive
       #ifndef STB_INCLUDE_LINE_NONE
       strcpy(temp, "\n#line ");

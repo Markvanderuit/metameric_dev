@@ -9,14 +9,14 @@
 #include <render/load/defaults.glsl>
 
 // General layout rule declarations
-layout(local_size_x_id = 0, local_size_y_id = 1) in;
+layout(local_size_x = 16, local_size_y = 16) in;
 layout(std140) uniform;
 layout(std430) buffer;
 
 // Specialization constant declarations
-layout(constant_id = 2) const uint max_depth = 4;     // Maximum path depth
-layout(constant_id = 3) const bool use_alpha = false; // On initial ray miss, return 0 alpha?
-layout(constant_id = 4) const bool use_debug = false; // Override and enable debug queries
+layout(constant_id = 0) const uint max_depth = 4;     // Maximum path depth
+layout(constant_id = 1) const bool use_alpha = false; // On initial ray miss, return 0 alpha?
+layout(constant_id = 2) const bool use_debug = false; // Override and enable debug queries
 
 struct WavelengthDistribution {
   float func_sum;

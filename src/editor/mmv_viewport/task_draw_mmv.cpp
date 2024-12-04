@@ -115,10 +115,12 @@ namespace met {
     // Initialize program object in cache
     std::tie(m_program_key, std::ignore) = info.global("cache").getw<gl::detail::ProgramCache>().set({{ 
       .type       = gl::ShaderType::eVertex,
+      .glsl_path  = "shaders/editor/mmv_viewport/draw_mmv_hull.vert",
       .spirv_path = "shaders/editor/mmv_viewport/draw_mmv_hull.vert.spv",
       .cross_path = "shaders/editor/mmv_viewport/draw_mmv_hull.vert.json"
     }, {
       .type       = gl::ShaderType::eFragment,
+      .glsl_path  = "shaders/editor/mmv_viewport/draw_mmv_hull.frag",
       .spirv_path = "shaders/editor/mmv_viewport/draw_mmv_hull.frag.spv",
       .cross_path = "shaders/editor/mmv_viewport/draw_mmv_hull.frag.json"
     }});

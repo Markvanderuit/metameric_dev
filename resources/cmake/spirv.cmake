@@ -17,6 +17,24 @@ find_program(spirv-cross      NAMES spirv-cross      PATHS ${bin_tools_path} NO_
 add_executable(stb_include_app                     ${CMAKE_SOURCE_DIR}/resources/cmake/stb_include/stb_include_app.cpp)
 target_include_directories(stb_include_app PRIVATE ${CMAKE_SOURCE_DIR}/resources/cmake/stb_include/include)
 
+# Generate preamble file; we avoid passing preprocessor defines using
+# some precompile step or glslangValidator, as we sometimes don't want
+# to use the spirv pipeline (like on a certain presentation demo on my
+# crappy integrated graphics). Instead, we embed a conf file with defines
+# in preamble.glsl, which the shader includes will be able to find.
+set(met_preamble_file ${CMAKE_BINARY_DIR}/preamble.glsl)
+FILE(WRITE ${met_preamble_file} "#version 460 core
+#define MET_WAVELENGTH_MIN        ${MET_WAVELENGTH_MIN} 
+#define MET_WAVELENGTH_MAX        ${MET_WAVELENGTH_MAX} 
+#define MET_WAVELENGTH_SAMPLES    ${MET_WAVELENGTH_SAMPLES}
+#define MET_WAVELENGTH_BASES      ${MET_WAVELENGTH_BASES} 
+#define MET_SUPPORTED_MESHES      ${MET_SUPPORTED_MESHES}
+#define MET_SUPPORTED_OBJECTS     ${MET_SUPPORTED_OBJECTS}
+#define MET_SUPPORTED_EMITTERS    ${MET_SUPPORTED_EMITTERS}
+#define MET_SUPPORTED_CONSTRAINTS ${MET_SUPPORTED_CONSTRAINTS}
+#define MET_SUPPORTED_TEXTURES    ${MET_SUPPORTED_TEXTURES}
+")
+
 function(compile_glsl_to_spirv input_dir output_dir glsl_path output_dependencies)
   # Obtain filepath, stripped of relative lead (/shaders/render/shader.glsl)
   cmake_path(RELATIVE_PATH glsl_path
@@ -47,24 +65,23 @@ function(compile_glsl_to_spirv input_dir output_dir glsl_path output_dependencie
 
     # First command; parse includes; we avoid use of GL_ARB_shading_language_include as it
     # and glslangvalidator seem to be... finicky?
-    COMMAND stb_include_app ${glsl_path} "${input_dir}/include" ${spv_path_parse}
+    COMMAND stb_include_app ${glsl_path} ${spv_path_parse} "${input_dir}/include" "${CMAKE_BINARY_DIR}"
     
     # Second command; nuke shader cache if one currently exists
     COMMAND ${CMAKE_COMMAND} -E rm -f "${output_dir}/shaders.bin"
 
     # Third command; generate spirv binary using glslangvalidator
     COMMAND ${glslangValidator} 
-            ${spv_path_parse}           # input glsl
-            -o ${spv_path_binary}          # output binary
-            --client opengl100          # create binary under OpenGL semantics
-            --target-env spirv1.5       # execution environment is spirv 1.5
-            ${MET_PREPROCESSOR_DEFINES} # forward -D... arguments
+            ${spv_path_parse}       # input glsl
+            -o ${spv_path_binary}   # output binary
+            --client opengl100      # create binary under OpenGL semantics
+            --target-env spirv1.5   # execution environment is spirv 1.5
 
     # Fourth command; generate reflection information in .json files using spirv-cross
     COMMAND ${spirv-cross} ${spv_path_binary} --output ${spv_path_json} --reflect
 
-    # Fifth command; remove parsed glsl file
-    COMMAND ${CMAKE_COMMAND} -E rm -f ${spv_path_parse}
+    # # Fifth command; remove parsed glsl file
+    # COMMAND ${CMAKE_COMMAND} -E rm -f ${spv_path_parse}
 
     DEPENDS ${glsl_path} ${glsl_includes} stb_include_app
     VERBATIM
