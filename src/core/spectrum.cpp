@@ -1,3 +1,18 @@
+// Copyright (C) 2024 Mark van de Ruit, Delft University of Technology.
+// 
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+// 
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+// 
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 #include <metameric/core/io.hpp>
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/serialization.hpp>
@@ -8,7 +23,8 @@
 
 namespace met {
   namespace models {
-    #include <metameric/core/detail/spectrum_models.ext>
+    // Embed spectrum model data directly
+    #include <metameric/core/detail/ext/spectrum_models.ext>
     
     // Linear color space transformations
     eig::Matrix3f xyz_to_srgb_transform {{ 3.240479f, -1.537150f,-0.498535f },

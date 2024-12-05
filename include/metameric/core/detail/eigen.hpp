@@ -1,20 +1,35 @@
+// Copyright (C) 2024 Mark van de Ruit, Delft University of Technology.
+// 
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+// 
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+// 
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 #pragma once
 
 // Extensions to Eigen's existing classes are inserted through header files
 #ifndef EIGEN_ARRAYBASE_PLUGIN
-  #define EIGEN_ARRAYBASE_PLUGIN  "metameric/core/detail/eigen_arraybase.ext"
+  #define EIGEN_ARRAYBASE_PLUGIN  "metameric/core/detail/ext/eigen_arraybase.ext"
 #endif
 
 #ifndef EIGEN_MATRIXBASE_PLUGIN
-  #define EIGEN_MATRIXBASE_PLUGIN "metameric/core/detail/eigen_matrixbase.ext"
+  #define EIGEN_MATRIXBASE_PLUGIN "metameric/core/detail/ext/eigen_matrixbase.ext"
 #endif
 
 #ifndef EIGEN_ARRAY_PLUGIN
-  #define EIGEN_ARRAY_PLUGIN "metameric/core/detail/eigen_array.ext"
+  #define EIGEN_ARRAY_PLUGIN "metameric/core/detail/ext/eigen_array.ext"
 #endif
 
 #ifndef EIGEN_MATRIX_PLUGIN
-  #define EIGEN_MATRIX_PLUGIN "metameric/core/detail/eigen_matrix.ext"
+  #define EIGEN_MATRIX_PLUGIN "metameric/core/detail/ext/eigen_matrix.ext"
 #endif
 
 #include <Eigen/Dense>
