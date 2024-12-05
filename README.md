@@ -70,7 +70,7 @@ If you found any of this useful in your research, please cite the following pape
 
 ## License and third party software
 
-The source code in this repository is released under the *GNU General Public License Version 3* (GPLv3).
+The software in this repository is released under an open source license, designed for you to use the software in open source or academic environments. If you are interested in obtaining the software under a private commercial license, contact the Delft University of Technology for options.
 
 All third-party software packages used in this repository are governed by their respective licenses. Without the following excellent libraries, this project would not exist:
 [AutoDiff](https://github.com/autodiff/autodiff),
