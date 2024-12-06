@@ -88,7 +88,7 @@ namespace met {
     m_sensor.flush();
 
     // Draw relevant program from cache
-    auto &program = info.global("cache").getw<gl::detail::ProgramCache>().at(m_program_key);
+    auto &program = info.global("cache").getw<gl::ProgramCache>().at(m_program_key);
 
     // Prepare program state
     program.bind();
@@ -128,7 +128,7 @@ namespace met {
     met_trace_full();
     
     // Initialize program object in cache
-    std::tie(m_program_key, std::ignore) = info.global("cache").getw<gl::detail::ProgramCache>().set({{ 
+    std::tie(m_program_key, std::ignore) = info.global("cache").getw<gl::ProgramCache>().set({{ 
       .type       = gl::ShaderType::eVertex,
       .glsl_path  = "shaders/editor/mmv_viewport/draw_mmv_hull.vert",
       .spirv_path = "shaders/editor/mmv_viewport/draw_mmv_hull.vert.spv",

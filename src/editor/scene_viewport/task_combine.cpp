@@ -31,7 +31,7 @@ namespace met {
     met_trace_full();
 
     // Initialize program object in cache
-    std::tie(m_program_key, std::ignore) = info.global("cache").getw<gl::detail::ProgramCache>().set({{ 
+    std::tie(m_program_key, std::ignore) = info.global("cache").getw<gl::ProgramCache>().set({{ 
       .type       = gl::ShaderType::eCompute,
       .glsl_path  = "shaders/editor/scene_viewport/combine.comp",
       .spirv_path = "shaders/editor/scene_viewport/combine.comp.spv",
@@ -61,7 +61,7 @@ namespace met {
     m_unif_buffer.flush();
     
     // Draw relevant program from cache
-    auto &program = info.global("cache").getw<gl::detail::ProgramCache>().at(m_program_key);
+    auto &program = info.global("cache").getw<gl::ProgramCache>().at(m_program_key);
 
     // Bind required resources to their corresponding targets
     program.bind("b_buff_unif",  m_unif_buffer);

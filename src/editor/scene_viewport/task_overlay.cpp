@@ -39,7 +39,7 @@ namespace met {
     met_trace_full();
 
     // Initialize program object in cache
-    std::tie(m_program_key, std::ignore) = info.global("cache").getw<gl::detail::ProgramCache>().set({{ 
+    std::tie(m_program_key, std::ignore) = info.global("cache").getw<gl::ProgramCache>().set({{ 
       .type       = gl::ShaderType::eVertex,
       .glsl_path  = "shaders/editor/scene_viewport/draw_paths.vert",
       .spirv_path = "shaders/editor/scene_viewport/draw_paths.vert.spv",
@@ -312,7 +312,7 @@ namespace met {
     guard(!e_query.data().empty());
     
     // Draw relevant program from cache
-    auto &program = info.global("cache").getw<gl::detail::ProgramCache>().at(m_program_key);
+    auto &program = info.global("cache").getw<gl::ProgramCache>().at(m_program_key);
 
     // Prepare draw state
     gl::state::set_viewport(i_target.size());    

@@ -17,7 +17,6 @@
 #include <metameric/core/ranges.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/render/primitives_render.hpp>
-#include <small_gl/detail/program_cache.hpp>
 
 namespace met {
   namespace detail {
@@ -140,7 +139,7 @@ namespace met {
     met_trace_full();
 
     // Initialize program object, if it doesn't yet exist
-    std::tie(m_cache_key, std::ignore) = m_cache_handle.getw<gl::detail::ProgramCache>().set({ 
+    std::tie(m_cache_key, std::ignore) = m_cache_handle.getw<gl::ProgramCache>().set({ 
       .type       = gl::ShaderType::eCompute,
       .glsl_path  = "shaders/render/primitive_render_path.comp",
       .spirv_path = "shaders/render/primitive_render_path.comp.spv",
@@ -197,7 +196,7 @@ namespace met {
     guard(has_next_sample_state(), m_film);
 
     // Draw relevant program from cache
-    auto &program = m_cache_handle.getw<gl::detail::ProgramCache>().at(m_cache_key);
+    auto &program = m_cache_handle.getw<gl::ProgramCache>().at(m_cache_key);
 
     // Bind required resources to their corresponding targets
     program.bind();

@@ -191,7 +191,7 @@ namespace met {
       met_trace_full();
 
       // Build shader in program cache, if it is not loaded already
-      auto &cache = scene.m_cache_handle.getw<gl::detail::ProgramCache>();
+      auto &cache = scene.m_cache_handle.getw<gl::ProgramCache>();
       std::tie(m_program_key, std::ignore) = cache.set({{ 
         .type       = gl::ShaderType::eCompute,
         .glsl_path  = "shaders/scene/bake_texture_brdf.comp",
@@ -236,7 +236,7 @@ namespace met {
       guard(is_active);
 
       // Get relevant program handle, bind, then bind resources to corresponding targets
-      auto &cache = scene.m_cache_handle.getw<gl::detail::ProgramCache>();
+      auto &cache = scene.m_cache_handle.getw<gl::ProgramCache>();
       auto &program = cache.at(m_program_key);
       program.bind();
       program.bind("b_buff_unif",       m_buffer);

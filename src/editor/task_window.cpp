@@ -26,7 +26,6 @@
 #include <small_gl/buffer.hpp>
 #include <small_gl/program.hpp>
 #include <small_gl/window.hpp>
-#include <small_gl/detail/program_cache.hpp>
 #include <string>
 
 namespace met {

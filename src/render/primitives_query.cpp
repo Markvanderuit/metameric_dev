@@ -17,7 +17,6 @@
 #include <metameric/core/ranges.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/render/primitives_query.hpp>
-#include <small_gl/detail/program_cache.hpp>
 
 namespace met {
   namespace detail {
@@ -44,7 +43,7 @@ namespace met {
     met_trace_full();
 
     // Initialize program object
-    std::tie(m_cache_key, std::ignore) = m_cache_handle.getw<gl::detail::ProgramCache>().set({ 
+    std::tie(m_cache_key, std::ignore) = m_cache_handle.getw<gl::ProgramCache>().set({ 
       .type       = gl::ShaderType::eCompute,
       .glsl_path  = "shaders/render/primitive_query_path.comp",
       .spirv_path = "shaders/render/primitive_query_path.comp.spv",
@@ -121,7 +120,7 @@ namespace met {
     m_query.flush();
 
     // Draw relevant program from cache
-    auto &program = m_cache_handle.getw<gl::detail::ProgramCache>().at(m_cache_key);
+    auto &program = m_cache_handle.getw<gl::ProgramCache>().at(m_cache_key);
 
     // Bind required resources to their corresponding targets
     program.bind();
@@ -179,7 +178,7 @@ namespace met {
     met_trace_full();
 
     // Initialize program object
-    std::tie(m_cache_key, std::ignore) = m_cache_handle.getw<gl::detail::ProgramCache>().set({ 
+    std::tie(m_cache_key, std::ignore) = m_cache_handle.getw<gl::ProgramCache>().set({ 
       .type       = gl::ShaderType::eCompute,
       .glsl_path  = "shaders/render/primitive_query_ray.comp",
       .spirv_path = "shaders/render/primitive_query_ray.comp.spv",
@@ -201,7 +200,7 @@ namespace met {
     }
 
     // Draw relevant program from cache
-    auto &program = m_cache_handle.getw<gl::detail::ProgramCache>().at(m_cache_key);
+    auto &program = m_cache_handle.getw<gl::ProgramCache>().at(m_cache_key);
 
     // Bind required resources to their corresponding targets
     program.bind();

@@ -25,7 +25,6 @@
 #include <small_gl/sampler.hpp>
 #include <small_gl/texture.hpp>
 #include <small_gl/utility.hpp>
-#include <small_gl/detail/program_cache.hpp>
 
 namespace met::detail {
   // Helper object for creating viewport begin/image/end tasks
@@ -184,7 +183,7 @@ namespace met::detail {
       met_trace_full();
     
       // Initialize program object in cache
-      std::tie(m_program_key, std::ignore) = info.global("cache").getw<gl::detail::ProgramCache>().set({{ 
+      std::tie(m_program_key, std::ignore) = info.global("cache").getw<gl::ProgramCache>().set({{ 
         .type       = gl::ShaderType::eCompute,
         .glsl_path  = "shaders/editor/detail/texture_resample.comp",
         .spirv_path = "shaders/editor/detail/texture_resample.comp.spv",
@@ -224,7 +223,7 @@ namespace met::detail {
         }
 
         // Draw relevant program from cache
-        auto &program = info.global("cache").getw<gl::detail::ProgramCache>().at(m_program_key);
+        auto &program = info.global("cache").getw<gl::ProgramCache>().at(m_program_key);
 
         // Bind image/sampler resources and program
         program.bind();

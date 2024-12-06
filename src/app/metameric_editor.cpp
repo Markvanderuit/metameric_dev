@@ -18,9 +18,7 @@
 #include <metameric/editor/schedule.hpp>
 #include <small_gl/window.hpp>
 #include <small_gl/program.hpp>
-#include <small_gl/detail/program_cache.hpp>
 #include <cstdlib>
-#include <exception>
 
 namespace met {
   constexpr auto window_flags 
@@ -71,9 +69,9 @@ namespace met {
 
     // Initialize program cache as resource owned by the scheduler;
     // load from file if a path is specified
-    scheduler.global("cache").set<gl::detail::ProgramCache>({ });
+    scheduler.global("cache").set<gl::ProgramCache>({ });
     if (!info.shader_path.empty() && fs::exists(info.shader_path))
-      scheduler.global("cache").getw<gl::detail::ProgramCache>().load(info.shader_path);
+      scheduler.global("cache").getw<gl::ProgramCache>().load(info.shader_path);
 
     // Initialize scene data as resources owned by the scheduler
     // load from file if a path is specified
@@ -88,7 +86,7 @@ namespace met {
 
     // Attempt to save shader cache, if exists
     if (!info.shader_path.empty())
-      scheduler.global("cache").getr<gl::detail::ProgramCache>().save(info.shader_path);
+      scheduler.global("cache").getr<gl::ProgramCache>().save(info.shader_path);
   }
 } // namespace met
 
