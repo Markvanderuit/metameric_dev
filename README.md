@@ -3,7 +3,7 @@
 ![teaser_1](/resources//assets/teaser_1.png)
 
 
-This repository contains the source code of our spectral uplifting editor *Metameric*, which accompanies our recent paper "**Controlled Spectral Uplifting for Indirect-Light-Metamerism**" ([paper](), [author](https://publications.graphics.tudelft.nl/papers/804), [proceedings](https://dx.doi.org/https://doi.org/10.1145/3680528.3687698)), presented at Siggraph Asia 2024.
+This repository contains the source code of our spectral uplifting editor *Metameric*, which accompanies our recent paper "**Controlled Spectral Uplifting for Indirect-Light-Metamerism**" ([paper](https://publications.graphics.tudelft.nl/papers/804), [author](https://markvanderuit.nl/publications/2024-11-19-paper-spectral), [proceedings](https://dx.doi.org/https://doi.org/10.1145/3680528.3687698)), presented at Siggraph Asia 2024.
 
 With this demo editor, we show how artist-controllable spectral uplifting might be a great addition to the artist toolbox. Our method allows us to use (and misuse) spectral metamerism. In a spectral renderer with color-to-spectral uplifting, the color behavior of scene objects is dependent on an extremely underdetermined uplifting process. We use this to change the uplifted appearance of objects under complex indirect illumination, while keeping input colors intact.
 We include several [example scenes](./scenes) with different spectral behaviors, and provide windows/linux builds (that might even work sometimes!) on the [releases page](github.com/markvanderuit/metameric_dev/releases/latest).
