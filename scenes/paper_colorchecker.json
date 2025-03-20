@@ -1,0 +1,1133 @@
+{
+  "emitters": [
+    {
+      "name": "Default emitter",
+      "value": {
+        "illuminant_i": 1,
+        "illuminant_scale": 1.0,
+        "is_active": true,
+        "transform": {
+          "position": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "rotation": [
+            0.0,
+            1.5707963705062866,
+            0.0
+          ],
+          "scaling": [
+            0.5,
+            0.5,
+            0.5
+          ]
+        },
+        "type": 0
+      }
+    }
+  ],
+  "objects": [
+    {
+      "name": "Plane",
+      "value": {
+        "brdf_type": 1,
+        "diffuse": {
+          "index": 0,
+          "variant": [
+            0.5,
+            0.5,
+            0.5
+          ]
+        },
+        "is_active": true,
+        "mesh_i": 0,
+        "metallic": {
+          "index": 0,
+          "variant": 0.0
+        },
+        "roughness": {
+          "index": 0,
+          "variant": 0.10000000149011612
+        },
+        "transform": {
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "rotation": [
+            0.0,
+            -1.5707963705062866,
+            0.0
+          ],
+          "scaling": [
+            1.5,
+            1.0,
+            1.0
+          ]
+        },
+        "uplifting_i": 0
+      }
+    },
+    {
+      "name": "00",
+      "value": {
+        "brdf_type": 1,
+        "diffuse": {
+          "index": 0,
+          "variant": [
+            0.17144109308719635,
+            0.08437621593475342,
+            0.05780543386936188
+          ]
+        },
+        "is_active": true,
+        "mesh_i": 0,
+        "metallic": {
+          "index": 0,
+          "variant": 0.0
+        },
+        "roughness": {
+          "index": 0,
+          "variant": 0.10000000149011612
+        },
+        "transform": {
+          "position": [
+            -1.25,
+            0.009999999776482582,
+            -0.75
+          ],
+          "rotation": [
+            0.0,
+            -1.5707963705062866,
+            0.0
+          ],
+          "scaling": [
+            0.25,
+            0.25,
+            0.25
+          ]
+        },
+        "uplifting_i": 0
+      }
+    },
+    {
+      "name": "01",
+      "value": {
+        "brdf_type": 1,
+        "diffuse": {
+          "index": 0,
+          "variant": [
+            0.7156936526298523,
+            0.19806930422782898,
+            0.027320891618728638
+          ]
+        },
+        "is_active": true,
+        "mesh_i": 0,
+        "metallic": {
+          "index": 0,
+          "variant": 0.0
+        },
+        "roughness": {
+          "index": 0,
+          "variant": 0.10000000149011612
+        },
+        "transform": {
+          "position": [
+            -1.25,
+            0.009999999776482582,
+            -0.25
+          ],
+          "rotation": [
+            0.0,
+            -1.5707963705062866,
+            0.0
+          ],
+          "scaling": [
+            0.25,
+            0.25,
+            0.25
+          ]
+        },
+        "uplifting_i": 0
+      }
+    },
+    {
+      "name": "02",
+      "value": {
+        "brdf_type": 1,
+        "diffuse": {
+          "index": 0,
+          "variant": [
+            0.023153364658355713,
+            0.04970656335353851,
+            0.29177069664001465
+          ]
+        },
+        "is_active": true,
+        "mesh_i": 0,
+        "metallic": {
+          "index": 0,
+          "variant": 0.0
+        },
+        "roughness": {
+          "index": 0,
+          "variant": 0.10000000149011612
+        },
+        "transform": {
+          "position": [
+            -1.25,
+            0.009999999776482582,
+            0.25
+          ],
+          "rotation": [
+            0.0,
+            -1.5707963705062866,
+            0.0
+          ],
+          "scaling": [
+            0.25,
+            0.25,
+            0.25
+          ]
+        },
+        "uplifting_i": 0
+      }
+    },
+    {
+      "name": "03",
+      "value": {
+        "brdf_type": 1,
+        "diffuse": {
+          "index": 0,
+          "variant": [
+            0.9130986928939819,
+            0.9130986928939819,
+            0.8713672161102295
+          ]
+        },
+        "is_active": true,
+        "mesh_i": 0,
+        "metallic": {
+          "index": 0,
+          "variant": 0.0
+        },
+        "roughness": {
+          "index": 0,
+          "variant": 0.10000000149011612
+        },
+        "transform": {
+          "position": [
+            -1.25,
+            0.009999999776482582,
+            0.75
+          ],
+          "rotation": [
+            0.0,
+            -1.5707963705062866,
+            0.0
+          ],
+          "scaling": [
+            0.25,
+            0.25,
+            0.25
+          ]
+        },
+        "uplifting_i": 0
+      }
+    },
+    {
+      "name": "10",
+      "value": {
+        "brdf_type": 1,
+        "diffuse": {
+          "index": 0,
+          "variant": [
+            0.5457245707511902,
+            0.3005438446998596,
+            0.2158605307340622
+          ]
+        },
+        "is_active": true,
+        "mesh_i": 0,
+        "metallic": {
+          "index": 0,
+          "variant": 0.0
+        },
+        "roughness": {
+          "index": 0,
+          "variant": 0.10000000149011612
+        },
+        "transform": {
+          "position": [
+            -0.75,
+            0.009999999776482582,
+            -0.75
+          ],
+          "rotation": [
+            0.0,
+            -1.5707963705062866,
+            0.0
+          ],
+          "scaling": [
+            0.25,
+            0.25,
+            0.25
+          ]
+        },
+        "uplifting_i": 0
+      }
+    },
+    {
+      "name": "11",
+      "value": {
+        "brdf_type": 1,
+        "diffuse": {
+          "index": 0,
+          "variant": [
+            0.06480327993631363,
+            0.10702311247587204,
+            0.3915725648403168
+          ]
+        },
+        "is_active": true,
+        "mesh_i": 0,
+        "metallic": {
+          "index": 0,
+          "variant": 0.0
+        },
+        "roughness": {
+          "index": 0,
+          "variant": 0.10000000149011612
+        },
+        "transform": {
+          "position": [
+            -0.75,
+            0.009999999776482582,
+            -0.25
+          ],
+          "rotation": [
+            0.0,
+            -1.5707963705062866,
+            0.0
+          ],
+          "scaling": [
+            0.25,
+            0.25,
+            0.25
+          ]
+        },
+        "uplifting_i": 0
+      }
+    },
+    {
+      "name": "12",
+      "value": {
+        "brdf_type": 1,
+        "diffuse": {
+          "index": 0,
+          "variant": [
+            0.06480327993631363,
+            0.3005438446998596,
+            0.06480327993631363
+          ]
+        },
+        "is_active": true,
+        "mesh_i": 0,
+        "metallic": {
+          "index": 0,
+          "variant": 0.0
+        },
+        "roughness": {
+          "index": 0,
+          "variant": 0.10000000149011612
+        },
+        "transform": {
+          "position": [
+            -0.75,
+            0.009999999776482582,
+            0.25
+          ],
+          "rotation": [
+            0.0,
+            -1.5707963705062866,
+            0.0
+          ],
+          "scaling": [
+            0.25,
+            0.25,
+            0.25
+          ]
+        },
+        "uplifting_i": 0
+      }
+    },
+    {
+      "name": "13",
+      "value": {
+        "brdf_type": 1,
+        "diffuse": {
+          "index": 0,
+          "variant": [
+            0.5840784907341003,
+            0.590618908405304,
+            0.5840784907341003
+          ]
+        },
+        "is_active": true,
+        "mesh_i": 0,
+        "metallic": {
+          "index": 0,
+          "variant": 0.0
+        },
+        "roughness": {
+          "index": 0,
+          "variant": 0.10000000149011612
+        },
+        "transform": {
+          "position": [
+            -0.75,
+            0.009999999776482582,
+            0.75
+          ],
+          "rotation": [
+            0.0,
+            -1.5707963705062866,
+            0.0
+          ],
+          "scaling": [
+            0.25,
+            0.25,
+            0.25
+          ]
+        },
+        "uplifting_i": 0
+      }
+    },
+    {
+      "name": "20",
+      "value": {
+        "brdf_type": 1,
+        "diffuse": {
+          "index": 0,
+          "variant": [
+            0.1094617173075676,
+            0.19806930422782898,
+            0.33716365694999695
+          ]
+        },
+        "is_active": true,
+        "mesh_i": 0,
+        "metallic": {
+          "index": 0,
+          "variant": 0.0
+        },
+        "roughness": {
+          "index": 0,
+          "variant": 0.10000000149011612
+        },
+        "transform": {
+          "position": [
+            -0.25,
+            0.009999999776482582,
+            -0.75
+          ],
+          "rotation": [
+            0.0,
+            -1.5707963705062866,
+            0.0
+          ],
+          "scaling": [
+            0.25,
+            0.25,
+            0.25
+          ]
+        },
+        "uplifting_i": 0
+      }
+    },
+    {
+      "name": "21",
+      "value": {
+        "brdf_type": 1,
+        "diffuse": {
+          "index": 0,
+          "variant": [
+            0.5394796133041382,
+            0.08865560591220856,
+            0.11953843384981155
+          ]
+        },
+        "is_active": true,
+        "mesh_i": 0,
+        "metallic": {
+          "index": 0,
+          "variant": 0.0
+        },
+        "roughness": {
+          "index": 0,
+          "variant": 0.10000000149011612
+        },
+        "transform": {
+          "position": [
+            -0.25,
+            0.009999999776482582,
+            -0.25
+          ],
+          "rotation": [
+            0.0,
+            -1.5707963705062866,
+            0.0
+          ],
+          "scaling": [
+            0.25,
+            0.25,
+            0.25
+          ]
+        },
+        "uplifting_i": 0
+      }
+    },
+    {
+      "name": "22",
+      "value": {
+        "brdf_type": 1,
+        "diffuse": {
+          "index": 0,
+          "variant": [
+            0.4286905527114868,
+            0.03189602866768837,
+            0.040915198624134064
+          ]
+        },
+        "is_active": true,
+        "mesh_i": 0,
+        "metallic": {
+          "index": 0,
+          "variant": 0.0
+        },
+        "roughness": {
+          "index": 0,
+          "variant": 0.10000000149011612
+        },
+        "transform": {
+          "position": [
+            -0.25,
+            0.009999999776482582,
+            0.25
+          ],
+          "rotation": [
+            0.0,
+            -1.5707963705062866,
+            0.0
+          ],
+          "scaling": [
+            0.25,
+            0.25,
+            0.25
+          ]
+        },
+        "uplifting_i": 0
+      }
+    },
+    {
+      "name": "23",
+      "value": {
+        "brdf_type": 1,
+        "diffuse": {
+          "index": 0,
+          "variant": [
+            0.3564002513885498,
+            0.3613068759441376,
+            0.3613068759441376
+          ]
+        },
+        "is_active": true,
+        "mesh_i": 0,
+        "metallic": {
+          "index": 0,
+          "variant": 0.0
+        },
+        "roughness": {
+          "index": 0,
+          "variant": 0.10000000149011612
+        },
+        "transform": {
+          "position": [
+            -0.25,
+            0.009999999776482582,
+            0.75
+          ],
+          "rotation": [
+            0.0,
+            -1.5707963705062866,
+            0.0
+          ],
+          "scaling": [
+            0.25,
+            0.25,
+            0.25
+          ]
+        },
+        "uplifting_i": 0
+      }
+    },
+    {
+      "name": "30",
+      "value": {
+        "brdf_type": 1,
+        "diffuse": {
+          "index": 0,
+          "variant": [
+            0.10461649298667908,
+            0.14995980262756348,
+            0.05286065489053726
+          ]
+        },
+        "is_active": true,
+        "mesh_i": 0,
+        "metallic": {
+          "index": 0,
+          "variant": 0.0
+        },
+        "roughness": {
+          "index": 0,
+          "variant": 0.10000000149011612
+        },
+        "transform": {
+          "position": [
+            0.25,
+            0.009999999776482582,
+            -0.75
+          ],
+          "rotation": [
+            0.0,
+            -1.5707963705062866,
+            0.0
+          ],
+          "scaling": [
+            0.25,
+            0.25,
+            0.25
+          ]
+        },
+        "uplifting_i": 0
+      }
+    },
+    {
+      "name": "31",
+      "value": {
+        "brdf_type": 1,
+        "diffuse": {
+          "index": 0,
+          "variant": [
+            0.10461649298667908,
+            0.04373502731323242,
+            0.1384316235780716
+          ]
+        },
+        "is_active": true,
+        "mesh_i": 0,
+        "metallic": {
+          "index": 0,
+          "variant": 0.0
+        },
+        "roughness": {
+          "index": 0,
+          "variant": 0.10000000149011612
+        },
+        "transform": {
+          "position": [
+            0.25,
+            0.009999999776482582,
+            -0.25
+          ],
+          "rotation": [
+            0.0,
+            -1.5707963705062866,
+            0.0
+          ],
+          "scaling": [
+            0.25,
+            0.25,
+            0.25
+          ]
+        },
+        "uplifting_i": 0
+      }
+    },
+    {
+      "name": "32",
+      "value": {
+        "brdf_type": 1,
+        "diffuse": {
+          "index": 0,
+          "variant": [
+            0.854992687702179,
+            0.5775805115699768,
+            0.008023192174732685
+          ]
+        },
+        "is_active": true,
+        "mesh_i": 0,
+        "metallic": {
+          "index": 0,
+          "variant": 0.0
+        },
+        "roughness": {
+          "index": 0,
+          "variant": 0.10000000149011612
+        },
+        "transform": {
+          "position": [
+            0.25,
+            0.009999999776482582,
+            0.25
+          ],
+          "rotation": [
+            0.0,
+            -1.5707963705062866,
+            0.0
+          ],
+          "scaling": [
+            0.25,
+            0.25,
+            0.25
+          ]
+        },
+        "uplifting_i": 0
+      }
+    },
+    {
+      "name": "33",
+      "value": {
+        "brdf_type": 1,
+        "diffuse": {
+          "index": 0,
+          "variant": [
+            0.18782076239585876,
+            0.19120167195796967,
+            0.19120167195796967
+          ]
+        },
+        "is_active": true,
+        "mesh_i": 0,
+        "metallic": {
+          "index": 0,
+          "variant": 0.0
+        },
+        "roughness": {
+          "index": 0,
+          "variant": 0.10000000149011612
+        },
+        "transform": {
+          "position": [
+            0.25,
+            0.009999999776482582,
+            0.75
+          ],
+          "rotation": [
+            0.0,
+            -1.5707963705062866,
+            0.0
+          ],
+          "scaling": [
+            0.25,
+            0.25,
+            0.25
+          ]
+        },
+        "uplifting_i": 0
+      }
+    },
+    {
+      "name": "40",
+      "value": {
+        "brdf_type": 1,
+        "diffuse": {
+          "index": 0,
+          "variant": [
+            0.22322797775268555,
+            0.2195262312889099,
+            0.4286905527114868
+          ]
+        },
+        "is_active": true,
+        "mesh_i": 0,
+        "metallic": {
+          "index": 0,
+          "variant": 0.0
+        },
+        "roughness": {
+          "index": 0,
+          "variant": 0.10000000149011612
+        },
+        "transform": {
+          "position": [
+            0.75,
+            0.009999999776482582,
+            -0.75
+          ],
+          "rotation": [
+            0.0,
+            -1.5707963705062866,
+            0.0
+          ],
+          "scaling": [
+            0.25,
+            0.25,
+            0.25
+          ]
+        },
+        "uplifting_i": 0
+      }
+    },
+    {
+      "name": "41",
+      "value": {
+        "brdf_type": 1,
+        "diffuse": {
+          "index": 0,
+          "variant": [
+            0.3564002513885498,
+            0.5088814496994019,
+            0.04817182198166847
+          ]
+        },
+        "is_active": true,
+        "mesh_i": 0,
+        "metallic": {
+          "index": 0,
+          "variant": 0.0
+        },
+        "roughness": {
+          "index": 0,
+          "variant": 0.10000000149011612
+        },
+        "transform": {
+          "position": [
+            0.75,
+            0.009999999776482582,
+            -0.25
+          ],
+          "rotation": [
+            0.0,
+            -1.5707963705062866,
+            0.0
+          ],
+          "scaling": [
+            0.25,
+            0.25,
+            0.25
+          ]
+        },
+        "uplifting_i": 0
+      }
+    },
+    {
+      "name": "42",
+      "value": {
+        "brdf_type": 1,
+        "diffuse": {
+          "index": 0,
+          "variant": [
+            0.5028865933418274,
+            0.08865560591220856,
+            0.304987370967865
+          ]
+        },
+        "is_active": true,
+        "mesh_i": 0,
+        "metallic": {
+          "index": 0,
+          "variant": 0.0
+        },
+        "roughness": {
+          "index": 0,
+          "variant": 0.10000000149011612
+        },
+        "transform": {
+          "position": [
+            0.75,
+            0.009999999776482582,
+            0.25
+          ],
+          "rotation": [
+            0.0,
+            -1.5707963705062866,
+            0.0
+          ],
+          "scaling": [
+            0.25,
+            0.25,
+            0.25
+          ]
+        },
+        "uplifting_i": 0
+      }
+    },
+    {
+      "name": "43",
+      "value": {
+        "brdf_type": 1,
+        "diffuse": {
+          "index": 0,
+          "variant": [
+            0.08650046586990356,
+            0.09084173291921616,
+            0.09084173291921616
+          ]
+        },
+        "is_active": true,
+        "mesh_i": 0,
+        "metallic": {
+          "index": 0,
+          "variant": 0.0
+        },
+        "roughness": {
+          "index": 0,
+          "variant": 0.10000000149011612
+        },
+        "transform": {
+          "position": [
+            0.75,
+            0.009999999776482582,
+            0.75
+          ],
+          "rotation": [
+            0.0,
+            -1.5707963705062866,
+            0.0
+          ],
+          "scaling": [
+            0.25,
+            0.25,
+            0.25
+          ]
+        },
+        "uplifting_i": 0
+      }
+    },
+    {
+      "name": "50",
+      "value": {
+        "brdf_type": 1,
+        "diffuse": {
+          "index": 0,
+          "variant": [
+            0.1247718408703804,
+            0.5209956765174866,
+            0.4072403013706207
+          ]
+        },
+        "is_active": true,
+        "mesh_i": 0,
+        "metallic": {
+          "index": 0,
+          "variant": 0.0
+        },
+        "roughness": {
+          "index": 0,
+          "variant": 0.10000000149011612
+        },
+        "transform": {
+          "position": [
+            1.25,
+            0.009999999776482582,
+            -0.75
+          ],
+          "rotation": [
+            0.0,
+            -1.5707963705062866,
+            0.0
+          ],
+          "scaling": [
+            0.25,
+            0.25,
+            0.25
+          ]
+        },
+        "uplifting_i": 0
+      }
+    },
+    {
+      "name": "51",
+      "value": {
+        "brdf_type": 1,
+        "diffuse": {
+          "index": 0,
+          "variant": [
+            0.7835379242897034,
+            0.3564002513885498,
+            0.021219009533524513
+          ]
+        },
+        "is_active": true,
+        "mesh_i": 0,
+        "metallic": {
+          "index": 0,
+          "variant": 0.0
+        },
+        "roughness": {
+          "index": 0,
+          "variant": 0.10000000149011612
+        },
+        "transform": {
+          "position": [
+            1.25,
+            0.009999999776482582,
+            -0.25
+          ],
+          "rotation": [
+            0.0,
+            -1.5707963705062866,
+            0.0
+          ],
+          "scaling": [
+            0.25,
+            0.25,
+            0.25
+          ]
+        },
+        "uplifting_i": 0
+      }
+    },
+    {
+      "name": "52",
+      "value": {
+        "brdf_type": 1,
+        "diffuse": {
+          "index": 0,
+          "variant": [
+            0.0,
+            0.2501583695411682,
+            0.3813261091709137
+          ]
+        },
+        "is_active": true,
+        "mesh_i": 0,
+        "metallic": {
+          "index": 0,
+          "variant": 0.0
+        },
+        "roughness": {
+          "index": 0,
+          "variant": 0.10000000149011612
+        },
+        "transform": {
+          "position": [
+            1.25,
+            0.009999999776482582,
+            0.25
+          ],
+          "rotation": [
+            0.0,
+            -1.5707963705062866,
+            0.0
+          ],
+          "scaling": [
+            0.25,
+            0.25,
+            0.25
+          ]
+        },
+        "uplifting_i": 0
+      }
+    },
+    {
+      "name": "53",
+      "value": {
+        "brdf_type": 1,
+        "diffuse": {
+          "index": 0,
+          "variant": [
+            0.03189602866768837,
+            0.03189602866768837,
+            0.03310476243495941
+          ]
+        },
+        "is_active": true,
+        "mesh_i": 0,
+        "metallic": {
+          "index": 0,
+          "variant": 0.0
+        },
+        "roughness": {
+          "index": 0,
+          "variant": 0.10000000149011612
+        },
+        "transform": {
+          "position": [
+            1.25,
+            0.009999999776482582,
+            0.75
+          ],
+          "rotation": [
+            0.0,
+            -1.5707963705062866,
+            0.0
+          ],
+          "scaling": [
+            0.25,
+            0.25,
+            0.25
+          ]
+        },
+        "uplifting_i": 0
+      }
+    }
+  ],
+  "settings": {
+    "name": "Settings",
+    "value": {
+      "renderer_type": 0,
+      "texture_size": 1,
+      "view_i": 0,
+      "view_scale": 0.5
+    }
+  },
+  "upliftings": [
+    {
+      "name": "Default uplifting",
+      "value": {
+        "basis_i": 0,
+        "illuminant_i": 0,
+        "observer_i": 0,
+        "verts": []
+      }
+    }
+  ],
+  "views": [
+    {
+      "name": "Default view",
+      "value": {
+        "camera_fov_y": 90.0,
+        "camera_trf": {
+          "position": [
+            0.0,
+            0.9990000128746033,
+            0.0
+          ],
+          "rotation": [
+            0.0,
+            1.5709999799728394,
+            0.0
+          ],
+          "scaling": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        "draw_frustrum": false,
+        "film_size": [
+          768,
+          512
+        ],
+        "observer_i": 0
+      }
+    }
+  ]
+}

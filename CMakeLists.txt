@@ -71,15 +71,9 @@ met_add_shader_target(metameric_shaders
 )
 
 # Add target metameric_data_copy; copies contents of /resources/data to /bin/data
+# as these are needed for running the editor
 met_add_folder_copy_target(metameric_data_copy 
   ${CMAKE_CURRENT_SOURCE_DIR}/resources/data
-  ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/data
-)
-
-# Add target metameric_scene_copy; copies contents  of /scene/cornell_box to /bin/data. 
-# This scene is loaded on program startup for demo purposes
-met_add_folder_copy_target(metameric_scene_copy 
-  ${CMAKE_CURRENT_SOURCE_DIR}/scenes/cornell_box
   ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/data
 )
 
@@ -128,6 +122,6 @@ target_link_libraries(editor
 
 # Setup editor executable
 add_executable(metameric_editor src/app/metameric_editor.cpp)
-add_dependencies(metameric_editor metameric_scene_copy metameric_data_copy embree_copy)
+add_dependencies(metameric_editor metameric_data_copy embree_copy)
 target_compile_features(metameric_editor PUBLIC cxx_std_23)
 target_link_libraries(metameric_editor PRIVATE core scene render editor)
