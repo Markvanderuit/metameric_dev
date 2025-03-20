@@ -365,13 +365,14 @@ namespace met {
 
       // Last parts before mismatch volume editor is spawned
       if (vert.has_mismatching(e_scene, uplf.value)) {
-        // Visual separator from editing components drawn in previous tasks
-        ImGui::SeparatorText("Mismatch editor");
 
         // Show optional color patches
         const auto &e_patches = info.relative("viewport_gen_patches")("patches")
                                     .template getr<std::vector<Colr>>();
         if (!e_patches.empty()) {
+          // Visual separator from editing components drawn in previous tasks
+          ImGui::SeparatorText("Mismatch color samples");
+          
           for (uint i = 0; i < e_patches.size(); ++i) {
             // Wrap around if we are out of line space
             if (ImGui::GetContentRegionAvail().x < 32.f)
@@ -387,6 +388,9 @@ namespace met {
               ImGui::SameLine();
           } // for (uint i)
         }
+        
+        // Visual separator from editing components drawn in previous tasks
+        ImGui::SeparatorText("Mismatch color volume");
       }
     });
   }

@@ -121,7 +121,7 @@ namespace met {
         for (uint j = 0; j < reconstruction.size(); ++j) {
           if (bits[j]) {
             sr.power++;
-            sr.values *= reconstruction[j].a;          // a_i
+            sr.values *= reconstruction[j].a;         // a_i
           } else {
             sr.values *= reconstruction[j].remainder; // w_i
           }

@@ -66,54 +66,49 @@ namespace met {
     info("patches").set(std::vector<Colr>()); // Make shared resource available
   }
   
-  void GenPatchesTask::eval(SchedulerHandle &info) {
+  // Helper function; given a convex hull with delaunay interior, sample n_samples positions
+  // in the hull interior
+  std::vector<Colr> sample_hull_interior_positions(const ConvexHull &chull, uint n_samples) {
     met_trace();
 
-    // Get shared resources
-    const auto &e_scene = info.global("scene").getr<Scene>();
-    const auto &e_cs    = info.parent()("selection").getr<ConstraintRecord>();
-    auto gizmo_active   = info.relative("viewport_guizmo")("is_active").getr<bool>();
-    auto &i_patches     = info("patches").getw<std::vector<Colr>>();
-    
-    // Obtain the generated convex hull for this uplifting/vertex combination
-    const auto &chull_builder = e_scene.components.upliftings.gl
-                                       .uplifting_data[e_cs.uplifting_i]
-                                       .metamer_builders[e_cs.vertex_i];
-    const auto &chull = chull_builder.hull;
+    // Declare uniform sampler, seeded by fair die roll
+    UniformSampler sampler = 4;
 
-    // Do not output any patches until the convex hull is in a converged state;
-    if (!chull.has_delaunay()) {
-      i_patches.clear();
-      return;
-    }
-
-    // Exit early unless inputs have changed somehow
-    guard(is_first_eval() || chull_builder.did_sample());
-    
-    // Compute volume of each tetrahedron in delaunay
-    std::vector<float> volumes(chull.deln.elems.size());
-    std::transform(std::execution::par_unseq, range_iter(chull.deln.elems), volumes.begin(),
-    [&](const eig::Array4u &el) {
-      // Get vertex positions for this tetrahedron
+    // Helper closure; 
+    // compute volume of a (tetrahedral) element in the convex hull's delaunay interior
+    auto func_compute_elem_volume = [&](const eig::Array4u &el) -> float {
+      // Get vertex positions for this element
       auto p = el | index_into_view(chull.deln.verts);
 
-      // Compute tetrahedral volume
-      return std::abs((p[0] - p[3]).matrix().dot((p[1] - p[3]).matrix().cross((p[2] - p[3]).matrix()))) / 6.f;
-    });
+      // Compute edge vectors
+      auto v30 = (p[0] - p[3]).matrix();
+      auto v31 = (p[1] - p[3]).matrix();
+      auto v32 = (p[2] - p[3]).matrix();
 
-    // Prepare for uniform sampling of the delaunay structure
-    UniformSampler sampler(4);
+      // Compute tetrahedral volume
+      return std::abs(v30.dot(v31.cross(v32))) / 6.f;
+    };
+
+    // Compute volume of each element in chull's delaunay interior
+    std::vector<float> volumes(chull.deln.elems.size());
+    std::transform(
+      std::execution::par_unseq, 
+      range_iter(chull.deln.elems), 
+      volumes.begin(), 
+      func_compute_elem_volume
+    );
+
+    // Set up 1D sampling distribution over element volumes
     Distribution distr(volumes);
 
-    // Generate patches by sampling random positions inside delaunay, which equate random 
-    // colors inside the metameric mismatch volume
-    i_patches.resize(n_samples);
-    rng::generate(i_patches, [&]() -> Colr {
-      // First, sample barycentric weights uniformly inside a tetrahedron 
-      // (https://vcg.isti.cnr.it/jgt/tetra.htm)
+    // Helper closure; 
+    // sample a random position in the chull's interior
+    auto func_sample_position = [&]() -> Colr {
+      // First, sample barycentric weights uniformly
       auto x = sampler.next_nd<3>();
-      if (x.head<2>().sum() > 1.f)
+      if (x.head<2>().sum() > 1.f) {
         x.head<2>() = 1.f - x.head<2>();
+      }
       if (x.tail<2>().sum() > 1.f) {
         float t = x[2];
         x[2] = 1.f - x.head<2>().sum();
@@ -129,18 +124,59 @@ namespace met {
       auto p = el | index_into_view(chull.deln.verts);
         
       // Then, recover position inside hull using the generated barycentric coordinates
-      return p[0] * (1.f - x.sum()) 
-           + p[1] * x.x() 
-           + p[2] * x.y() 
-           + p[3] * x.z();
-    });
+      return p[0] * (1.f - x.sum()) + p[1] * x.x()  + p[2] * x.y() + p[3] * x.z();
+    };
 
-    // Finally, sort patches
-    // Hack; we sort by a morton order lol
-    auto maxc = rng::max(i_patches, {}, [](const Colr &c) { return c.maxCoeff(); });
-    auto minc = rng::min(i_patches, {}, [](const Colr &c) { return c.minCoeff(); });
-    rng::sort(i_patches, {}, [minc, mdiv = 1.f / (maxc - minc)](const Colr &c) {
-      return detail::morton_code((c - minc) * mdiv);
-    });
+    // Sample random positions in the delaunay delaunay, which equate random 
+    // colors inside the convex hull structure
+    std::vector<Colr> samples(n_samples);
+    rng::generate(samples, func_sample_position);
+    return samples;
+  }
+
+  // Helper function; sort color values by morton order; color sorting is a bit of a fun
+  // problem, but this gives a generally good output
+  void sort_hull_interior_samples(std::vector<Colr> &samples) {
+    met_trace();
+
+    // Declare comparator over morton code representation of 3d color position
+    auto maxc = rng::max(samples, {}, [](const Colr &c) { return c.maxCoeff(); });
+    auto minc = rng::min(samples, {}, [](const Colr &c) { return c.minCoeff(); });
+    auto func_compare_morton = [minc, rcp = 1.f / (maxc - minc)](const Colr &c) { 
+      return detail::morton_code((c - minc) * rcp);
+    };
+    
+    // Finally, sort sample output
+    rng::sort(samples, {}, func_compare_morton);
+  }
+
+  void GenPatchesTask::eval(SchedulerHandle &info) {
+    met_trace();
+
+    // Get shared resources
+    const auto &e_scene = info.global("scene").getr<Scene>();
+    const auto &e_cs    = info.parent()("selection").getr<ConstraintRecord>();
+    auto gizmo_active   = info.relative("viewport_guizmo")("is_active").getr<bool>();
+    auto &i_patches     = info("patches").getw<std::vector<Colr>>();
+    
+    // Obtain the generated convex hull for this uplifting/vertex combination
+    const auto &chull_builder 
+      = e_scene.components.upliftings.gl.uplifting_data[e_cs.uplifting_i]
+               .metamer_builders[e_cs.vertex_i];
+    const auto &chull = chull_builder.hull;
+
+    // Do not output any patches until the structure is in a valid state
+    // with delaunay interior
+    if (!chull.has_delaunay()) {
+      i_patches.clear();
+      return;
+    }
+
+    // Exit early unless inputs have changed somehow
+    guard(is_first_eval() || chull_builder.did_sample());
+    
+    // Generate samples and output in sorted order for visualization
+    i_patches = sample_hull_interior_positions(chull, n_samples);
+    sort_hull_interior_samples(i_patches);
   }
 } // namespace met
