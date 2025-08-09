@@ -10,6 +10,7 @@ void init_brdf_null(inout BRDFInfo brdf, in SurfaceInfo si, vec4 wvls) {
 BRDFSample sample_brdf_null(in BRDFInfo brdf, in vec3 sample_3d, in SurfaceInfo si) {
   BRDFSample bs;
 
+  bs.is_spectral = false;
   bs.is_delta = true;
   bs.wo       = -si.wi;
   bs.pdf      = 1.f;

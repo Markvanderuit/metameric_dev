@@ -164,7 +164,7 @@ vec4 schlick_fresnel(in vec4 f0, in float cos_theta) {
 // Convert between eta and principled specular
 float eta_to_specular(in float eta) {
   float div = (eta - 1.f) / (eta + 1.f);
-  return div * div / .08f;
+  return div * div / 0.08f;
 }
 
 // Convert between eta and principled specular

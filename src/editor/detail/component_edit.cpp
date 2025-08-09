@@ -55,12 +55,18 @@ namespace met {
     // Helper function; given a title, access to a set of textures, and a modifiable variant
     // representing a color or a texture, spawn a combo box for texture/color selection
     constexpr
-    void push_texture_variant_selector_1f(const std::string &title, const auto &resources, auto &variant) {
+    void push_texture_variant_selector_1f(
+      const std::string &title, 
+      const auto &resources, 
+      auto &variant,
+      float minv = 0.f,
+      float maxv = 1.f
+    ) {
       // First, spawn a editor for the variant's specific type; color editor, or texture selector
       ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x * 0.75);
       if (std::holds_alternative<float>(variant)) {
         auto value = std::get<float>(variant);
-        ImGui::SliderFloat(fmt::format("##_{}_value", title).c_str(), &value, 0.f, 1.f);
+        ImGui::SliderFloat(fmt::format("##_{}_value", title).c_str(), &value, minv, maxv);
         ImGui::SameLine();
         variant = value;
       } else if (std::holds_alternative<uint>(variant)) {
@@ -104,7 +110,7 @@ namespace met {
 
       // Type selector
       if (ImGui::BeginCombo("BRDF Type", fmt::format("{}", value.brdf_type).c_str())) {
-        for (uint i = 0; i < 3; ++i) {
+        for (uint i = 0; i < 4; ++i) {
           auto type = static_cast<Object::BRDFType>(i);
           auto name = fmt::format("{}", type);
           if (ImGui::Selectable(name.c_str(), value.brdf_type == type)) {
@@ -121,6 +127,11 @@ namespace met {
       if (value.brdf_type == Object::BRDFType::eMicrofacet) {
         push_texture_variant_selector_1f("Roughness", scene.resources.images, value.roughness);
         push_texture_variant_selector_1f("Metallic",  scene.resources.images, value.metallic);
+        ImGui::SliderFloat("Eta", &value.eta_minmax[1], 1.001f, 2.0f);
+      }
+      if (value.brdf_type == Object::BRDFType::eDielectric) {
+        ImGui::SliderFloat2("Eta (min, max)", value.eta_minmax.data(), 1.001f, 2.0f);
+        ImGui::SliderFloat("Absorption", &value.absorption, 1.f, 100.0f);
       }
     };
 

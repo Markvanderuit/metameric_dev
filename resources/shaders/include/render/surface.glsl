@@ -12,7 +12,7 @@ struct SurfaceInfo {
   vec3 p;  // Surface position in world space
   vec3 n;  // Surface geometric normal
   vec2 tx; // Surface texture coordinates
-
+ 
   // Local shading information
   vec3 ns; // Surface shading normal; defines local shading frame
   vec3 wi; // Incident direction in local shading frame
@@ -47,8 +47,12 @@ SurfaceInfo get_surface_info(in Ray ray) {
   return si;
 }
 
+// Offset above/below surface depending on the incidence of the ray direction
 vec3 surface_offset(in SurfaceInfo si, in vec3 d) {
-  return si.p + si.n * M_RAY_EPS;
+  if (dot(si.ns, d) >= 0)
+    return si.p + si.n * M_RAY_EPS;
+  else
+    return si.p - si.n * M_RAY_EPS;
 }
 
 // Shorthands for frame transformation

@@ -54,6 +54,12 @@ void detail_fill_surface_info_object(inout SurfaceInfo si, in Ray ray) {
   si.n  = normalize(object_info.trf * vec4(si.n,  0)).xyz;
   si.ns = normalize(object_info.trf * vec4(si.ns, 0)).xyz;
 
+  // Flip shading normal around to ray incident ray orientation
+  // if (dot(ray.d, si.n) > 0) {
+  //   // si.ns = -si.ns;
+  //   si.n  = -si.n;
+  // }
+
   // Generate shading frame based on shading normal
   si.wi = to_local(get_frame(si.ns), -ray.d);
   si.t  = ray.t;

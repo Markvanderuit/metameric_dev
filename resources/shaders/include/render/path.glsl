@@ -18,7 +18,7 @@ vec4 Li_debug(in SensorSample ss, in SamplerState state) {
   if (!is_valid(si) || !is_object(si))
     return vec4(0);
     
-  return vec4(si.n, 1);
+  return vec4(si.t, si.t, si.t, 1);
 }
 
 vec4 Li(in SensorSample ss, in SamplerState state, out float alpha) {
@@ -30,8 +30,9 @@ vec4 Li(in SensorSample ss, in SamplerState state, out float alpha) {
   vec4 beta = vec4(1.f / ss.pdfs);
 
   // Prior brdf sample data, default-initialized, kept for multiple importance sampling
-  float bs_pdf      = 1.f;
-  bool  bs_is_delta = true;
+  float bs_pdf         = 1.f;
+  bool  bs_is_delta    = true;
+  bool  bs_is_spectral = false;
 
   // Iterate up to maximum depth
   for (uint depth = 0; depth < max_depth; ++depth) {
@@ -135,6 +136,12 @@ vec4 Li(in SensorSample ss, in SamplerState state, out float alpha) {
       // Early exit on zero brdf density
       if (bs.pdf == 0.f)
         break;
+
+      // Handle introduction of wavelength-dependence in the BRDF sample
+      if (!bs_is_spectral && bs.is_spectral) {
+        bs_is_spectral = true;
+        beta *= vec4(4, 0, 0, 0);
+      }
       
       // Update throughput
       beta *= eval_brdf(brdf, si, bs.wo) // brdf throughput

@@ -22,10 +22,12 @@ struct ObjectInfo {
   uint uplifting_i;
 
   // Material data
-  uint  brdf_type;   // Type of brdf; 0 = null, 1 = diffuse, 2 = mirror, 3 = ggx
+  uint  brdf_type;   // Type of brdf; 0 = null, 1 = diffuse, 2 = mirror, 3 = ggx, 4 = glass
   uvec2 albedo_data;
   uint  metallic_data;
   uint  roughness_data;
+  vec2  eta_minmax;
+  float absorption;
 };
 
 // Info object for referred patch from texture atlas
@@ -74,12 +76,12 @@ struct BRDFInfo {
   #define BRDFTypeNull       0
   #define BRDFTypeDiffuse    1
   #define BRDFTypeMicrofacet 2
+  #define BRDFTypeDielectric 3
 
-  uint  type;     // Type of BRDF: null, diffuse, principled for now
-  vec4  r;        // Underlying surface albedo for four wavelengths
-  float alpha;    // Supplemental values for principled brdf
-  float metallic; // Supplemental values for principled brdf
-  vec4  F0;       // Supplemental values for principled brdf
+  uint  type; // Type of BRDF: one of the above values
+  vec4  wvls; // 4 wavelengths for which the BRDF is evaluated
+  vec4  r;    // Underlying reflectance or transmittances on 4 wvls
+  vec4  data; // Supplemental values for principled/dielectric brdfs
 };
 
 // Info object for referred BLAS data

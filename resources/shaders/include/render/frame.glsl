@@ -36,4 +36,13 @@ float cos_theta(in vec3 v) {
   return v.z;
 }
 
+vec3 local_reflect(in vec3 wi) {
+  return vec3(-wi.xy, wi.z);
+}
+
+vec3 local_refract(in vec3 wi, float cos_theta, float eta) {
+  float scale = -(cos_theta < 0 ? 1.f / eta : eta);
+  return vec3(scale * wi.xy, cos_theta);
+}
+
 #endif // FRAME_GLSL_GUARD

@@ -18,9 +18,10 @@
 
 namespace met {
   bool Object::operator==(const Object &o) const {
-    guard(std::tie(is_active,   transform,   mesh_i,   uplifting_i,   brdf_type) == 
-          std::tie(o.is_active, o.transform, o.mesh_i, o.uplifting_i, o.brdf_type), 
+    guard(std::tie(is_active,   transform,   mesh_i,   uplifting_i,   brdf_type, absorption) == 
+          std::tie(o.is_active, o.transform, o.mesh_i, o.uplifting_i, o.brdf_type, o.absorption), 
           false);
+    guard(eta_minmax.isApprox(o.eta_minmax), false);
 
     guard(diffuse.index() == o.diffuse.index(), false);
     switch (diffuse.index()) {
@@ -106,7 +107,7 @@ namespace met {
           auto trf        = (object_trf * mesh_trf).eval();
 
           // Fill in object struct data
-          m_object_info_map->data[i] = {
+          m_object_info_map->data[i] = {  
             .trf            = trf,
             .is_active      = object.is_active,
             .mesh_i         = object.mesh_i,
@@ -115,6 +116,8 @@ namespace met {
             .albedo_data    = pack_material_3f(object.diffuse),
             .metallic_data  = pack_material_1f(object.metallic),
             .roughness_data = pack_material_1f(object.roughness),
+            .eta_minmax     = object.eta_minmax,
+            .absorption     = object.absorption
           };
         } // for (uint i)
         
@@ -228,8 +231,11 @@ namespace met {
          = m_is_first_update            // First run, demands render anyways
         || atlas.is_invalitated()       // Texture atlas re-allocated, demands re-render
         || object.state.roughness       // Different albedo value set on object
-        || object.state.metallic        // Different albedo value set on object
+        || object.state.metallic        // Different value set on object
+        || object.state.eta_minmax      // Different value set on object
         || object.state.mesh_i          // Different mesh attached to object
+        || object.state.absorption      // Different value set on object
+        || object.state.eta_minmax      // Different value set on object
         || scene.resources.meshes       // User loaded/deleted a mesh;
         || scene.resources.images       // User loaded/deleted an image;
         || settings.state.texture_size; // Texture size setting changed

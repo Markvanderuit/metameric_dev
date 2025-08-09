@@ -30,6 +30,7 @@ namespace met {
       eNull       = 0,  // null does not interact with scene
       eDiffuse    = 1,  // diffuse is simple lambertian
       eMicrofacet = 2,  // microfacet is simple conductor/dielectric mixture built on ggx
+      eDielectric = 3,  // simple dielectric glass with spectral component
     };
     
   public:
@@ -43,10 +44,12 @@ namespace met {
 
     // Material data is packed with object; 
     // Most values are a variant; either a specified value, or a texture index
-    BRDFType                  brdf_type = BRDFType::eDiffuse;
-    std::variant<Colr,  uint> diffuse   = Colr(.5f);
-    std::variant<float, uint> metallic  = 0.f;
-    std::variant<float, uint> roughness = 0.1f;
+    BRDFType                  brdf_type  = BRDFType::eDiffuse;
+    std::variant<Colr,  uint> diffuse    = Colr(.5f);        // for diffuse/microfacet/dielectric with absorption
+    std::variant<float, uint> metallic   = 0.0f;             // for microfacet brdf
+    std::variant<float, uint> roughness  = 0.1f;             // for microfacet brdf
+    eig::Array2f              eta_minmax = { 1.25f, 1.25f }; // for dielectric brdf
+    float                     absorption = 0.f;              // for dielectric brdf
 
   public: // Boilerplate
     bool operator==(const Object &o) const;
@@ -94,8 +97,10 @@ namespace met {
         alignas(8)  eig::Array2u  albedo_data;
         alignas(4)  uint          metallic_data;
         alignas(4)  uint          roughness_data;
+        alignas(4)  eig::Array2f  eta_minmax;
+        alignas(4)  float         absorption;
       };
-      static_assert(sizeof(BlockLayout) == 96);
+      static_assert(sizeof(BlockLayout) == 112);
 
       // All-object buffer layout
       struct BufferLayout {
@@ -131,6 +136,8 @@ namespace met {
       SceneStateHandler<decltype(Object::diffuse)>     diffuse;
       SceneStateHandler<decltype(Object::metallic)>    metallic;
       SceneStateHandler<decltype(Object::roughness)>   roughness;
+      SceneStateHandler<decltype(Object::eta_minmax)>  eta_minmax;
+      SceneStateHandler<decltype(Object::absorption)>  absorption;
 
     public:
       bool update(const Object &o) override {
@@ -144,6 +151,8 @@ namespace met {
         | diffuse.update(o.diffuse)
         | metallic.update(o.metallic)
         | roughness.update(o.roughness)
+        | eta_minmax.update(o.eta_minmax)
+        | absorption.update(o.absorption)
         );
       }
     };
@@ -164,6 +173,7 @@ struct fmt::formatter<met::Object::BRDFType>{
       case met::Object::BRDFType::eNull        : s = "null"; break;
       case met::Object::BRDFType::eDiffuse     : s = "diffuse"; break;
       case met::Object::BRDFType::eMicrofacet  : s = "microfacet"; break;
+      case met::Object::BRDFType::eDielectric  : s = "dielectric"; break;
       default                                  : s = "undefined"; break;
     }
     return fmt::format_to(ctx.out(), "{}", s);

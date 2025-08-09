@@ -151,10 +151,12 @@ namespace met {
           { "transform",   object.transform   },
           { "mesh_i",      object.mesh_i      },
           { "uplifting_i", object.uplifting_i },
-          { "brdf_type",   object.brdf_type   }};
-    js["diffuse"]   = {{ "index", object.diffuse.index() },   { "variant", object.diffuse }};
+          { "brdf_type",   object.brdf_type   },
+          { "eta_minmax",  object.eta_minmax  },
+          { "absorption",  object.absorption  }};
+    js["diffuse"]   = {{ "index", object.diffuse.index() },   { "variant", object.diffuse   }};
     js["roughness"] = {{ "index", object.roughness.index() }, { "variant", object.roughness }};
-    js["metallic"]  = {{ "index", object.metallic.index() },  { "variant", object.metallic }};
+    js["metallic"]  = {{ "index", object.metallic.index() },  { "variant", object.metallic  }};
   }
 
   void from_json(const json &js, Object &object) {
@@ -186,6 +188,12 @@ namespace met {
         case 1: object.roughness = js.at("roughness").at("variant").get<uint>(); break;
         default: debug::check_expr(false, "Error parsing json material data");
       }
+    }
+    if (js.contains("eta_minmax")) {
+      js.at("eta_minmax").get_to(object.eta_minmax);
+    }
+    if (js.contains("absorption")) {
+      js.at("absorption").get_to(object.absorption);
     }
   }
 
@@ -518,7 +526,8 @@ namespace met {
         .brdf_type   = brdf_type,
         .diffuse     = diffuse,
         .metallic    = metallic,
-        .roughness   = roughness
+        .roughness   = roughness,
+        .eta_minmax  = { 1.25f, 1.25f }
       };
 
       // 4 - store mesh and object in scene

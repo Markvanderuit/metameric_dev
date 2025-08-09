@@ -22,6 +22,9 @@ struct BRDFSample {
   // Is the sample a dirac delta
   bool is_delta;
 
+  // Is the sample wavelength-dependent (and thus collapsing to a single wvl for now)
+  bool is_spectral;
+
   // Exitant sampled direction, local space
   vec3 wo;
   
@@ -47,8 +50,9 @@ EmitterSample emitter_sample_zero() {
 // Create an invalid sample
 BRDFSample brdf_sample_zero() {
   BRDFSample bs;
-  bs.is_delta = false;
-  bs.pdf      = 0.f;
+  bs.is_delta    = false;
+  bs.is_spectral = false;
+  bs.pdf         = 0.f;
   return bs;
 }
 

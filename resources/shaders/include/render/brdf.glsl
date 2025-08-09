@@ -7,26 +7,29 @@
 #include <render/brdf/null.glsl>
 #include <render/brdf/diffuse.glsl>
 #include <render/brdf/microfacet.glsl>
+#include <render/brdf/dielectric.glsl>
 
 BRDFInfo get_brdf(in SurfaceInfo si, vec4 wvls, in vec2 sample_2d) {
   BRDFInfo brdf;
 
   if (is_object(si)) {
-    ObjectInfo object_info = scene_object_info(record_get_object(si.data));
-    brdf.type = object_info.brdf_type;
+    ObjectInfo object = scene_object_info(record_get_object(si.data));
+    brdf.type = object.brdf_type;
+    brdf.wvls = wvls;
+    
+    if (brdf.type == BRDFTypeDiffuse) {
+      init_brdf_diffuse(object, brdf, si, wvls, sample_2d);
+    } else if (brdf.type == BRDFTypeMicrofacet) {
+      init_brdf_microfacet(object, brdf, si, wvls, sample_2d);
+    } else if (brdf.type == BRDFTypeDielectric) {
+      init_brdf_dielectric(object, brdf, si, wvls, sample_2d);
+    } else {
+      init_brdf_null(brdf, si, wvls);
+    }
   } else {
     brdf.type = BRDFTypeNull;
-  }
-
-  if (brdf.type == BRDFTypeDiffuse) {
-    init_brdf_diffuse(brdf, si, wvls, sample_2d);
-  } else if (brdf.type == BRDFTypeNull) {
     init_brdf_null(brdf, si, wvls);
-  } else if (brdf.type == BRDFTypeMicrofacet) {
-    init_brdf_microfacet(brdf, si, wvls, sample_2d);
-  } /* else if (...) {
-    // ...
-  } */
+  }
 
   return brdf;
 }
@@ -38,6 +41,8 @@ BRDFSample sample_brdf(in BRDFInfo brdf, in vec3 sample_3d, in SurfaceInfo si) {
     return sample_brdf_null(brdf, sample_3d, si);
   } else if (brdf.type == BRDFTypeMicrofacet) {
     return sample_brdf_microfacet(brdf, sample_3d, si);
+  } else if (brdf.type == BRDFTypeDielectric) {
+    return sample_brdf_dielectric(brdf, sample_3d, si);
   } /* else if (...) {
     // ...
   } */
@@ -50,6 +55,8 @@ vec4 eval_brdf(in BRDFInfo brdf, in SurfaceInfo si, in vec3 wo) {
     return eval_brdf_null(brdf, si, wo);
   } else if (brdf.type == BRDFTypeMicrofacet) {
     return eval_brdf_microfacet(brdf, si, wo);
+  } else if (brdf.type == BRDFTypeDielectric) {
+    return eval_brdf_dielectric(brdf, si, wo);
   } /* else if (...) {
     // ...
   } */
@@ -62,6 +69,8 @@ float pdf_brdf(in BRDFInfo brdf, in SurfaceInfo si, in vec3 wo) {
     return pdf_brdf_null(brdf, si, wo);
   } else if (brdf.type == BRDFTypeMicrofacet) {
     return pdf_brdf_microfacet(brdf, si, wo);
+  } else if (brdf.type == BRDFTypeDielectric) {
+    return pdf_brdf_dielectric(brdf, si, wo);
   } /* else if (...) {
     // ...
   } */
