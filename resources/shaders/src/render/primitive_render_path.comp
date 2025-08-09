@@ -14,9 +14,10 @@ layout(std140) uniform;
 layout(std430) buffer;
 
 // Specialization constant declarations
-layout(constant_id = 0) const uint max_depth = 4;     // Maximum path depth
-layout(constant_id = 1) const bool use_alpha = false; // On initial ray miss, return 0 alpha?
-layout(constant_id = 2) const bool use_debug = false; // Override and enable debug queries
+layout(constant_id = 0) const uint max_depth = 0;              // Maximum path depth (unused if 0)
+layout(constant_id = 1) const uint rr_depth  = path_max_depth; // Russian roulette starting depth
+layout(constant_id = 2) const bool use_alpha = false;          // On initial ray miss, return 0 alpha?
+layout(constant_id = 3) const bool use_debug = false;          // Override and enable debug queries
 
 struct WavelengthDistribution {
   float func_sum;

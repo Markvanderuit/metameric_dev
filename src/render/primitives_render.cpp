@@ -145,8 +145,9 @@ namespace met {
       .spirv_path = "shaders/render/primitive_render_path.comp.spv",
       .cross_path = "shaders/render/primitive_render_path.comp.json",
       .spec_const = {{ 0u, info.max_depth          },
-                     { 1u, info.enable_alpha       },
-                     { 2u, uint(info.enable_debug) }}
+                     { 1u, info.rr_depth           },
+                     { 2u, info.enable_alpha       },
+                     { 3u, uint(info.enable_debug) }}
     });
 
     // Assign sampler configuration

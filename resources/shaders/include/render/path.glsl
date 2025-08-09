@@ -26,16 +26,18 @@ vec4 Li(in SensorSample ss, in SamplerState state, out float alpha) {
   path_query_initialize(pt);
   
   // Path throughput information; we track 4 wavelengths simultaneously
-  vec4 S    = vec4(0.f);
-  vec4 beta = vec4(1.f / ss.pdfs);
+  vec4  Li   = vec4(0);           // Accumulated spectrum
+  vec4  Beta = vec4(1 / ss.pdfs); // Path throughput over density
 
-  // Prior brdf sample data, default-initialized, kept for multiple importance sampling
+  // Prior brdf sample data, default-initialized, kept for NEE and MIS
   float bs_pdf         = 1.f;
   bool  bs_is_delta    = true;
   bool  bs_is_spectral = false;
 
   // Iterate up to maximum depth
-  for (uint depth = 0; depth < max_depth; ++depth) {
+  for (uint depth = 0; ; ++depth) {
+    guard_break(max_depth == 0 || depth < max_depth);
+
     // Ray-trace first. Then, if no surface is intersected by the ray, 
     // add contribution of environment map, and terminate the current path
     if (!scene_intersect(ss.ray)) {
@@ -43,7 +45,7 @@ vec4 Li(in SensorSample ss, in SamplerState state, out float alpha) {
         float em_pdf = bs_is_delta ? 0.f : pdf_env_emitter(ss.ray.d, ss.wvls);
         
         // No division by sample density, as this is incorporated in path throughput
-        vec4 s = beta                       // throughput
+        vec4 s = Beta                       // throughput
                * eval_env_emitter(ss.wvls)  // emitted value
                * mis_power(bs_pdf, em_pdf); // mis weight
 
@@ -51,7 +53,7 @@ vec4 Li(in SensorSample ss, in SamplerState state, out float alpha) {
         path_query_finalize_envmap(pt, s, ss.wvls);
 
         // Add to output radiance
-        S += s;
+        Li += s;
       }
       
       // Output 0 alpha on initial ray miss
@@ -73,7 +75,7 @@ vec4 Li(in SensorSample ss, in SamplerState state, out float alpha) {
       float em_pdf = bs_is_delta ? 0.f : pdf_emitters(si, ss.wvls);
 
       // No division by sample density, as this is incorporated in path throughput
-      vec4 s = beta                       // throughput 
+      vec4 s = Beta                       // throughput 
              * eval_emitter(si, ss.wvls)  // emitted value
              * mis_power(bs_pdf, em_pdf); // mis weight
 
@@ -81,7 +83,7 @@ vec4 Li(in SensorSample ss, in SamplerState state, out float alpha) {
       path_query_finalize_direct(pt, s, ss.wvls);
 
       // Add to output radiance and terminate path
-      S += s;
+      Li += s;
       break;
     }
 
@@ -94,7 +96,7 @@ vec4 Li(in SensorSample ss, in SamplerState state, out float alpha) {
     
     // Emitter sampling
     {
-      // Generate position sample on emitter, with ray towards sample
+      // Generate directional sample towards emitter
       EmitterSample es = sample_emitters(si, ss.wvls, next_3d(state));
       
       // Exitant direction in local frame
@@ -112,7 +114,7 @@ vec4 Li(in SensorSample ss, in SamplerState state, out float alpha) {
           float mis_weight = es.is_delta ? 1.f : mis_power(es.pdf, brdf_pdf);
 
           // Assemble path throughput
-          vec4 s = beta                    // current path throughput
+          vec4 s = Beta                    // current path throughput
                  * es.L                    // emitter response
                  * eval_brdf(brdf, si, wo) // brdf response
                  * cos_theta(wo)           // cosine attenuation
@@ -123,7 +125,7 @@ vec4 Li(in SensorSample ss, in SamplerState state, out float alpha) {
           path_query_finalize_emitter(pt, es, s, ss.wvls);
 
           // Add to output radiance
-          S += s;
+          Li += s;
         }
       }
     }
@@ -140,31 +142,31 @@ vec4 Li(in SensorSample ss, in SamplerState state, out float alpha) {
       // Handle introduction of wavelength-dependence in the BRDF sample
       if (!bs_is_spectral && bs.is_spectral) {
         bs_is_spectral = true;
-        beta *= vec4(4, 0, 0, 0);
+        Beta *= vec4(4, 0, 0, 0);
       }
       
-      // Update throughput
-      beta *= eval_brdf(brdf, si, bs.wo) // brdf throughput
+      // Update throughput, sample density
+      Beta *= eval_brdf(brdf, si, bs.wo) // brdf throughput
             * abs(cos_theta(bs.wo))      // cosine attenuation
-            / bs.pdf;                    // sample density
+            / bs.pdf;
 
       // Update relevant sample information
       bs_pdf      = bs.pdf;
       bs_is_delta = bs.is_delta;
-      
-      // Early exit on zero throughput
-      if (beta == vec4(0))
-        break;
 
       // Generate the next ray to trace through the scene
       ss.ray = ray_towards_direction(si, to_world(si, bs.wo));
     }
 
-    // TODO RR goes here
-    // ...
+    // Russian Roulette
+    if (rr_depth != 0 && depth >= rr_depth) {
+      float q = min(0.95, hmax(Beta));
+      guard_break(next_1d(state) < q);
+      Beta /= q;
+    }
   } // for (uint depth)
 
-  return S;
+  return Li;
 }
 
 #endif // RENDER_PATH_GLSL_GUARD

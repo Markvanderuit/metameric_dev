@@ -31,8 +31,9 @@ namespace met {
     // the target is left unmodified. If set to 0, no limit is imposed.
     uint spp_max = std::numeric_limits<uint>::max();
 
-    // Maximum path length
-    uint max_depth = PathRecord::path_max_depth;
+    // Maximum path length (unused if 0) and russian roulette start (unused if set to 0)
+    uint max_depth = 0;
+    uint rr_depth  = PathRecord::path_max_depth;
 
     // Render pixels each other frame, alternating between checkerboards
     bool pixel_checkerboard = false;

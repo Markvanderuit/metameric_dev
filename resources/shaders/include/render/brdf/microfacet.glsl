@@ -9,7 +9,7 @@
 #define get_microfacet_r(brdf)        brdf.r
 #define get_microfacet_alpha(brdf)    brdf.data.x
 #define get_microfacet_metallic(brdf) brdf.data.y
-#define get_microfacet_eta(brdf)      brdf.data.w
+#define get_microfacet_eta(brdf)      brdf.data.z
 
 vec2 _microfacet_lobe_probs(in BRDFInfo brdf, in SurfaceInfo si) {  
   // Estimate fresnel for incident vector to establish probabilities
@@ -36,6 +36,7 @@ void init_brdf_microfacet(in ObjectInfo object, inout BRDFInfo brdf, in SurfaceI
   get_microfacet_r(brdf)         = texture_reflectance(si, wvls, sample_2d);
   get_microfacet_alpha(brdf)     = max(1e-3, brdf_data.x);
   get_microfacet_metallic(brdf)  = brdf_data.y;
+  get_microfacet_eta(brdf)       = object.eta_minmax.x;
 }
 
 vec4 eval_brdf_microfacet(in BRDFInfo brdf, in SurfaceInfo si, in vec3 wo) {

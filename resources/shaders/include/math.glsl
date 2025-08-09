@@ -144,7 +144,17 @@ float mis_balance(in float pdf_a, in float pdf_b) {
   return pdf_a / (pdf_a + pdf_b);
 }
 
+vec4 mis_balance(in vec4 pdf_a, in vec4 pdf_b) {
+  return pdf_a / (pdf_a + pdf_b);
+}
+
 float mis_power(in float pdf_a, in float pdf_b) {
+  pdf_a *= pdf_a;
+  pdf_b *= pdf_b;
+  return pdf_a / (pdf_a + pdf_b);
+}
+
+vec4 mis_power(in vec4 pdf_a, in vec4 pdf_b) {
   pdf_a *= pdf_a;
   pdf_b *= pdf_b;
   return pdf_a / (pdf_a + pdf_b);
