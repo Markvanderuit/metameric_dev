@@ -66,53 +66,45 @@ void init_brdf_dielectric(in ObjectInfo object, inout BRDFInfo brdf, in SurfaceI
 
 BRDFSample sample_brdf_dielectric(in BRDFInfo brdf, in vec3 sample_3d, in SurfaceInfo si) {
   // Compute eta for hero wavelength only, the rest gets killed later on
-  float eta = _brdf_eta_dispersive(brdf, brdf.wvls.x);
-
   // Compute fresnel, angle of transmission
+  float eta = _brdf_eta_dispersive(brdf, brdf.wvls.x);
   float cos_theta_t;
   float F = _brdf_dielectric_fresnel(cos_theta(si.wi), cos_theta_t, eta);
 
-  BRDFSample bs;
-  bs.is_delta = true;
+  // Pick reflection/refraction
+  bool is_transmitted = sample_3d.x > F;
 
-  if (sample_3d.x <= F) {
-    // Scatter, reflect
-    bs.is_spectral = false;
-    bs.wo  = local_reflect(si.wi);
-    bs.pdf = F;
-  } else {
-    // Transmit, refract, add confetti
-    bs.is_spectral = get_dielectric_is_dispersive(brdf);
-    bs.wo  = local_refract(si.wi, cos_theta_t, eta);
-    bs.pdf = 1.f - F;
-  }
+  BRDFSample bs;
+
+  bs.is_delta    = true;
+  bs.is_spectral = is_transmitted && get_dielectric_is_dispersive(brdf);
+  bs.wo          = is_transmitted ? local_refract(si.wi, cos_theta_t, eta) : local_reflect(si.wi);
+  bs.pdf         = is_transmitted ? 1.f - F : F;
 
   return bs;
 }
 
 vec4 eval_brdf_dielectric(in BRDFInfo brdf, in SurfaceInfo si, in vec3 wo) {
   // Compute eta for hero wavelength only, the rest gets killed later on
-  float eta = _brdf_eta_dispersive(brdf, brdf.wvls.x);
-
   // Compute fresnel, angle of transmission
+  float eta = _brdf_eta_dispersive(brdf, brdf.wvls.x);
   float cos_theta_t;
   float F = _brdf_dielectric_fresnel(cos_theta(si.wi), cos_theta_t, eta);
   
   if (cos_theta(si.wi) * cos_theta(wo) >= 0) {
     // Scatter, reflect
-    return vec4(F / abs(cos_theta(si.wi)));
+    return vec4(F / abs(cos_theta(wo)));
   } else {
     // Transmit, refract, add beer
     vec4 r = wo.z < 0 // exiting
            ? vec4(1)
            : exp(-get_dielectric_absorption(brdf) * (vec4(1) - get_dielectric_r(brdf)) * si.t);
-    float scaling = cos_theta_t < 0.f ? 1.f / eta : eta;
-    return r * sdot(scaling) * (1.f - F) / abs(cos_theta(si.wi));
+    float scaling = sdot(cos_theta_t < 0.f ? 1.f / eta : eta);
+    return vec4(scaling * (1.f - F) / abs(cos_theta(wo)));
   }
 }
 
 float pdf_brdf_dielectric(in BRDFInfo brdf, in SurfaceInfo si, in vec3 wo) {
-  // Specular brdf, probability is always zero
   return 0.f;
 }
 

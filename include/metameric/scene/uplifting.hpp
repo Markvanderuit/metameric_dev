@@ -226,7 +226,7 @@ namespace met {
 
       // Helper object that
       // - generates per-object spectral texture data
-      // - writes this data to the scene texture atlas
+      // - writes this data to a scene texture atlas
       struct ObjectData {
         // Layout for data written to std140 buffer
         struct BlockLayout { uint object_i; };
@@ -246,14 +246,38 @@ namespace met {
         void update(const Scene &scene);
       };
 
+      // Helper object that
+      // - generates per-emitter spectral texture data (for uplifted emitters)
+      // - writes this data to a scene texture atlas
+      struct EmitterData {
+        struct BlockLayout { uint emitter_i; };
+        
+        // Objects for texture bake
+        std::string  m_program_key;
+        gl::Sampler  m_sampler;
+        gl::Buffer   m_buffer;
+        BlockLayout *m_buffer_map;
+        
+        // Small private state
+        uint m_emitter_i;
+        bool m_is_first_update;
+
+      public:
+        EmitterData(const Scene &scene, uint emitter_i);
+        void update(const Scene &scene);
+      };
+
     public:
       // Object caches; these help generate uplifting data and bake object textures, and
       // are exposed so the editor can access their data
       std::vector<UpliftingData> uplifting_data;
       std::vector<ObjectData>    object_data;
+      std::vector<EmitterData>   emitter_data;
 
-      // Atlas textures; each scene object has a patch in the atlas for some material parameters
-      detail::TextureAtlas2d4f texture_coef; // Stores packed linear coefficients representing surface spectral reflectances in basis
+      // Atlas textures; each uplifted object/emitter has a patch in the atlas for some material parameters
+      // Stores packed linear coefficients representing spectral functions in basis
+      detail::TextureAtlas2d4f texture_object_coef; 
+      detail::TextureAtlas2d4f texture_emitter_coef;
 
       // Array texture; each layer holds one of 12 basis function spectra
       gl::TextureArray1d1f texture_basis;

@@ -201,21 +201,23 @@ namespace met {
 
     // Bind required resources to their corresponding targets
     program.bind();
-    program.bind("b_film",                m_film);
-    program.bind("b_buff_sensor_info",    sensor.buffer());
-    program.bind("b_buff_sampler_state",  get_sampler_state());
-    program.bind("b_buff_object_info",    scene.components.objects.gl.object_info);
-    program.bind("b_buff_emitter_info",   scene.components.emitters.gl.emitter_info);
-    program.bind("b_buff_envmap_info",    scene.components.emitters.gl.emitter_envm_info);
-    program.bind("b_buff_coef_info",      scene.components.upliftings.gl.texture_coef.buffer());
-    program.bind("b_buff_brdf_info",      scene.components.objects.gl.texture_brdf.buffer());
-    program.bind("b_buff_wvls_distr",     get_wavelength_distr());
-    program.bind("b_buff_emitters_distr", scene.components.emitters.gl.emitter_distr_buffer);
-    program.bind("b_illm_1f",             scene.resources.illuminants.gl.spec_texture, m_sampler);
-    program.bind("b_bsis_1f",             scene.components.upliftings.gl.texture_basis, m_sampler);
-    program.bind("b_brdf_2f",             scene.components.objects.gl.texture_brdf.texture(), m_sampler);
-    program.bind("b_coef_4f",             scene.components.upliftings.gl.texture_coef.texture(), m_sampler);
-    program.bind("b_cmfs_3f",             scene.resources.observers.gl.cmfs_texture, m_sampler);
+    program.bind("b_film",                   m_film);
+    program.bind("b_buff_sensor_info",       sensor.buffer());
+    program.bind("b_buff_sampler_state",     get_sampler_state());
+    program.bind("b_buff_object_info",       scene.components.objects.gl.object_info);
+    program.bind("b_buff_emitter_info",      scene.components.emitters.gl.emitter_info);
+    program.bind("b_buff_envmap_info",       scene.components.emitters.gl.emitter_envm_info);
+    program.bind("b_buff_object_coef_info",  scene.components.upliftings.gl.texture_object_coef.buffer());
+    program.bind("b_buff_object_brdf_info",  scene.components.objects.gl.texture_brdf.buffer());
+    program.bind("b_buff_emitter_coef_info", scene.components.upliftings.gl.texture_emitter_coef.buffer());
+    program.bind("b_buff_wvls_distr",        get_wavelength_distr());
+    program.bind("b_buff_emitters_distr",    scene.components.emitters.gl.emitter_distr_buffer);
+    program.bind("b_illm_1f",                scene.resources.illuminants.gl.spec_texture, m_sampler);
+    program.bind("b_bsis_1f",                scene.components.upliftings.gl.texture_basis, m_sampler);
+    program.bind("b_object_brdf_2f",         scene.components.objects.gl.texture_brdf.texture(), m_sampler);
+    program.bind("b_object_coef_4f",         scene.components.upliftings.gl.texture_object_coef.texture(), m_sampler);
+    program.bind("b_emitter_coef_4f",        scene.components.upliftings.gl.texture_emitter_coef.texture(), m_sampler);
+    program.bind("b_cmfs_3f",                scene.resources.observers.gl.cmfs_texture, m_sampler);
     
     if (!scene.resources.meshes.empty()) {
       program.bind("b_buff_blas_info", scene.resources.meshes.gl.blas_info);

@@ -66,26 +66,31 @@ layout(binding = 7) uniform b_buff_envmap_info {
   bool envm_is_present;
   uint envm_i;
 } buff_envmap_info;
-layout(binding = 8) uniform b_buff_coef_info {
+layout(binding = 8) uniform b_buff_object_coef_info {
   uint n;
   AtlasInfo data[met_max_textures];
-} buff_coef_info;
-layout(binding = 9) uniform b_buff_brdf_info {
+} buff_object_coef_info;
+layout(binding = 9) uniform b_buff_emitter_coef_info {
   uint n;
   AtlasInfo data[met_max_textures];
-} buff_brdf_info;
+} buff_emitter_coef_info;
+layout(binding = 10) uniform b_buff_object_brdf_info {
+  uint n;
+  AtlasInfo data[met_max_textures];
+} buff_object_brdf_info;
 
 // Storage buffer declarations
 layout(binding = 0) restrict readonly buffer b_buff_blas_node { BVHNodePack   data[]; } buff_blas_node;
 layout(binding = 1) restrict readonly buffer b_buff_blas_prim { PrimitivePack data[]; } buff_blas_prim;
 
 // Texture/image units, ergo samplers and output images
-layout(binding = 0)          uniform sampler1DArray b_illm_1f; // Illuminant function data, 1 component
-layout(binding = 1)          uniform sampler1DArray b_cmfs_3f; // Observer function data, 3 components
-layout(binding = 2)          uniform sampler1DArray b_bsis_1f; // Basis function data, 1 component
-layout(binding = 3)          uniform sampler2DArray b_coef_4f; // Texture atlas storing packed coefficients for surface reflectance
-layout(binding = 4)          uniform sampler2DArray b_brdf_2f; // Texture atlas storing packed secondary brdf data
-layout(binding = 0, rgba32f) uniform restrict image2D b_film;  // Target film, averaged over frames
+layout(binding = 0)          uniform sampler1DArray b_illm_1f;         // Illuminant function data, 1 component
+layout(binding = 1)          uniform sampler1DArray b_cmfs_3f;         // Observer function data, 3 components
+layout(binding = 2)          uniform sampler1DArray b_bsis_1f;         // Basis function data, 1 component
+layout(binding = 3)          uniform sampler2DArray b_object_coef_4f;  // Texture atlas storing packed coefficients for uplifted reflectance
+layout(binding = 4)          uniform sampler2DArray b_object_brdf_2f;  // Texture atlas storing packed secondary brdf data
+layout(binding = 5)          uniform sampler2DArray b_emitter_coef_4f; // Texture atlas storing packed coefficients for uplifted illuminants
+layout(binding = 0, rgba32f) uniform restrict image2D b_film;          // Target film, averaged over frames
 
 
 // BLAS info and stack live in shared memory
@@ -101,8 +106,8 @@ declare_distr_sampler(emitters, buff_emitters_distr.data, met_max_emitters);
 declare_scene_cmfs_data(b_cmfs_3f);
 declare_scene_illuminant_data(b_illm_1f);
 declare_scene_emitter_data(buff_emitter_info.data, buff_emitter_info.n, buff_envmap_info);
+declare_scene_texture_data(buff_object_coef_info.data, buff_object_brdf_info.data, buff_emitter_coef_info.data, b_object_coef_4f, b_object_brdf_2f, b_emitter_coef_4f, b_bsis_1f);
 declare_scene_object_data(buff_objects.data, buff_objects.n);
-declare_scene_texture_data(buff_coef_info.data, buff_brdf_info.data, b_coef_4f, b_brdf_2f, b_bsis_1f);
 declare_scene_blas_data(buff_blas_prim.data, buff_blas_node.data, _blas_info);
 
 // All includes from here on out require scene data to be declared above;

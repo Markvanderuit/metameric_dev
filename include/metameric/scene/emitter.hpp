@@ -31,26 +31,28 @@ namespace met {
       eRect    = 3u
     };
 
+    // Emitter's spectral source
+    enum class SpectrumType : uint {
+      eIllm = 0u, // a selected illuminant spectrum
+      eColr = 1u, // a uplifted color/texture value
+    };
+
   public:
     // Specific emitter type
-    Type type = Type::eRect;
-    
+    Type         type      = Type::eRect;
+    SpectrumType spec_type = SpectrumType::eIllm;
+
     // Scene properties
     bool      is_active = true;
     Transform transform;
-
-    // Spectral data references a scene resource
-    bool  is_textured      = 0;   // select between spectrum and spatially varying texture data
-    uint  illuminant_i     = 0;   // index to illuminant spectrum, not spatially varying
-    uint  texture_i        = 0;   // index to uplifted rgb texture, spatially varying
-    float illuminant_scale = 1.f; // power scaling
     
+    // Illuminant data
+    std::variant<Colr, uint> color = Colr(1.f); // Color or texture index
+    uint  illuminant_i             = 0;         // index to spectrum
+    float illuminant_scale         = 1.f;       // scaling applied to emission
 
   public: // Boilerplater
-    bool operator==(const Emitter &o) const {
-      return std::tie(type, is_active, transform, illuminant_i, is_textured, texture_i, illuminant_scale) 
-          == std::tie(o.type, o.is_active, o.transform, o.illuminant_i, o.is_textured, o.texture_i, o.illuminant_scale);
-    }
+    bool operator==(const Emitter &o) const;
   };
 
   namespace detail {
@@ -64,10 +66,12 @@ namespace met {
         alignas(16) eig::Matrix4f trf;
         alignas(4)  uint          is_active;
         alignas(4)  uint          type;
-        alignas(4)  uint          illuminant_data;
+        alignas(4)  uint          spec_type;
         alignas(4)  float         illuminant_scale;
+        alignas(4)  uint          illuminant_i;
+        alignas(4)  eig::Array2u  color_data;
       };
-      static_assert(sizeof(BlockLayout) == 80);
+      static_assert(sizeof(BlockLayout) == 96);
 
       // All-object buffer layout
       struct BufferLayout {
@@ -99,6 +103,34 @@ namespace met {
       // Class constructor and update function handle GL-side data
       SceneGLHandler();
       void update(const Scene &) override;
+    };
+
+    
+    // Template specialization of SceneStateHandler that exposes fine-grained
+    // state tracking for object members in the program view
+    template <>
+    struct SceneStateHandler<Emitter> : public SceneStateHandlerBase<Emitter> {
+      SceneStateHandler<decltype(Emitter::is_active)>        is_active;
+      SceneStateHandler<decltype(Emitter::type)>             type;
+      SceneStateHandler<decltype(Emitter::spec_type)>        spec_type;
+      SceneStateHandler<decltype(Emitter::transform)>        transform;
+      SceneStateHandler<decltype(Emitter::color)>            color;
+      SceneStateHandler<decltype(Emitter::illuminant_i)>     illuminant_i;
+      SceneStateHandler<decltype(Emitter::illuminant_scale)> illuminant_scale;
+      
+    public:
+      bool update(const Emitter &o) override {
+        met_trace();
+        return m_mutated =
+        ( is_active.update(o.is_active)
+        | type.update(o.type)
+        | spec_type.update(o.spec_type)
+        | transform.update(o.transform)
+        | color.update(o.color)
+        | illuminant_i.update(o.illuminant_i)
+        | illuminant_scale.update(o.illuminant_scale)
+        );
+      }
     };
   } // namespace detail
 } // namespace met

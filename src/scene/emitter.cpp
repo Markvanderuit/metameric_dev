@@ -19,7 +19,39 @@
 #include <numbers>
 
 namespace met {
+  bool Emitter::operator==(const Emitter &o) const {
+    met_trace();
+    
+    guard(std::tie(type, spec_type, is_active, transform, illuminant_i, illuminant_scale) == 
+          std::tie(o.type, o.spec_type, o.is_active, o.transform, o.illuminant_i, o.illuminant_scale),
+          false);
+
+    guard(color.index() == o.color.index(), false);
+    switch (color.index()) {
+      case 0: guard(std::get<Colr>(color).isApprox(std::get<Colr>(o.color)), false); break;
+      case 1: guard(std::get<uint>(color) == std::get<uint>(o.color), false); break;
+    }
+
+    return true;
+  }
+
   namespace detail {  
+    // Helper to pack color/uint variant to a uvec2
+    inline
+    eig::Array2u pack_material_3f(const std::variant<Colr, uint> &v) {
+      met_trace();
+      std::array<uint, 2> u;
+      if (v.index()) {
+        u[0] = std::get<1>(v);
+        u[1] = 0x00010000;
+      } else {
+        Colr c = std::get<0>(v);
+        u[0] = detail::pack_half_2x16(c.head<2>());
+        u[1] = detail::pack_half_2x16({ c.z(), 0 });
+      }
+      return { u[0], u[1] };
+    }
+
     inline
     gl::Buffer to_std140(const Distribution &d) {
       met_trace_full();
@@ -63,8 +95,10 @@ namespace met {
             .trf              = emitter.transform.affine().matrix(),
             .is_active        = emitter.is_active,
             .type             = static_cast<uint>(emitter.type),
-            .illuminant_data  = emitter.illuminant_i,
-            .illuminant_scale = emitter.illuminant_scale
+            .spec_type        = static_cast<uint>(emitter.spec_type),
+            .illuminant_scale = emitter.illuminant_scale,
+            .illuminant_i     = emitter.illuminant_i,
+            .color_data       = { 0, 0 }
           };
         } // for (uint i)
 

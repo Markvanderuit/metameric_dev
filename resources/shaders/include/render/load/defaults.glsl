@@ -36,12 +36,15 @@ uint scene_object_count()            { return 0;               }
 #endif // !SCENE_DATA_OBJECT
 
 #ifndef SCENE_DATA_TEXTURE
-  AtlasInfo scene_texture_coef_info(uint i)               { AtlasInfo d; return d; }
-  AtlasInfo scene_texture_brdf_info(uint i)               { AtlasInfo d; return d; }
-  vec2      scene_texture_coef_size()                     { return vec2(0);        }
-  vec2      scene_texture_brdf_size()                     { return vec2(0);        }
-  uvec4     scene_texture_coef_fetch(ivec3 p)             { return uvec4(0);       }
-  uint      scene_texture_brdf_fetch(ivec3 p)             { return 0u;             }
+  AtlasInfo scene_texture_object_coef_info(uint i)        { AtlasInfo d; return d; }
+  AtlasInfo scene_texture_object_brdf_info(uint i)        { AtlasInfo d; return d; }
+  AtlasInfo scene_texture_emitter_coef_info(uint i)       { AtlasInfo d; return d; }
+  vec2      scene_texture_object_coef_size()              { return vec2(0);        }
+  vec2      scene_texture_object_brdf_size()              { return vec2(0);        }
+  vec2      scene_texture_emitter_coef_size()             { return vec2(0);        }
+  uvec4     scene_texture_object_coef_fetch(ivec3 p)      { return uvec4(0);       }
+  uint      scene_texture_object_brdf_fetch(ivec3 p)      { return 0u;             }
+  uvec4     scene_texture_emitter_coef_fetch(ivec3 p)     { return uvec4(0);       }
   float     scene_texture_basis_sample(float wvl, uint j) { return 0.f;            }
 #endif // !SCENE_DATA_TEXTURE
 

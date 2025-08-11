@@ -122,6 +122,7 @@ namespace met {
     // Handle to program shader cache, accessible to gl-side data builders;
     mutable ResourceHandle m_cache_handle;
     friend class detail::SceneGLHandler<Uplifting>::ObjectData;
+    friend class detail::SceneGLHandler<Uplifting>::EmitterData;
     friend class detail::SceneGLHandler<Object>::ObjectData;
   };
 

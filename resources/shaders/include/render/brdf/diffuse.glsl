@@ -14,23 +14,27 @@ void init_brdf_diffuse(in ObjectInfo object, inout BRDFInfo brdf, in SurfaceInfo
 BRDFSample sample_brdf_diffuse(in BRDFInfo brdf, in vec3 sample_3d, in SurfaceInfo si) {
   if (cos_theta(si.wi) <= 0.f)
     return brdf_sample_zero();
+
   BRDFSample bs;
   bs.is_spectral = false;
-  bs.is_delta = false;
-  bs.wo       = square_to_cos_hemisphere(sample_3d.yz);
-  bs.pdf      = square_to_cos_hemisphere_pdf(bs.wo);
+  bs.is_delta    = false;
+  bs.wo          = square_to_cos_hemisphere(sample_3d.yz);
+  bs.pdf         = square_to_cos_hemisphere_pdf(bs.wo);
+  
   return bs;
 }
 
 vec4 eval_brdf_diffuse(in BRDFInfo brdf, in SurfaceInfo si, in vec3 wo) {
   if (cos_theta(si.wi) <= 0.f || cos_theta(wo) <= 0.f)
     return vec4(0.f);
+  
   return get_diffuse_r(brdf) * M_PI_INV;
 }
 
 float pdf_brdf_diffuse(in BRDFInfo brdf, in SurfaceInfo si, in vec3 wo) {
   if (cos_theta(si.wi) <= 0.f || cos_theta(wo) <= 0.f)
     return 0.f;
+  
   return square_to_cos_hemisphere_pdf(wo);
 }
 

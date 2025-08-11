@@ -14,9 +14,9 @@ layout(std140) uniform;
 layout(std430) buffer;
 
 // Specialization constant declarations
-layout(constant_id = 0) const uint max_depth = 4;      // Maximum path depth
-layout(constant_id = 1) const uint rr_depth  = 0;      // Russian roulette starting depth
-layout(constant_id = 2) const bool use_debug  = false; // Override and enable debug queries
+layout(constant_id = 0) const uint max_depth = 4;     // Maximum path depth
+layout(constant_id = 1) const uint rr_depth  = 0;     // Russian roulette starting depth
+layout(constant_id = 2) const bool use_debug = false; // Override and enable debug queries
 
 struct WavelengthDistribution {
   float func_sum;
@@ -63,14 +63,18 @@ layout(binding = 7) uniform b_buff_envmap_info {
   bool envm_is_present;
   uint envm_i;
 } buff_envmap_info;
-layout(binding = 8) uniform b_buff_coef_info {
+layout(binding = 8) uniform b_buff_object_coef_info {
   uint n;
   AtlasInfo data[met_max_textures];
-} buff_coef_info;
-layout(binding = 9) uniform b_buff_brdf_info {
+} buff_object_coef_info;
+layout(binding = 9) uniform b_buff_emitter_coef_info {
   uint n;
   AtlasInfo data[met_max_textures];
-} buff_brdf_info;
+} buff_emitter_coef_info;
+layout(binding = 10) uniform b_buff_object_brdf_info {
+  uint n;
+  AtlasInfo data[met_max_textures];
+} buff_object_brdf_info;
 
 // Storage buffer declarations
 layout(binding = 0) restrict readonly buffer b_buff_blas_node { BVHNodePack data[];   } buff_blas_node;
@@ -85,8 +89,9 @@ layout(binding = 3) restrict coherent buffer b_buff_output {
 layout(binding = 0) uniform sampler1DArray b_illm_1f; // Illuminant function data, 1 component
 layout(binding = 1) uniform sampler1DArray b_cmfs_3f; // Observer function data, 3 components
 layout(binding = 2) uniform sampler1DArray b_bsis_1f; // Basis function data, 1 component
-layout(binding = 3) uniform sampler2DArray b_coef_4f; // Texture atlas storing packed coefficients for surface reflectance
-layout(binding = 4) uniform sampler2DArray b_brdf_2f; // Texture atlas storing packed secondary brdf data
+layout(binding = 3) uniform sampler2DArray b_object_coef_4f;  // Texture atlas storing packed coefficients for uplifted reflectance
+layout(binding = 4) uniform sampler2DArray b_object_brdf_2f;  // Texture atlas storing packed secondary brdf data
+layout(binding = 5) uniform sampler2DArray b_emitter_coef_4f; // Texture atlas storing packed coefficients for uplifted illuminants
 
 // Declare scene data; creates functions to access and interact with
 // scene data without knowing the exact names of buffers, textures, etc
@@ -96,7 +101,7 @@ declare_scene_cmfs_data(b_cmfs_3f);
 declare_scene_illuminant_data(b_illm_1f);
 declare_scene_emitter_data(buff_emitter_info.data, buff_emitter_info.n, buff_envmap_info);
 declare_scene_object_data(buff_objects.data, buff_objects.n);
-declare_scene_texture_data(buff_coef_info.data, buff_brdf_info.data, b_coef_4f, b_brdf_2f, b_bsis_1f);
+declare_scene_texture_data(buff_object_coef_info.data, buff_object_brdf_info.data, buff_emitter_coef_info.data, b_object_coef_4f, b_object_brdf_2f, b_emitter_coef_4f, b_bsis_1f);
 declare_scene_blas_data(buff_blas_prim.data, buff_blas_node.data, buff_blas_info.data);
 declare_path_data(buff_output.head, buff_output.data);
 

@@ -200,10 +200,12 @@ namespace met {
   void to_json(json &js, const Emitter &emitter) {
     met_trace();
     js = {{ "type",             emitter.type             },
+          { "spec_type",        emitter.spec_type        },
           { "transform",        emitter.transform        },
           { "is_active",        emitter.is_active        },
           { "illuminant_i",     emitter.illuminant_i     },
           { "illuminant_scale", emitter.illuminant_scale }};
+    js["color"] = {{ "index", emitter.color.index() }, { "variant", emitter.color }};
   }
 
   void from_json(const json &js, Emitter &emitter) {
@@ -213,6 +215,16 @@ namespace met {
     js.at("transform").get_to(emitter.transform);
     js.at("illuminant_i").get_to(emitter.illuminant_i);
     js.at("illuminant_scale").get_to(emitter.illuminant_scale);
+    if (js.contains("spec_type")) {
+      js.at("spec_type").get_to(emitter.spec_type);
+    }
+    if (js.contains("color")) {
+      switch (js.at("color").at("index").get<size_t>()) {
+        case 0: emitter.color = js.at("color").at("variant").get<Colr>(); break;
+        case 1: emitter.color = js.at("color").at("variant").get<uint>(); break;
+        default: debug::check_expr(false, "Error parsing json material data");
+      }
+    }
   }
 
   void to_json(json &js, const Scene &scene) {

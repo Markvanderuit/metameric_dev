@@ -48,6 +48,7 @@ namespace met {
 
   namespace detail {
     // Helper to pack color/uint variant to a uvec2
+    inline
     eig::Array2u pack_material_3f(const std::variant<Colr, uint> &v) {
       met_trace();
       std::array<uint, 2> u;
@@ -63,6 +64,7 @@ namespace met {
     }
 
     // Helper to pack float/uint variant to a uint
+    inline
     uint pack_material_1f(const std::variant<float, uint> &v) {
       met_trace();
       uint u;
@@ -199,9 +201,9 @@ namespace met {
       auto &cache = scene.m_cache_handle.getw<gl::ProgramCache>();
       std::tie(m_program_key, std::ignore) = cache.set({{ 
         .type       = gl::ShaderType::eCompute,
-        .glsl_path  = "shaders/scene/bake_texture_brdf.comp",
-        .spirv_path = "shaders/scene/bake_texture_brdf.comp.spv",
-        .cross_path = "shaders/scene/bake_texture_brdf.comp.json",
+        .glsl_path  = "shaders/scene/bake_object_brdf.comp",
+        .spirv_path = "shaders/scene/bake_object_brdf.comp.spv",
+        .cross_path = "shaders/scene/bake_object_brdf.comp.json",
       }});
 
       // Initialize uniform buffers and writeable, flushable mappings

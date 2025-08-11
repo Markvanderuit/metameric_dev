@@ -58,18 +58,22 @@ struct EmitterInfo {
   #define EmitterTypeSphere    2
   #define EmitterTypeRectangle 3
 
+  #define EmitterSpectrumTypeIlluminant 0
+  #define EmitterSpectrumTypeColor      1
+
   // Transform data; sphere/rect position are extracted
   mat4 trf;                
 
   // Shape data
   bool is_active; // Should the emitter be interacted with?
   uint type;      // Type of emitter; constant, point, sphere, rect
+  uint spec_type; // Type of spectral source: distribution, uplifted color
 
   // Spectral data
-  uint  illuminant_i;     // Index of spd
   float illuminant_scale; // Scalar multiplier applied to values  
+  uint  illuminant_i;     // Index of spd
+  uvec2 color_data;       // Packed data of uplifted color
 };
-
 
 // Info object to gather brdf data locally
 struct BRDFInfo {

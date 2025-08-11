@@ -37,7 +37,7 @@ namespace met {
   
   bool Uplifting::operator==(const Uplifting &o) const {
     return std::tie(observer_i, illuminant_i, basis_i)
-      == std::tie(o.observer_i, o.illuminant_i, o.basis_i) 
+       == std::tie(o.observer_i, o.illuminant_i, o.basis_i) 
       && rng::equal(verts, o.verts);
   }
   
@@ -294,6 +294,7 @@ namespace met {
     SceneGLHandler<met::Uplifting>::SceneGLHandler() {
       met_trace_full();
       
+      // ...
     }
         
     void SceneGLHandler<met::Uplifting>::update(const Scene &scene) {
@@ -301,6 +302,7 @@ namespace met {
 
       // Get relevant resources
       const auto &objects    = scene.components.objects;
+      const auto &emitters   = scene.components.emitters;
       const auto &upliftings = scene.components.upliftings;
       const auto &images     = scene.resources.images;
       const auto &bases      = scene.resources.bases;
@@ -321,15 +323,19 @@ namespace met {
       }
 
       // Flag that the atlas' internal texture has **not** been invalidated by internal resize yet
-      if (texture_coef.is_init())
-        texture_coef.set_invalitated(false);
+      if (texture_object_coef.is_init())
+        texture_object_coef.set_invalitated(false);
+      
+      if (texture_emitter_coef.is_init())
+        texture_emitter_coef.set_invalitated(false);
 
-      // Check for atlas resize
-      if (upliftings || objects || settings.state.texture_size || !texture_coef.is_init()) {
+      // Check for atlas resize (objects)
+      if (upliftings || objects || settings.state.texture_size || !texture_object_coef.is_init()) {
         // First, ensure atlas exists for us to operate on
-        if (!texture_coef.is_init())
-          texture_coef = {{ .levels  = 1, .padding = 0 }};
+        if (!texture_object_coef.is_init())
+          texture_object_coef = {{ .levels  = 1, .padding = 0 }};
 
+        // Gather indices of emitters that need uplifting
         // Gather necessary texture sizes for each object
         // If the texture index was specified, we insert the texture size as an input
         // for the atlas. If a color was specified, we allocate a small patch
@@ -350,12 +356,50 @@ namespace met {
         // Regenerate atlas if inputs don't match the atlas' current layout
         // Note; barycentric weights will need a full rebuild, which is detected
         //       by the nr. of objects changing or the texture setting changing. A bit spaghetti-y :S
-        texture_coef.resize(inputs);
-        if (texture_coef.is_invalitated()) {
+        texture_object_coef.resize(inputs);
+        if (texture_object_coef.is_invalitated()) {
           // The barycentric texture was re-allocated, which means underlying memory was all invalidated.
           // So in a case of really bad spaghetti-code, we force object-dependent parts to update
           auto &e_scene = const_cast<Scene &>(scene);
           e_scene.components.objects.set_mutated(true);
+        }
+      }
+
+      
+      // Check for atlas resize (emitters)
+      if (upliftings || emitters || settings.state.texture_size || !texture_emitter_coef.is_init()) {
+        // First, ensure atlas exists for us to operate on
+        if (!texture_emitter_coef.is_init())
+          texture_emitter_coef = {{ .levels  = 1, .padding = 0 }};
+
+        // Gather indices of emitters that need uplifting
+        // Gather necessary texture sizes for each object
+        // If the texture index was specified, we insert the texture size as an input
+        // for the atlas. If a color was specified, we allocate a small patch
+        std::vector<eig::Array2u> inputs(objects.size());
+        rng::transform(emitters, inputs.begin(), [&](const auto &emitter) -> eig::Array2u {
+          guard(emitter->spec_type == Emitter::SpectrumType::eColr, eig::Array2u  { 0, 0 });
+          return emitter->color | visit {
+            [&](uint i) { return images.gl.m_texture_info_map->data[i].size; },
+            [&](Colr f) { return eig::Array2u { 16, 16 }; },
+          };
+        });
+
+        // Scale atlas inputs to respect the maximum texture size set in Settings::texture_size
+        eig::Array2u maximal = rng::fold_left(inputs, eig::Array2u(0), [](auto a, auto b) { return a.cwiseMax(b).eval(); });
+        eig::Array2f scaled  = settings->apply_texture_size(maximal).cast<float>() / maximal.cast<float>();
+        for (auto &input : inputs)
+          input = (input.cast<float>() * scaled).max(2.f).cast<uint>().eval();
+
+        // Regenerate atlas if inputs don't match the atlas' current layout
+        // Note; barycentric weights will need a full rebuild, which is detected
+        //       by the nr. of objects changing or the texture setting changing. A bit spaghetti-y :S
+        texture_emitter_coef.resize(inputs);
+        if (texture_emitter_coef.is_invalitated()) {
+          // The barycentric texture was re-allocated, which means underlying memory was all invalidated.
+          // So in a case of really bad spaghetti-code, we force object-dependent parts to update
+          auto &e_scene = const_cast<Scene &>(scene);
+          e_scene.components.emitters.set_mutated(true);
         }
       }
 
@@ -368,11 +412,18 @@ namespace met {
         object_data.push_back({ scene, i });
       for (uint i = object_data.size(); i > scene.components.objects.size(); --i)
         object_data.pop_back();
+      for (uint i = emitter_data.size(); i < scene.components.emitters.size(); ++i)
+        emitter_data.push_back({ scene, i });
+      for (uint i = emitter_data.size(); i > scene.components.emitters.size(); --i)
+        emitter_data.pop_back();
+      
 
       // Generate spectral uplifting data and per-object spectral texture
       for (auto &data : uplifting_data)
         data.update(scene);
       for (auto &data : object_data)
+        data.update(scene);
+      for (auto &data : emitter_data)
         data.update(scene);
     }
 
@@ -659,9 +710,9 @@ namespace met {
       auto &cache = scene.m_cache_handle.getw<gl::ProgramCache>();
       std::tie(m_program_key, std::ignore) = cache.set({{ 
         .type       = gl::ShaderType::eCompute,
-        .glsl_path  = "shaders/scene/bake_texture_coef.comp",
-        .spirv_path = "shaders/scene/bake_texture_coef.comp.spv",
-        .cross_path = "shaders/scene/bake_texture_coef.comp.json",
+        .glsl_path  = "shaders/scene/bake_object_coef.comp",
+        .spirv_path = "shaders/scene/bake_object_coef.comp.spv",
+        .cross_path = "shaders/scene/bake_object_coef.comp.json",
       }});
 
       // Initialize uniform buffers and writeable, flushable mappings
@@ -685,7 +736,7 @@ namespace met {
       const auto &uplifting_gl = scene.components.upliftings.gl.uplifting_data[object->uplifting_i];
 
       // Find relevant patch in the texture atlas
-      const auto &atlas = scene.components.upliftings.gl.texture_coef;
+      const auto &atlas = scene.components.upliftings.gl.texture_object_coef;
       const auto &patch = atlas.patch(m_object_i);
 
       // We continue only after careful checking of internal state, as the bake
@@ -710,6 +761,94 @@ namespace met {
       program.bind();
       program.bind("b_buff_unif",        m_buffer);
       program.bind("b_buff_objects",     scene.components.objects.gl.object_info);
+      program.bind("b_buff_atlas",       atlas.buffer());
+      program.bind("b_atlas",            atlas.texture());
+      program.bind("b_buff_uplift_coef", uplifting_gl.buffer_coef);
+      program.bind("b_buff_uplift_bary", uplifting_gl.buffer_bary);
+      if (!scene.resources.images.empty()) {
+        program.bind("b_buff_textures",  scene.resources.images.gl.texture_info);
+        program.bind("b_txtr_3f",        scene.resources.images.gl.texture_atlas_3f.texture());
+        program.bind("b_txtr_3f",        m_sampler);  
+        program.bind("b_txtr_1f",        scene.resources.images.gl.texture_atlas_1f.texture());
+        program.bind("b_txtr_1f",        m_sampler);  
+      }
+
+      // Insert relevant barriers
+      gl::sync::memory_barrier(gl::BarrierFlags::eTextureFetch       |
+                               gl::BarrierFlags::eClientMappedBuffer |
+                               gl::BarrierFlags::eStorageBuffer      | 
+                               gl::BarrierFlags::eUniformBuffer      );
+
+      // Dispatch compute region of patch size
+      auto dispatch_ndiv = ceil_div(patch.size, 16u);
+      gl::dispatch_compute({ .groups_x = dispatch_ndiv.x(),
+                             .groups_y = dispatch_ndiv.y() });
+
+      // Finally; set entry state to false
+      m_is_first_update = false;
+    }
+
+    SceneGLHandler<met::Uplifting>::EmitterData::EmitterData(const Scene &scene, uint emitter_i)
+    : m_emitter_i(emitter_i) {
+      met_trace_full();
+
+      // Build shader in program cache, if it is not loaded already
+      auto &cache = scene.m_cache_handle.getw<gl::ProgramCache>();
+      std::tie(m_program_key, std::ignore) = cache.set({{ 
+        .type       = gl::ShaderType::eCompute,
+        .glsl_path  = "shaders/scene/bake_emitter_coef.comp",
+        .spirv_path = "shaders/scene/bake_emitter_coef.comp.spv",
+        .cross_path = "shaders/scene/bake_emitter_coef.comp.json",
+      }});
+
+      // Initialize uniform buffers and writeable, flushable mappings
+      std::tie(m_buffer, m_buffer_map) = gl::Buffer::make_flusheable_object<BlockLayout>();
+      m_buffer_map->emitter_i = m_emitter_i;
+      m_buffer.flush();
+
+      // Linear texture sampler
+      m_sampler = {{ .min_filter = gl::SamplerMinFilter::eLinear, 
+                     .mag_filter = gl::SamplerMagFilter::eLinear }};
+    }
+    
+    void SceneGLHandler<met::Uplifting>::EmitterData::update(const Scene &scene) {
+      met_trace_full();
+
+      // Get handles to relevant scene data
+      const auto &emitter      = scene.components.emitters[m_emitter_i];
+      const auto &settings     = scene.components.settings;
+      const auto &uplifting    = scene.components.upliftings[0];
+      const auto &uplifting_gl = scene.components.upliftings.gl.uplifting_data[0];
+
+      // Find relevant patch in the texture atlas
+      const auto &atlas = scene.components.upliftings.gl.texture_emitter_coef;
+      const auto &patch = atlas.patch(m_emitter_i);
+      
+      // Check that a patch is actually used, if it is at 0
+      // we already know the emitter doesn't need uplifting
+      guard(!patch.size.isApprox(eig::Array2u(0)));
+
+      // We continue only after careful checking of internal state, as the bake
+      // is relatively expensive and doesn't always need to happen. Careful in
+      // this case means "ewwwwwww"
+      bool is_active 
+         = m_is_first_update            // First run, demands render anyways
+        || atlas.is_invalitated()       // Texture atlas re-allocated, demands re-render
+        || emitter.state.color          // Different color value set on emitter
+        || emitter.state.type           // Different type set on emitter
+        || emitter.state.spec_type      // Different type set on emitter
+        || uplifting                    // Uplifting was changed
+        || scene.resources.images       // User loaded/deleted a image;
+        || settings.state.texture_size; // Texture size setting changed
+      guard(is_active);
+      fmt::print("Uplifting {}: baked emitter {}\n", 0, m_emitter_i);
+
+      // Get relevant program handle, bind, then bind resources to corresponding targets
+      auto &cache = scene.m_cache_handle.getw<gl::ProgramCache>();
+      auto &program = cache.at(m_program_key);
+      program.bind();
+      program.bind("b_buff_unif",        m_buffer);
+      program.bind("b_buff_emitters",    scene.components.emitters.gl.emitter_info);
       program.bind("b_buff_atlas",       atlas.buffer());
       program.bind("b_atlas",            atlas.texture());
       program.bind("b_buff_uplift_coef", uplifting_gl.buffer_coef);

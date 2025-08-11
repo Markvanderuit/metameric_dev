@@ -39,7 +39,7 @@ vec4 Li(in SensorSample ss, in SamplerState state, out float alpha) {
     guard_break(max_depth == 0 || depth < max_depth);
 
     // Ray-trace first. Then, if no surface is intersected by the ray, 
-    // add contribution of environment map, and terminate the current path
+    // add contribution of environment map and terminate the current path
     if (!scene_intersect(ss.ray)) {
       if (scene_has_envm_emitter()) {
         float em_pdf = bs_is_delta ? 0.f : pdf_env_emitter(ss.ray.d, ss.wvls);
@@ -115,9 +115,9 @@ vec4 Li(in SensorSample ss, in SamplerState state, out float alpha) {
 
           // Assemble path throughput
           vec4 s = Beta                    // current path throughput
-                 * es.L                    // emitter response
                  * eval_brdf(brdf, si, wo) // brdf response
                  * cos_theta(wo)           // cosine attenuation
+                 * es.L                    // emitter response
                  * mis_weight              // mis weight
                  / es.pdf;                 // sample density
 
@@ -138,21 +138,21 @@ vec4 Li(in SensorSample ss, in SamplerState state, out float alpha) {
       // Early exit on zero brdf density
       if (bs.pdf == 0.f)
         break;
-
-      // Handle introduction of wavelength-dependence in the BRDF sample
-      if (!bs_is_spectral && bs.is_spectral) {
-        bs_is_spectral = true;
-        Beta *= vec4(4, 0, 0, 0);
-      }
       
       // Update throughput, sample density
       Beta *= eval_brdf(brdf, si, bs.wo) // brdf throughput
             * abs(cos_theta(bs.wo))      // cosine attenuation
             / bs.pdf;
 
-      // Update relevant sample information
+      // Store last brdf sample information for NEE
       bs_pdf      = bs.pdf;
       bs_is_delta = bs.is_delta;
+
+      // Handle wavelength-dependence in the BRDF by terminating secondary wavelengths
+      if (!bs_is_spectral && bs.is_spectral) {
+        bs_is_spectral = true;
+        Beta *= vec4(4, 0, 0, 0);
+      }
 
       // Generate the next ray to trace through the scene
       ss.ray = ray_towards_direction(si, to_world(si, bs.wo));

@@ -46,6 +46,10 @@ vec3 square_to_unif_sphere(in vec2 sample_2d) {
   return vec3(r * cos_phi, r * sin_phi, z);
 }
 
+float square_to_unif_sphere_pdf(in vec3 v) {
+  return M_PI_INV;
+}
+
 vec3 square_to_cos_hemisphere(in vec2 sample_2d) {
   vec2 p = square_to_unif_disk_concentric(sample_2d);
   return vec3(p, sqrt(max(1.f - sdot(p), 0.f)));
