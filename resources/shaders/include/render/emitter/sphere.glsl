@@ -1,6 +1,20 @@
 #ifndef RENDER_EMITTER_SPHERE_GLSL_GUARD
 #define RENDER_EMITTER_SPHERE_GLSL_GUARD
 
+vec4 eval_emitter_sphere(in EmitterInfo em, in SurfaceInfo si, in vec4 wvls) {
+  // If normal is not inclined along the ray, return nothing
+  if (cos_theta(si.wi) <= 0)
+    return vec4(0);
+  
+  vec2 tx2 = vec2(atan(length(si.ns.xy) / si.ns.z), atan(si.ns.y / si.ns.x));
+
+  return scene_illuminant(em.illuminant_i, wvls) * em.illuminant_scale;
+}
+
+float pdf_emitter_sphere(in EmitterInfo em, in SurfaceInfo si) {
+  return 2.f * M_PI_INV * sdot(si.t) / (sdot(em.trf[0].xyz) * cos_theta(si.wi));
+}
+
 EmitterSample sample_emitter_sphere(in EmitterInfo em, in SurfaceInfo si, in vec4 wvls, in vec2 sample_2d) {
   // Sample position on hemisphere facing surface, point may not be nearest
   Frame frm = get_frame(normalize(si.p - em.trf[3].xyz));
@@ -22,22 +36,11 @@ EmitterSample sample_emitter_sphere(in EmitterInfo em, in SurfaceInfo si, in vec
     return es;
   }
   
-  es.L        = scene_illuminant(em.illuminant_i, wvls) * em.illuminant_scale;
+  es.L        = eval_emitter_sphere(em, si, wvls);
   es.pdf      = 2.f * M_PI_INV * sdot(es.ray.t) / (sdot(em.trf[0].xyz) * dp);
   es.is_delta = false;
 
   return es;
-}
-
-vec4 eval_emitter_sphere(in EmitterInfo em, in SurfaceInfo si, in vec4 wvls) {
-  // If normal is not inclined along the ray, return nothing
-  if (cos_theta(si.wi) <= 0)
-    return vec4(0);
-  return scene_illuminant(em.illuminant_i, wvls) * em.illuminant_scale;
-}
-
-float pdf_emitter_sphere(in EmitterInfo em, in SurfaceInfo si) {
-  return 2.f * M_PI_INV * sdot(si.t) / (sdot(em.trf[0].xyz) * cos_theta(si.wi));
 }
 
 #endif // RENDER_EMITTER_SPHERE_GLSL_GUARD

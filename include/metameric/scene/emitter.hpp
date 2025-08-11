@@ -155,3 +155,22 @@ struct fmt::formatter<met::Emitter::Type>{
     return fmt::format_to(ctx.out(), "{}", s);
   }
 };
+
+template<>
+struct fmt::formatter<met::Emitter::SpectrumType>{
+  template <typename context_ty>
+  constexpr auto parse(context_ty& ctx) { 
+    return ctx.begin(); 
+  }
+
+  template <typename fmt_context_ty>
+  constexpr auto format(const met::Emitter::SpectrumType& ty, fmt_context_ty& ctx) const {
+    std::string s;
+    switch (ty) {
+      case met::Emitter::SpectrumType::eIllm : s = "spectrum"; break;
+      case met::Emitter::SpectrumType::eColr : s = "uplifted"; break;
+      default                                : s = "undefined"; break;
+    }
+    return fmt::format_to(ctx.out(), "{}", s);
+  }
+};

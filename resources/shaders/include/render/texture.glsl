@@ -1,6 +1,8 @@
 #ifndef TEXTURE_GLSL_GUARD
 #define TEXTURE_GLSL_GUARD
 
+#include <render/warp.glsl>
+
 // Constant-expression texel corners used for manual texture interpolation
 const vec2 tx_offsets[4] = { vec2(0, 0), vec2(1, 0), vec2(0, 1), vec2(1, 1) };
 
@@ -46,27 +48,52 @@ vec3 si_to_object_brdf_atlas_tx(in SurfaceInfo si) {
   return tx3;
 }
 
-// Translate emitter texture coordinates to coordinates suited for a texture atlas;
-// baked spectral texture coefficients live in an atlas in this implementation, 
-// so this step is necessary.
-vec3 si_to_emitter_coef_atlas_tx(in SurfaceInfo si) {
-  // Load relevant info objects
-  ObjectInfo object_info = scene_object_info(record_get_object(si.data));
-  AtlasInfo  atlas_info  = scene_texture_object_coef_info(record_get_object(si.data));
+// // Translate emitter texture coordinates to coordinates suited for a texture atlas;
+// // baked spectral texture coefficients live in an atlas in this implementation, 
+// // so this step is necessary.
+// vec3 si_to_envmap_coef_atlas_tx(in EmitterInfo emitter_info, in vec3 d) {
+//   // Load relevant info objects
+//   AtlasInfo  atlas_info  = scene_texture_emitter_coef_info(scene_envm_emitter_idx());
   
-  // Obtain uv coordinates, or set to 0.5 if the albedo value is specified
-  vec2 tx2 = record_is_sampled(object_info.albedo_data) ? si.tx : vec2(0.5f);
+//   // Transform directional vector to spherical coordinates, or set to 0.5 if
+//   // a single value is specified
+//   // vec2 tx2 = vec2(acos(d.z), atan(d.y, d.x));
 
-  // Translate to texture atlas patch
-  vec3 tx3 = vec3(atlas_info.uv0 + atlas_info.uv1 * tx2, atlas_info.layer);
-  tx3.xy *= scene_texture_object_coef_size(); // Scale [0,1] to texture size
-  tx3.xy -= 0.5f;                            // Offset by half a pixel
+//   // Obtain uv coordinates, or set to 0.5 if the albedo value is specified
+//   vec2 tx2 = record_is_sampled(object_info.albedo_data) ? si.tx : vec2(0.5f);
 
-  // Clamp to texture atlas patch
-  tx3.xy = clamp(tx3.xy, vec2(atlas_info.offs), vec2(atlas_info.offs + atlas_info.size - 1));
+//   // Translate to texture atlas patch
+//   vec3 tx3 = vec3(atlas_info.uv0 + atlas_info.uv1 * tx2, atlas_info.layer);
+//   tx3.xy *= scene_texture_object_coef_size(); // Scale [0,1] to texture size
+//   tx3.xy -= 0.5f;                            // Offset by half a pixel
 
-  return tx3;
-}
+//   // Clamp to texture atlas patch
+//   tx3.xy = clamp(tx3.xy, vec2(atlas_info.offs), vec2(atlas_info.offs + atlas_info.size - 1));
+
+//   return tx3;
+// }
+
+// // Translate emitter texture coordinates to coordinates suited for a texture atlas;
+// // baked spectral texture coefficients live in an atlas in this implementation, 
+// // so this step is necessary.
+// vec3 si_to_emitter_coef_atlas_tx(in EmitterInfo emitter_info, in SurfaceInfo si) {
+//   // Load relevant info objects
+//   // ObjectInfo object_info = scene_object_info(record_get_object(si.data));
+//   AtlasInfo  atlas_info  = scene_texture_emitter_coef_info(record_get_object(si.data));
+  
+//   // Obtain uv coordinates, or set to 0.5 if the albedo value is specified
+//   vec2 tx2 = record_is_sampled(object_info.albedo_data) ? si.tx : vec2(0.5f);
+
+//   // Translate to texture atlas patch
+//   vec3 tx3 = vec3(atlas_info.uv0 + atlas_info.uv1 * tx2, atlas_info.layer);
+//   tx3.xy *= scene_texture_object_coef_size(); // Scale [0,1] to texture size
+//   tx3.xy -= 0.5f;                            // Offset by half a pixel
+
+//   // Clamp to texture atlas patch
+//   tx3.xy = clamp(tx3.xy, vec2(atlas_info.offs), vec2(atlas_info.offs + atlas_info.size - 1));
+
+//   return tx3;
+// }
 
 // Sample four-wavelength surface reflectances using stochastic sampling; we avoid
 // doing four texel fetches + unpacking, and instead do simple stochastic filtering

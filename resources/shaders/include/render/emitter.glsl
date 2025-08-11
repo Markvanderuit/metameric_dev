@@ -35,15 +35,15 @@ vec4 eval_emitter(in EmitterInfo em, in SurfaceInfo si, in vec4 wvls) {
   } else if (em.type == EmitterTypePoint) {
     return eval_emitter_point(em, si, wvls);
   } else if (em.type == EmitterTypeConstant) {
-    return eval_emitter_constant(em, wvls);
+    return eval_emitter_constant(em, wvls, to_world(si, si.wi));
   }
 }
 
-vec4 eval_env_emitter(in vec4 wvls) {
+vec4 eval_env_emitter(in vec4 wvls, vec3 wo) {
   if (!scene_has_envm_emitter())
     return vec4(0);
   EmitterInfo em = scene_emitter_info(scene_envm_emitter_idx());
-  return eval_emitter_constant(em, wvls);
+  return eval_emitter_constant(em, wvls, wo);
 }
 
 float pdf_env_emitter(vec3 d_local, in vec4 wvls) {

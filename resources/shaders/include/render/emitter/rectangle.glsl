@@ -30,6 +30,10 @@ vec4 eval_emitter_rectangle(in EmitterInfo em, in SurfaceInfo si, in vec4 wvls) 
   // If normal is not inclined along the ray, return nothing
   if (cos_theta(si.wi) <= 0)
     return vec4(0);
+  
+  // Texture coordinates
+  vec2 xy = 0.5 + (inverse(em.trf) * vec4(si.p, 1)).xy;
+
   return scene_illuminant(em.illuminant_i, wvls) * em.illuminant_scale;
 }
 

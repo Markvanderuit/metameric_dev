@@ -15,8 +15,8 @@ EmitterSample sample_emitter_constant(in EmitterInfo em, in SurfaceInfo si, in v
   return es;
 }
 
-vec4 eval_emitter_constant(in EmitterInfo em, in vec4 wvls) {
-  return scene_illuminant(em.illuminant_i, wvls) * em.illuminant_scale;
+vec4 eval_emitter_constant(in EmitterInfo em, in vec4 wvls, in vec3 wo) {
+  return scene_illuminant(em.illuminant_i, wvls) * em.illuminant_scale * wo.y;
 }
 
 float pdf_emitter_constant(in EmitterInfo em, in vec3 d_local) {

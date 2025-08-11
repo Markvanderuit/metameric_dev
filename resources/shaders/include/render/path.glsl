@@ -45,9 +45,9 @@ vec4 Li(in SensorSample ss, in SamplerState state, out float alpha) {
         float em_pdf = bs_is_delta ? 0.f : pdf_env_emitter(ss.ray.d, ss.wvls);
         
         // No division by sample density, as this is incorporated in path throughput
-        vec4 s = Beta                       // throughput
-               * eval_env_emitter(ss.wvls)  // emitted value
-               * mis_power(bs_pdf, em_pdf); // mis weight
+        vec4 s = Beta                                 // throughput
+               * eval_env_emitter(ss.wvls, ss.ray.d)  // emitted value
+               * mis_power(bs_pdf, em_pdf);           // mis weight
 
         // Store current path query if requested
         path_query_finalize_envmap(pt, s, ss.wvls);

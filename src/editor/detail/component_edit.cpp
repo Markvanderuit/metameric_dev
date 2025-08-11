@@ -169,8 +169,27 @@ namespace met {
       
       ImGui::Separator();
 
+      // Illuminant distribution/uplifted color
+      
+      // Type selector
+      if (ImGui::BeginCombo("Illuminant type", fmt::format("{}", value.spec_type).c_str())) {
+        for (uint i = 0; i < 2; ++i) {
+          auto type = static_cast<Emitter::SpectrumType>(i);
+          auto name = fmt::format("{}", type);
+          if (ImGui::Selectable(name.c_str(), value.spec_type == type)) {
+            value.spec_type = type;
+          }
+        } // for (uint i)
+        ImGui::EndCombo();
+      }
+
       // Target distribution
-      push_resource_selector("Illuminant", scene.resources.illuminants, value.illuminant_i);
+      if (value.spec_type == Emitter::SpectrumType::eIllm) {
+        push_resource_selector("Spectrum", scene.resources.illuminants, value.illuminant_i);
+      }
+      if (value.spec_type == Emitter::SpectrumType::eColr) {
+        push_texture_variant_selector_3f("Color", scene.resources.images, value.color);
+      }
       ImGui::DragFloat("Power", &value.illuminant_scale, 0.005f, 0.0f, 100.f);
     };
 
