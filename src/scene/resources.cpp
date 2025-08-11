@@ -479,7 +479,7 @@ namespace met::detail {
     // for (int i = 0; i < emitters.size(); ++i) {
     //   const auto &[emitter, state] = emitters[i];
     //   guard_continue(emitter.is_active);
-    //   guard_continue(emitter.type != Emitter::Type::eConstant && emitter.type != Emitter::Type::ePoint);
+    //   guard_continue(emitter.type != Emitter::Type::eEnviron && emitter.type != Emitter::Type::ePoint);
             
     //   // Get emitter transform
     //   auto trf = emitter.transform.affine();

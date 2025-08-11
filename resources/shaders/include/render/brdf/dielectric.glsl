@@ -7,9 +7,9 @@
 #define get_dielectric_r(brdf)             brdf.r
 #define get_dielectric_cauchy_b(brdf)      brdf.data.x
 #define get_dielectric_cauchy_c(brdf)      brdf.data.y
+#define get_dielectric_eta(brdf)           brdf.data.x
+#define get_dielectric_is_dispersive(brdf) (brdf.data.y != 0)
 #define get_dielectric_absorption(brdf)    brdf.data.z
-#define get_dielectric_eta(brdf)           brdf.data.w
-#define get_dielectric_is_dispersive(brdf) (brdf.data.w == 0)
 
 // Source, Mitsuba 0.5, util.cpp, line 651
 float _brdf_dielectric_fresnel(in float cos_theta_i, inout float cos_theta_t, in float eta) {
@@ -53,10 +53,8 @@ void init_brdf_dielectric(in ObjectInfo object, inout BRDFInfo brdf, in SurfaceI
   if (eta_min == eta_max || eta_min > eta_max) {
     // Effectively disables _brdf_eta_dispersive(...) in case configuration isn't spectral
     get_dielectric_eta(brdf) = eta_min;
+    get_dielectric_cauchy_c(brdf) = 0;
   } else {
-    // Set exact eta to 0 so get_brdf_is_dispersive() returns true
-    get_dielectric_eta(brdf) = 0;
-
     // Compute cauchy coefficients b and c
     float lambda_min_2 = wavelength_min * wavelength_min, 
           lambda_max_2 = wavelength_max * wavelength_max;
@@ -109,10 +107,7 @@ vec4 eval_brdf_dielectric(in BRDFInfo brdf, in SurfaceInfo si, in vec3 wo) {
            ? vec4(1)
            : exp(-get_dielectric_absorption(brdf) * (vec4(1) - get_dielectric_r(brdf)) * si.t);
     float scaling = cos_theta_t < 0.f ? 1.f / eta : eta;
-    return r 
-          * (scaling * scaling)
-          * (1.f - F)
-          / abs(cos_theta(si.wi));
+    return r * sdot(scaling) * (1.f - F) / abs(cos_theta(si.wi));
   }
 }
 

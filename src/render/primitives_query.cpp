@@ -134,16 +134,11 @@ namespace met {
     program.bind("b_buff_wvls_distr",     m_wavelength_distr_buffer);
     program.bind("b_buff_emitters_distr", scene.components.emitters.gl.emitter_distr_buffer);
     program.bind("b_buff_envmap_info",    scene.components.emitters.gl.emitter_envm_info);
-    program.bind("b_coef_4f",             scene.components.upliftings.gl.texture_coef.texture());
-    program.bind("b_coef_4f",             m_sampler);
-    program.bind("b_brdf_2f",             scene.components.objects.gl.texture_brdf.texture());
-    program.bind("b_brdf_2f",             m_sampler);
-    program.bind("b_bsis_1f",             scene.components.upliftings.gl.texture_basis);
-    program.bind("b_bsis_1f",             m_sampler);
-    program.bind("b_cmfs_3f",             scene.resources.observers.gl.cmfs_texture);
-    program.bind("b_cmfs_3f",             m_sampler);
-    program.bind("b_illm_1f",             scene.resources.illuminants.gl.spec_texture);
-    program.bind("b_illm_1f",             m_sampler);
+    program.bind("b_coef_4f",             scene.components.upliftings.gl.texture_coef.texture(), m_sampler);
+    program.bind("b_brdf_2f",             scene.components.objects.gl.texture_brdf.texture(), m_sampler);
+    program.bind("b_bsis_1f",             scene.components.upliftings.gl.texture_basis, m_sampler);
+    program.bind("b_cmfs_3f",             scene.resources.observers.gl.cmfs_texture, m_sampler);
+    program.bind("b_illm_1f",             scene.resources.illuminants.gl.spec_texture, m_sampler);
     if (!scene.resources.meshes.empty()) {
       program.bind("b_buff_blas_info", scene.resources.meshes.gl.blas_info);
       program.bind("b_buff_blas_node", scene.resources.meshes.gl.blas_nodes);

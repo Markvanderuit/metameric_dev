@@ -16,6 +16,7 @@
 #pragma once
 
 #include <metameric/core/fwd.hpp>
+#include <metameric/scene/detail/atlas.hpp>
 #include <metameric/scene/detail/utility.hpp>
 #include <small_gl/buffer.hpp>
 
@@ -24,10 +25,10 @@ namespace met {
   struct Emitter {
     // Emitter type; only very basic primitives are supported
     enum class Type : uint { 
-      eConstant = 0u, 
-      ePoint    = 1u, 
-      eSphere   = 2u, 
-      eRect     = 3u
+      eEnviron = 0u, 
+      ePoint   = 1u, 
+      eSphere  = 2u, 
+      eRect    = 3u
     };
 
   public:
@@ -38,14 +39,17 @@ namespace met {
     bool      is_active = true;
     Transform transform;
 
-    // Spectral data references a scene resource 
-    uint  illuminant_i     = 0;    // index to spectral illuminant
-    float illuminant_scale = 1.f;  // power multiplier
+    // Spectral data references a scene resource
+    bool  is_textured      = 0;   // select between spectrum and spatially varying texture data
+    uint  illuminant_i     = 0;   // index to illuminant spectrum, not spatially varying
+    uint  texture_i        = 0;   // index to uplifted rgb texture, spatially varying
+    float illuminant_scale = 1.f; // power scaling
+    
 
   public: // Boilerplater
     bool operator==(const Emitter &o) const {
-      return std::tie(type, is_active, transform, illuminant_i, illuminant_scale) 
-          == std::tie(o.type, o.is_active, o.transform, o.illuminant_i, o.illuminant_scale);
+      return std::tie(type, is_active, transform, illuminant_i, is_textured, texture_i, illuminant_scale) 
+          == std::tie(o.type, o.is_active, o.transform, o.illuminant_i, o.is_textured, o.texture_i, o.illuminant_scale);
     }
   };
 
@@ -60,7 +64,7 @@ namespace met {
         alignas(16) eig::Matrix4f trf;
         alignas(4)  uint          is_active;
         alignas(4)  uint          type;
-        alignas(4)  uint          illuminant_i;
+        alignas(4)  uint          illuminant_data;
         alignas(4)  float         illuminant_scale;
       };
       static_assert(sizeof(BlockLayout) == 80);
@@ -87,7 +91,8 @@ namespace met {
       // This buffer stores information on at most one environment emitter to sample.
       gl::Buffer emitter_envm_info;
 
-      // Thiis buffer stores a sampling distribution based on emitter power and surface
+      // This buffer stores a sampling distribution based on emitter power and surface
+      // This ignores spatially varying emitters r.n.
       gl::Buffer emitter_distr_buffer;
 
     public:
@@ -109,7 +114,7 @@ struct fmt::formatter<met::Emitter::Type>{
   constexpr auto format(const met::Emitter::Type& ty, fmt_context_ty& ctx) const {
     std::string s;
     switch (ty) {
-      case met::Emitter::Type::eConstant : s = "constant"; break;
+      case met::Emitter::Type::eEnviron  : s = "environ"; break;
       case met::Emitter::Type::ePoint    : s = "point"; break;
       case met::Emitter::Type::eRect     : s = "rect"; break;
       case met::Emitter::Type::eSphere   : s = "sphere"; break;

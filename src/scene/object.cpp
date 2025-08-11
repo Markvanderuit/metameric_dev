@@ -18,6 +18,8 @@
 
 namespace met {
   bool Object::operator==(const Object &o) const {
+    met_trace();
+
     guard(std::tie(is_active,   transform,   mesh_i,   uplifting_i,   brdf_type, absorption) == 
           std::tie(o.is_active, o.transform, o.mesh_i, o.uplifting_i, o.brdf_type, o.absorption), 
           false);
