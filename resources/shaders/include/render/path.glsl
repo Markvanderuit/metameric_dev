@@ -18,7 +18,7 @@ vec4 Li_debug(in SensorSample ss, in SamplerState state) {
   if (!is_valid(si) || !is_object(si))
     return vec4(0);
     
-  return vec4(si.t, si.t, si.t, 1);
+  return vec4(vec3(abs(si.t)), 1);
 }
 
 vec4 Li(in SensorSample ss, in SamplerState state, out float alpha) {
@@ -38,41 +38,23 @@ vec4 Li(in SensorSample ss, in SamplerState state, out float alpha) {
   for (uint depth = 0; ; ++depth) {
     guard_break(max_depth == 0 || depth < max_depth);
 
-    // Ray-trace first. Then, if no surface is intersected by the ray, 
-    // add contribution of environment map and terminate the current path
+    // Ray-trace against scene first
     if (!scene_intersect(ss.ray)) {
-      if (scene_has_envm_emitter()) {
-        float em_pdf = bs_is_delta ? 0.f : pdf_env_emitter(ss.ray.d, ss.wvls);
-        
-        // No division by sample density, as this is incorporated in path throughput
-        vec4 s = Beta                                 // throughput
-               * eval_env_emitter(ss.wvls, ss.ray.d)  // emitted value
-               * mis_power(bs_pdf, em_pdf);           // mis weight
-
-        // Store current path query if requested
-        path_query_finalize_envmap(pt, s, ss.wvls);
-
-        // Add to output radiance
-        Li += s;
-      }
-      
       // Output 0 alpha on initial ray miss
       alpha = depth > 0 ? 1.f : 0.f;
-      break;
     } else {
+      // Store the next vertex to path query if requested
+      path_query_extend(pt, ss.ray);
       alpha = 1.f;
     }
 
-    // Get info about the intersected surface
+    // Get info about the intersected surface or lack thereof
     SurfaceInfo si = get_surface_info(ss.ray);
-
-    // Store the next vertex to path query if requested
-    path_query_extend(pt, ss.ray);
 
     // If an emissive object is hit, add its contribution to the 
     // current path, and then terminate said path
     if (is_emitter(si)) {
-      float em_pdf = bs_is_delta ? 0.f : pdf_emitters(si, ss.wvls);
+      float em_pdf = bs_is_delta ? 0.f : pdf_emitter(si);
 
       // No division by sample density, as this is incorporated in path throughput
       vec4 s = Beta                       // throughput 
@@ -87,17 +69,13 @@ vec4 Li(in SensorSample ss, in SamplerState state, out float alpha) {
       break;
     }
 
-    // If maximum path depth was reached at this point, terminate
-    if (depth == max_depth - 1)
-      break;
-
     // Construct the underlying BRDF at the intersected surface
     BRDFInfo brdf = get_brdf(si, ss.wvls, next_2d(state));
     
     // Emitter sampling
     {
       // Generate directional sample towards emitter
-      EmitterSample es = sample_emitters(si, ss.wvls, next_3d(state));
+      EmitterSample es = sample_emitter(si, ss.wvls, next_3d(state));
       
       // Exitant direction in local frame
       vec3 wo = to_local(si, es.ray.d);

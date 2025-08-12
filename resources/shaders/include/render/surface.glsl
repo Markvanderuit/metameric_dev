@@ -5,20 +5,33 @@
 #include <render/frame.glsl>
 #include <render/record.glsl>
 
+// An object defining a generic ray intersection in the scene.
+// Also defines no intersection (e.g. envmaps in the distance)
+// Generally the output of ray_intersect(...)
+struct IntersectionInfo {
+  vec3 p;  // Potential intersected position, can be undefined
+  vec3 n;  // Normal defining intersection-local frame
+  vec2 tx; // Surface/emitter texture coordinates
+  vec3 wi; // Incident direction in local frame
+  float t; // Distance traveled along ray in incident direction
+
+  // Intersected object/emitter record; validity, type, entity index, optionally underlying primitive
+  uint data;
+};
+
 // An object defining a potential surface intersection in the scene.
 // Is generally the output of ray_intersect(...).
 struct SurfaceInfo {
-  // Surface geometric information
+  // Surface information
   vec3 p;  // Surface position in world space
-  vec3 n;  // Surface geometric normal
   vec2 tx; // Surface texture coordinates
+  vec3 n;  // Surface shading normal; defines local frame
  
-  // Local shading information
-  vec3 ns; // Surface shading normal; defines local shading frame
-  vec3 wi; // Incident direction in local shading frame
-  float t; // Distance traveled along ray in incident direction
+  // Ray information
+  vec3 wi; // Incident direction in local frame
+  float t; // Distance traveled along incident direction
   
-  // Intersected object record; object/emitter index, primitive index
+  // Intersection record; object/emitter index, primitive index
   uint data;
 };
 
@@ -35,13 +48,16 @@ SurfaceInfo get_surface_info(in Ray ray) {
   SurfaceInfo si;
   si.data = ray.data;
   
-  // If hit data is present, forward to underlying surface type: object or emitter
   if (is_valid(si)) {
+    // If hit data is present, forward to underlying surface type: object or emitter
     if (is_object(si)) {
       detail_fill_surface_info_object(si, ray);
     } else if (is_emitter(si)) {
       detail_fill_surface_info_emitter(si, ray);
     }
+  } else {
+    // Otherwise, fill info for fallback interaction type: envmap
+    detail_fill_surface_info_envmap(si, ray);
   }
 
   return si;
@@ -49,15 +65,15 @@ SurfaceInfo get_surface_info(in Ray ray) {
 
 // Offset above/below surface depending on the incidence of the ray direction
 vec3 surface_offset(in SurfaceInfo si, in vec3 d) {
-  if (dot(si.ns, d) >= 0)
+  if (dot(si.n, d) >= 0)
     return si.p + si.n * M_RAY_EPS;
   else
     return si.p - si.n * M_RAY_EPS;
 }
 
 // Shorthands for frame transformation
-vec3 to_local(in SurfaceInfo si, in vec3 v) { return to_local(get_frame(si.ns), v); }
-vec3 to_world(in SurfaceInfo si, in vec3 v) { return to_world(get_frame(si.ns), v); }
+vec3 to_local(in SurfaceInfo si, in vec3 v) { return to_local(get_frame(si.n), v); }
+vec3 to_world(in SurfaceInfo si, in vec3 v) { return to_world(get_frame(si.n), v); }
 
 Ray ray_towards_direction(in SurfaceInfo si, in vec3 d) {
   return init_ray(surface_offset(si, d), d);

@@ -100,7 +100,7 @@ vec4 eval_brdf_dielectric(in BRDFInfo brdf, in SurfaceInfo si, in vec3 wo) {
            ? vec4(1)
            : exp(-get_dielectric_absorption(brdf) * (vec4(1) - get_dielectric_r(brdf)) * si.t);
     float scaling = sdot(cos_theta_t < 0.f ? 1.f / eta : eta);
-    return vec4(scaling * (1.f - F) / abs(cos_theta(wo)));
+    return r * scaling * (1.f - F) / abs(cos_theta(wo));
   }
 }
 

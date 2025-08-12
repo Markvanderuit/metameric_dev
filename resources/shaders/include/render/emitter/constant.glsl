@@ -16,11 +16,11 @@ EmitterSample sample_emitter_constant(in EmitterInfo em, in SurfaceInfo si, in v
 }
 
 vec4 eval_emitter_constant(in EmitterInfo em, in vec4 wvls, in vec3 wo) {
-  return scene_illuminant(em.illuminant_i, wvls) * em.illuminant_scale * wo.y;
+  return scene_illuminant(em.illuminant_i, wvls) * em.illuminant_scale;
 }
 
-float pdf_emitter_constant(in EmitterInfo em, in vec3 d_local) {
-  return square_to_unif_hemisphere_pdf(d_local);
+float pdf_emitter_constant(in EmitterInfo em, in SurfaceInfo si) {
+  return square_to_unif_hemisphere_pdf(si.wi);
 }
 
 #endif // RENDER_EMITTER_CONSTANT_GLSL_GUARD

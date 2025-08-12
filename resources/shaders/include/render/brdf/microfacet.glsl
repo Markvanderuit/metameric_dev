@@ -48,7 +48,8 @@ vec4 eval_brdf_microfacet(in BRDFInfo brdf, in SurfaceInfo si, in vec3 wo) {
   
   // Diffuse component
   // Lambert, subdued by metallic for now
-  vec4 diffuse = get_microfacet_r(brdf) * (1.f - get_microfacet_metallic(brdf));
+  vec4 diffuse = (1.f - get_microfacet_metallic(brdf))
+               * get_microfacet_r(brdf);
   f += diffuse;
 
   // Specular componennt
@@ -57,7 +58,8 @@ vec4 eval_brdf_microfacet(in BRDFInfo brdf, in SurfaceInfo si, in vec3 wo) {
   float D_G = eval_microfacet(si, wh, wo, get_microfacet_alpha(brdf));
   vec4  F0  = clamp(mix(vec4(eta_to_specular(get_microfacet_eta(brdf))), get_microfacet_r(brdf), get_microfacet_metallic(brdf)), 0.f, 1.f);
   vec4  F   = schlick_fresnel(F0, max(0.f, dot(si.wi, wh)));
-  f += D_G * F;
+  vec4 specular = D_G * F;
+  f += specular;
 
   return f * M_PI_INV;
 }
