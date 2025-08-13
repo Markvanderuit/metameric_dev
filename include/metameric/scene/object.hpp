@@ -90,14 +90,17 @@ namespace met {
       // Per-object block layout
       struct BlockLayout {
         alignas(16) eig::Matrix4f trf;
+        // ---
         alignas(4)  uint          is_active;
         alignas(4)  uint          mesh_i;
         alignas(4)  uint          uplifting_i;
         alignas(4)  uint          brdf_type;
+        // ---
         alignas(8)  eig::Array2u  albedo_data;
         alignas(4)  uint          metallic_data;
         alignas(4)  uint          roughness_data;
-        alignas(4)  eig::Array2f  eta_minmax;
+        // ---
+        alignas(8)  eig::Array2f  eta_minmax;
         alignas(4)  float         absorption;
       };
       static_assert(sizeof(BlockLayout) == 112);

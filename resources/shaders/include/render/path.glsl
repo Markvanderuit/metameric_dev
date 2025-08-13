@@ -15,10 +15,13 @@ vec4 Li_debug(in SensorSample ss, in SamplerState state) {
 
   // Get info about the intersected surface; if an emitter was intersected, return early
   SurfaceInfo si = get_surface_info(ss.ray);
-  if (!is_valid(si) || !is_object(si))
+
+  if (!is_object(si))
     return vec4(0);
-    
-  return vec4(vec3(abs(si.t)), 1);
+
+  // Generate a directional sample towards an emitter.
+  EmitterSample es = sample_emitter(si, ss.wvls, next_3d(state));
+  return vec4(vec3(es.pdf), 1);
 }
 
 vec4 Li(in SensorSample ss, in SamplerState state, out float alpha) {
@@ -50,8 +53,9 @@ vec4 Li(in SensorSample ss, in SamplerState state, out float alpha) {
 
     // Get info about the intersected surface or lack thereof
     SurfaceInfo si = get_surface_info(ss.ray);
+    guard_break(is_valid(si));
 
-    // If an emissive object is hit, add its contribution to the 
+    // If an emissive object or envmap is hit, add its contribution to the 
     // current path, and then terminate said path
     if (is_emitter(si)) {
       float em_pdf = prev_bs_is_delta ? 0.f : pdf_emitter(si);

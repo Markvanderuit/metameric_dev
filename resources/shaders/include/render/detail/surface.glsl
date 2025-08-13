@@ -80,8 +80,6 @@ void detail_fill_surface_info_emitter(inout SurfaceInfo si, in Ray ray) {
 }
 
 void detail_fill_surface_info_envmap(inout SurfaceInfo si, in Ray ray) {
-  guard(scene_has_envm_emitter());
-
   // Set envmap as emitter hit data
   record_set_emitter(si.data, scene_envm_emitter_idx());
 

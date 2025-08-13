@@ -109,14 +109,13 @@ namespace met {
       m_cdf.resize(values.size() + 1);
       
       // Scan values to build cdf
+      // Cumulative sum to build cdf
       m_cdf.front() = 0.f;
       for (uint i = 1; i < m_cdf.size(); ++i)
-        m_cdf[i] = m_cdf[i - 1] + m_func[i - 1] / static_cast<float>(m_func.size());    
+        m_cdf[i] = m_cdf[i - 1] + m_func[i - 1];
 
-      // Keep sum around
+      // Keep sum around for normalization
       m_func_sum = m_cdf.back();
-
-      // Normalize
       for (uint i = 0; i < m_func.size(); ++i)
         m_func[i] /= m_func_sum;
       for (uint i = 1; i < m_cdf.size(); ++i)
@@ -127,18 +126,15 @@ namespace met {
       return m_cdf[i];
     }
 
-    float inv_sum() const {
-      return m_func_sum;  
-    }
-
     float sum() const {
-      return m_func_sum == 0.f ? 0.f : 1.f / m_func_sum;
+      return m_func_sum;
     }
 
     size_t size() const {
       return m_func.size();
     }
 
+    // Returns a specific index
     uint sample_discrete(float u) const {
       // Find iterator to first element greater than u; ergo std::upper_bound
       int i = 0;
@@ -148,27 +144,26 @@ namespace met {
       return static_cast<uint>(std::clamp(i, 0, static_cast<int>(m_func.size()) - 1));
     }
 
-    // Returns between 0 and 1
-    float sample(float u) const {
-      uint  i     = sample_discrete(u);
-      float d_cdf = m_cdf[i + 1] - m_cdf[i];
-
-      if (d_cdf == 0.f) {
-        return static_cast<float>(i) / m_func.size();
-      } else {
-        float a = (u - m_cdf[i]) / d_cdf;
-        return (static_cast<float>(i) + a) / m_func.size();
-      }
+    float pdf_discrete(uint i) const {
+      return m_func[i];
     }
 
-    float pdf_discrete(uint i) const {
-      return m_func[i] / static_cast<float>(m_func.size());
+    // Returns between 0 and 1
+    float sample(float u) const {
+      uint i = sample_discrete(u);
+      
+      // Size of bucket in CDF, exact interpolant between the two;
+      // note, alpha can div-by-0 so u is masked below
+      float range = m_cdf[i + 1] - m_cdf[i];
+      float alpha = (u - m_cdf[i]) / range;
+      
+      return (range == 0.f ? i : i + alpha) / m_func.size();
     }
 
     float pdf(float sample) const {
       uint  i = static_cast<uint>(sample * (m_func.size() - 1));
-      float a = sample * (m_func.size() - 1) - static_cast<float>(i);
-      
+      float a = sample * (m_func.size() - 1) - i;
+
       if (a == 0.f) {
         return m_func[i];
       } else {

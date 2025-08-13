@@ -23,40 +23,32 @@ struct DistributionSampleDiscrete {
   }                                                                     \
                                                                         \
   float pdf_##name##_discrete(in uint i) {                              \
-    return distr.func[i] / float(distr_len);                            \
+    return distr.func[i];                                               \
   }                                                                     \
                                                                         \
   float pdf_##name(in float sample_1d) {                                \
     uint  i  = uint(sample_1d * float(distr_len - 1));                  \
-    float a  = sample_1d * float(distr_len - 1)                         \
-             - float(i);                                                \
+    float a  = sample_1d * float(distr_len - 1) - float(i);             \
     if (a == 0.f) {                                                     \
       return distr.func[i];                                             \
     } else {                                                            \
-      return mix(distr.func[i    ],                                     \
-                 distr.func[i + 1] ,                                    \
-                 a);                                                    \
+      return mix(distr.func[i], distr.func[i + 1], a);                  \
     }                                                                   \
   }                                                                     \
                                                                         \
   DistributionSampleDiscrete sample_##name##_discrete(in float u) {     \
     DistributionSampleDiscrete ds;                                      \
     ds.i   = sample_##name##_base(u);                                   \
-    ds.pdf = distr.func[ds.i] / float(distr_len);                      \
+    ds.pdf = distr.func[ds.i];                                          \
     return ds;                                                          \
   }                                                                     \
                                                                         \
   DistributionSampleContinuous sample_##name##_continuous(in float u) { \
     DistributionSampleContinuous ds;                                    \
-                                                                        \
     uint  i = sample_##name##_base(u);                                  \
     float d = distr.cdf[i + 1] - distr.cdf[i];                          \
-    if (d == 0.f) {                                                     \
-      ds.f = float(i) / float(distr_len);                              \
-    } else {                                                            \
-      float a = (u - distr.cdf[i]) / d;                                 \
-      ds.f = (float(i) + a) / float(distr_len);                        \
-    }                                                                   \
+    float a = (u - distr.cdf[i]) / d;                                   \
+    ds.f = (d == 0.f ? float(i) : float(i) + a) / float(distr_len);     \
     ds.pdf = pdf_##name(ds.f);                                          \
     return ds;                                                          \
   }
@@ -84,7 +76,7 @@ struct DistributionSampleDiscrete {
   }
 
 
-#define declare_distr_sampler_default(name)          \
+#define declare_distr_sampler_default(name)                             \
   float pdf_##name##_discrete(in uint i) {                              \
     return 1.f;                                                         \
   }                                                                     \

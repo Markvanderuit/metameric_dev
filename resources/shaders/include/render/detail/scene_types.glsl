@@ -71,8 +71,8 @@ struct EmitterInfo {
 
   // Spectral data
   float illuminant_scale; // Scalar multiplier applied to values  
-  uint  illuminant_i;     // Index of spd
   uvec2 color_data;       // Packed data of uplifted color
+  uint  illuminant_i;     // Index of spd
 };
 
 // Info object to gather brdf data locally

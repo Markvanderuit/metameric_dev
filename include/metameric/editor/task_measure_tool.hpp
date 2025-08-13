@@ -86,7 +86,6 @@ namespace met {
       // Divider by nr. of requested path samples; not total paths. Most extra paths
       // come from NEE, and further division is taken into account by probability weighintg
       float colr_div = 1.f / (4.f * static_cast<float>(m_query_spp));
-      colr_div *= wavelength_samples;
 
       // For each path, integrate spectral throughput into a distribution and
       // then convert this to a color.

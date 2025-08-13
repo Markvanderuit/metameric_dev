@@ -56,7 +56,7 @@ namespace met {
     gl::Buffer to_std140(const Distribution &d) {
       met_trace_full();
       std::vector<eig::Array4f> data;
-      data.push_back(eig::Array4f(d.inv_sum()));
+      data.push_back(eig::Array4f(d.sum()));
       rng::copy(d.data_func(), std::back_inserter(data));
       rng::copy(d.data_cdf(), std::back_inserter(data));
       return gl::Buffer {{ .data = cnt_span<const std::byte>(data) }};    
@@ -97,8 +97,8 @@ namespace met {
             .type             = static_cast<uint>(emitter.type),
             .spec_type        = static_cast<uint>(emitter.spec_type),
             .illuminant_scale = emitter.illuminant_scale,
-            .illuminant_i     = emitter.illuminant_i,
-            .color_data       = { 0, 0 }
+            .color_data       = { 0, 0 },
+            .illuminant_i     = emitter.illuminant_i
           };
         } // for (uint i)
 
@@ -139,9 +139,10 @@ namespace met {
 
           emitter_distr[i] = w;
         }
-
+        
         // Generate sampling distribution and push to gpu
-        emitter_distr_buffer = to_std140(Distribution(cnt_span<float>(emitter_distr)));
+        auto emitter_cdf = Distribution(cnt_span<float>(emitter_distr));
+        emitter_distr_buffer = to_std140(emitter_cdf);
 
         // Store information on first co  nstant emitter, if one is present and active;
         // we don't support multiple environment emitters
@@ -154,6 +155,7 @@ namespace met {
             break;
           }
         }
+        fmt::print("env present: {}\n", m_envm_info_data->envm_is_present);
         emitter_envm_info.flush();
       }
 

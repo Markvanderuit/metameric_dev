@@ -29,7 +29,7 @@ namespace met {
     gl::Buffer to_std140(const Distribution &d) {
       met_trace_full();
       std::vector<eig::Array4f> data;
-      data.push_back(eig::Array4f(d.inv_sum()));
+      data.push_back(eig::Array4f(d.sum()));
       rng::copy(d.data_func(), std::back_inserter(data));
       rng::copy(d.data_cdf(), std::back_inserter(data));
       return gl::Buffer {{ .data = cnt_span<const std::byte>(data) }};    

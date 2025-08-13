@@ -64,12 +64,14 @@ namespace met {
       // Per-object block layout
       struct BlockLayout {
         alignas(16) eig::Matrix4f trf;
+        // ---
         alignas(4)  uint          is_active;
         alignas(4)  uint          type;
         alignas(4)  uint          spec_type;
         alignas(4)  float         illuminant_scale;
+        // ---
+        alignas(8)  eig::Array2u  color_data;
         alignas(4)  uint          illuminant_i;
-        alignas(4)  eig::Array2u  color_data;
       };
       static_assert(sizeof(BlockLayout) == 96);
 
@@ -87,6 +89,7 @@ namespace met {
         alignas(4) bool envm_is_present;
         alignas(4) uint envm_i;
       } *m_envm_info_data;
+      static_assert(sizeof(EnvBufferLayout) == 8);
 
     public:
       // This buffer stores one instance of BlockLayout per emitter component

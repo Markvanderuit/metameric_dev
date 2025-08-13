@@ -132,11 +132,11 @@ SensorSample sample_sensor(in FilmSensor sensor, in ivec2 px, in uint sample_i, 
 }
 
 vec3 sensor_apply(in vec4 wvls, in vec4 L) {
-  return (scene_cmfs(0, wvls) * L) * 0.25f * float(wavelength_samples);
+  return (scene_cmfs(0, wvls) * L) * 0.25f;
 }
 
 vec3 sensor_apply(in SensorSample sensor_sample, in vec4 L) {
-  return (scene_cmfs(0, sensor_sample.wvls) * L) * 0.25f * float(wavelength_samples);
+  return (scene_cmfs(0, sensor_sample.wvls) * L) * 0.25f;
 }
 
 #endif // RENDER_SENSOR_GLSL_GUARD

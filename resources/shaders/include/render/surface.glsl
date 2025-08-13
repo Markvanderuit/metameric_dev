@@ -55,7 +55,7 @@ SurfaceInfo get_surface_info(in Ray ray) {
     } else if (is_emitter(si)) {
       detail_fill_surface_info_emitter(si, ray);
     }
-  } else {
+  } else if (scene_has_envm_emitter()) {
     // Otherwise, fill info for fallback interaction type: envmap
     detail_fill_surface_info_envmap(si, ray);
   }

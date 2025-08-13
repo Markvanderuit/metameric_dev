@@ -25,9 +25,9 @@ namespace met::detail {
   // atlas, fit for std140/std430 buffer layout. Kept separate as it is
   // template-independent, and we use it between different-typed atlases.
   struct alignas(16) AtlasBlockLayout {
-    alignas(4) uint         layer_i;
-    alignas(8) eig::Array2u offs, size;
-    alignas(8) eig::Array2f uv0, uv1;
+    alignas(4) uint         layer_i;    /* 16 */
+    alignas(8) eig::Array2u offs, size; /* 16 */
+    alignas(8) eig::Array2f uv0, uv1;   /* 16 */
   };
   static_assert(sizeof(AtlasBlockLayout) == 48);
   
