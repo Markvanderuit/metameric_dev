@@ -1,5 +1,5 @@
-#ifndef BRDF_DIELECTRIC_GLSL_GUARD
-#define BRDF_DIELECTRIC_GLSL_GUARD
+#ifndef BRDF_dielectric_GLSL_GUARD
+#define BRDF_dielectric_GLSL_GUARD
 
 #include <render/record.glsl>
 
@@ -64,6 +64,26 @@ void init_brdf_dielectric(in ObjectInfo object, inout BRDFInfo brdf, in SurfaceI
   }
 }
 
+BRDFSample sample_brdf_dielectric(in BRDFInfo brdf, in vec3 sample_3d, in SurfaceInfo si) {
+  // Compute eta for hero wavelength only, the rest gets killed later on
+  // Compute fresnel, angle of transmission
+  float eta = _brdf_eta_dispersive(brdf, brdf.wvls.x);
+  float cos_theta_t;
+  float F = _brdf_dielectric_fresnel(cos_theta(si.wi), cos_theta_t, eta);
+
+  // Pick reflection/refraction
+  bool is_transmitted = sample_3d.x > F;
+
+  BRDFSample bs;
+
+  bs.is_delta    = true;
+  bs.is_spectral = is_transmitted && get_dielectric_is_dispersive(brdf);
+  bs.wo          = is_transmitted ? local_refract(si.wi, cos_theta_t, eta) : local_reflect(si.wi);
+  bs.pdf         = is_transmitted ? 1.f - F : F;
+
+  return bs;
+}
+
 vec4 eval_brdf_dielectric(in BRDFInfo brdf, in SurfaceInfo si, in vec3 wo) {
   // Compute eta for hero wavelength only, the rest gets killed later on
   // Compute fresnel, angle of transmission
@@ -89,35 +109,4 @@ float pdf_brdf_dielectric(in BRDFInfo brdf, in SurfaceInfo si, in vec3 wo) {
   return 0.f;
 }
 
-
-BRDFSample sample_brdf_dielectric(in BRDFInfo brdf, in vec3 sample_3d, in SurfaceInfo si) {
-  // Compute eta for hero wavelength, the rest gets killed for nown
-  float eta = _brdf_eta_dispersive(brdf, brdf.wvls.x);
-
-  // Compute fresnel, angle of transmission
-  float cos_theta_t;
-  float F = _brdf_dielectric_fresnel(cos_theta(si.wi), cos_theta_t, eta);
-
-  // Pick reflection/refraction lobe
-  bool is_transmitted = sample_3d.x > F;
-
-  // Return object
-  BRDFSample bs;
-  bs.is_delta    = true;
-  
-  if (sample_3d.z <= F) {
-    // Reflect
-    bs.is_spectral = false;
-    bs.wo          = local_reflect(si.wi);
-    bs.pdf         = F;
-  } else {
-    // Transmit
-    bs.is_spectral = true;
-    bs.wo          = local_refract(si.wi, cos_theta_t, eta);
-    bs.pdf         = 1.f - F;
-  }
-  
-  return bs;
-}
-
-#endif // BRDF_DIELECTRIC_GLSL_GUARD
+#endif // BRDF_dielectric_GLSL_GUARD

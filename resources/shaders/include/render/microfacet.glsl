@@ -5,7 +5,6 @@
 #include <render/warp.glsl>
 #include <render/sample.glsl>
 
-
 float eval_microfacet_partial(in vec3 wi, in vec3 wh, in vec3 wo, in float alpha) {
   float alpha_2 = alpha * alpha;
 

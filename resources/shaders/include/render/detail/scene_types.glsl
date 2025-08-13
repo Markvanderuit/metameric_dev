@@ -53,11 +53,10 @@ struct AtlasInfo {
 // Given the lack of unions, emitters store additional data
 // Illuminant data is unpacked when necessary; see record.glsl
 struct EmitterInfo {
-  #define EmitterTypeConstant  0
-  #define EmitterTypePoint     1
-  #define EmitterTypeSphere    2
-  #define EmitterTypeRectangle 3
-
+  #define EmitterTypeConstant           0
+  #define EmitterTypePoint              1
+  #define EmitterTypeSphere             2
+  #define EmitterTypeRectangle          3
   #define EmitterSpectrumTypeIlluminant 0
   #define EmitterSpectrumTypeColor      1
 

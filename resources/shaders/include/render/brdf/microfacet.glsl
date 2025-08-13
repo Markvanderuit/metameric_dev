@@ -2,7 +2,6 @@
 #define BRDF_MICROFACET_GLSL_GUARD
 
 #include <render/record.glsl>
-#include <render/warp.glsl>
 #include <render/microfacet.glsl>
 
 // Accessors to BRDFInfo data
@@ -89,7 +88,7 @@ BRDFSample sample_brdf_microfacet(in BRDFInfo brdf, in vec3 sample_3d, in Surfac
   if (cos_theta(si.wi) <= 0.f)
     return brdf_sample_zero();
 
-  // Return value
+  // Return object
   BRDFSample bs;
   bs.is_spectral = false;
   bs.is_delta   = false;

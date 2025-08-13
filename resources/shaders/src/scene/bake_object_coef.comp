@@ -92,6 +92,7 @@ void main() {
     // Store better result if error is improved
     if (err > result_err)
       continue;
+    
     result_err  = err;
     result_bary = bary;
     result_indx = j;

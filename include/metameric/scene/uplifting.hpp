@@ -250,7 +250,11 @@ namespace met {
       // - generates per-emitter spectral texture data (for uplifted emitters)
       // - writes this data to a scene texture atlas
       struct EmitterData {
-        struct BlockLayout { uint emitter_i; };
+        struct BlockLayout { 
+          alignas(8) eig::Array2f boundaries;
+          alignas(4) uint         emitter_i; 
+        };
+        static_assert(sizeof(BlockLayout) == 16);
         
         // Objects for texture bake
         std::string  m_program_key;
@@ -258,7 +262,7 @@ namespace met {
         gl::Buffer   m_buffer;
         BlockLayout *m_buffer_map;
         
-        // Small private state
+        // Small amount of state
         uint m_emitter_i;
         bool m_is_first_update;
 

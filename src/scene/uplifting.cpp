@@ -325,7 +325,6 @@ namespace met {
       // Flag that the atlas' internal texture has **not** been invalidated by internal resize yet
       if (texture_object_coef.is_init())
         texture_object_coef.set_invalitated(false);
-      
       if (texture_emitter_coef.is_init())
         texture_emitter_coef.set_invalitated(false);
 
@@ -364,7 +363,6 @@ namespace met {
           e_scene.components.objects.set_mutated(true);
         }
       }
-
       
       // Check for atlas resize (emitters)
       if (upliftings || emitters || settings.state.texture_size || !texture_emitter_coef.is_init()) {
@@ -376,9 +374,9 @@ namespace met {
         // Gather necessary texture sizes for each object
         // If the texture index was specified, we insert the texture size as an input
         // for the atlas. If a color was specified, we allocate a small patch
-        std::vector<eig::Array2u> inputs(objects.size());
+        std::vector<eig::Array2u> inputs(emitters.size());
         rng::transform(emitters, inputs.begin(), [&](const auto &emitter) -> eig::Array2u {
-          guard(emitter->spec_type == Emitter::SpectrumType::eColr, eig::Array2u  { 0, 0 });
+          guard(emitter->spec_type == Emitter::SpectrumType::eColr, eig::Array2u  { 16, 16 });
           return emitter->color | visit {
             [&](uint i) { return images.gl.m_texture_info_map->data[i].size; },
             [&](Colr f) { return eig::Array2u { 16, 16 }; },
@@ -390,7 +388,7 @@ namespace met {
         eig::Array2f scaled  = settings->apply_texture_size(maximal).cast<float>() / maximal.cast<float>();
         for (auto &input : inputs)
           input = (input.cast<float>() * scaled).max(2.f).cast<uint>().eval();
-
+        
         // Regenerate atlas if inputs don't match the atlas' current layout
         // Note; barycentric weights will need a full rebuild, which is detected
         //       by the nr. of objects changing or the texture setting changing. A bit spaghetti-y :S
@@ -731,7 +729,6 @@ namespace met {
       // Get handles to relevant scene data
       const auto &object       = scene.components.objects[m_object_i];
       const auto &settings     = scene.components.settings;
-      const auto &mesh         = scene.resources.meshes[object->mesh_i];
       const auto &uplifting    = scene.components.upliftings[object->uplifting_i];
       const auto &uplifting_gl = scene.components.upliftings.gl.uplifting_data[object->uplifting_i];
 
@@ -767,10 +764,8 @@ namespace met {
       program.bind("b_buff_uplift_bary", uplifting_gl.buffer_bary);
       if (!scene.resources.images.empty()) {
         program.bind("b_buff_textures",  scene.resources.images.gl.texture_info);
-        program.bind("b_txtr_3f",        scene.resources.images.gl.texture_atlas_3f.texture());
-        program.bind("b_txtr_3f",        m_sampler);  
-        program.bind("b_txtr_1f",        scene.resources.images.gl.texture_atlas_1f.texture());
-        program.bind("b_txtr_1f",        m_sampler);  
+        program.bind("b_txtr_3f",        scene.resources.images.gl.texture_atlas_3f.texture(), m_sampler);  
+        program.bind("b_txtr_1f",        scene.resources.images.gl.texture_atlas_1f.texture(), m_sampler);  
       }
 
       // Insert relevant barriers
@@ -820,12 +815,14 @@ namespace met {
       const auto &uplifting    = scene.components.upliftings[0];
       const auto &uplifting_gl = scene.components.upliftings.gl.uplifting_data[0];
 
+      // Check that the emitter even necessitates uplifting
+      guard(emitter->spec_type == Emitter::SpectrumType::eColr);
+
       // Find relevant patch in the texture atlas
       const auto &atlas = scene.components.upliftings.gl.texture_emitter_coef;
       const auto &patch = atlas.patch(m_emitter_i);
-      
-      // Check that a patch is actually used, if it is at 0
-      // we already know the emitter doesn't need uplifting
+
+      // Check that a patch is actually used
       guard(!patch.size.isApprox(eig::Array2u(0)));
 
       // We continue only after careful checking of internal state, as the bake
@@ -835,13 +832,23 @@ namespace met {
          = m_is_first_update            // First run, demands render anyways
         || atlas.is_invalitated()       // Texture atlas re-allocated, demands re-render
         || emitter.state.color          // Different color value set on emitter
-        || emitter.state.type           // Different type set on emitter
+        // || emitter.state.type           // Different type set on emitter
         || emitter.state.spec_type      // Different type set on emitter
         || uplifting                    // Uplifting was changed
         || scene.resources.images       // User loaded/deleted a image;
         || settings.state.texture_size; // Texture size setting changed
       guard(is_active);
-      fmt::print("Uplifting {}: baked emitter {}\n", 0, m_emitter_i);
+      fmt::print("Uplifting {}: baking emitter {}\n", 0, m_emitter_i);
+
+      // Determine color boundaries for scaling hdr data
+      // TODO precompute
+      m_buffer_map->boundaries = emitter->color | visit {
+        [](const Colr &)   { return eig::Array2f(0, 1);                          },
+        [&](const uint &i) { return scene.resources.images[i]->min_max_values(); }
+      };
+      m_buffer.flush();
+
+      fmt::print("Boundaries: {}\n", m_buffer_map->boundaries);
 
       // Get relevant program handle, bind, then bind resources to corresponding targets
       auto &cache = scene.m_cache_handle.getw<gl::ProgramCache>();
@@ -854,11 +861,9 @@ namespace met {
       program.bind("b_buff_uplift_coef", uplifting_gl.buffer_coef);
       program.bind("b_buff_uplift_bary", uplifting_gl.buffer_bary);
       if (!scene.resources.images.empty()) {
-        program.bind("b_buff_textures",  scene.resources.images.gl.texture_info);
-        program.bind("b_txtr_3f",        scene.resources.images.gl.texture_atlas_3f.texture());
-        program.bind("b_txtr_3f",        m_sampler);  
-        program.bind("b_txtr_1f",        scene.resources.images.gl.texture_atlas_1f.texture());
-        program.bind("b_txtr_1f",        m_sampler);  
+        program.bind("b_buff_textures", scene.resources.images.gl.texture_info);
+        program.bind("b_txtr_3f",       scene.resources.images.gl.texture_atlas_3f.texture(), m_sampler);  
+        program.bind("b_txtr_1f",       scene.resources.images.gl.texture_atlas_1f.texture(), m_sampler);  
       }
 
       // Insert relevant barriers
@@ -869,8 +874,7 @@ namespace met {
 
       // Dispatch compute region of patch size
       auto dispatch_ndiv = ceil_div(patch.size, 16u);
-      gl::dispatch_compute({ .groups_x = dispatch_ndiv.x(),
-                             .groups_y = dispatch_ndiv.y() });
+      gl::dispatch_compute({ .groups_x = dispatch_ndiv.x(), .groups_y = dispatch_ndiv.y() });
 
       // Finally; set entry state to false
       m_is_first_update = false;

@@ -68,28 +68,18 @@ void detail_fill_surface_info_emitter(inout SurfaceInfo si, in Ray ray) {
   // Fill data based on type of area emitters
   if (em.type == EmitterTypeSphere) {
     si.n  = normalize(si.p - em.trf[3].xyz);
-    si.tx = vec2(atan(length(si.n.xy) / si.n.z), atan(si.n.y / si.n.x));
+    si.tx = mod(vec2(atan(si.n.x, -si.n.z) * .5f, acos(si.n.y)) * M_PI_INV + 1.f, 1.f);
   } else if (em.type == EmitterTypeRectangle) {
     si.n  = normalize(em.trf[2].xyz);
     si.tx = 0.5 + (inverse(em.trf) * vec4(si.p, 1)).xy;
+  } else if (em.type == EmitterTypePoint || em.type == EmitterTypeConstant) {
+    si.n  = ray.d;
+    si.tx = mod(vec2(atan(si.n.x, -si.n.z) * .5f, acos(si.n.y)) * M_PI_INV + 1.f, 1.f);
   }
 
   // Generate shading frame based on geometric normal
   si.wi = to_local(get_frame(si.n), -ray.d);
   si.t  = ray.t;
-}
-
-void detail_fill_surface_info_envmap(inout SurfaceInfo si, in Ray ray) {
-  // Set envmap as emitter hit data
-  record_set_emitter(si.data, scene_envm_emitter_idx());
-
-  // Fill data for spherical environment map
-  si.n  = -ray.d;
-  si.tx = vec2(atan(length(si.n.xy) / si.n.z), atan(si.n.y / si.n.x));
-
-  // Local shading frame is global frame
-  si.t  = ray.t;
-  si.wi = -ray.d;
 }
 
 #endif // GLSL_SURFACE_DETAIL_GUARD

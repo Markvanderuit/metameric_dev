@@ -11,9 +11,6 @@ struct EmitterSample {
   // Is the sample a dirac delta
   bool is_delta;
 
-  // Emitted radiance along ray towards position
-  vec4 L;
-  
   // Sample density
   float pdf;
 };

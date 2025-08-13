@@ -15,13 +15,15 @@ vec4 Li_debug(in SensorSample ss, in SamplerState state) {
 
   // Get info about the intersected surface; if an emitter was intersected, return early
   SurfaceInfo si = get_surface_info(ss.ray);
-
-  if (!is_object(si))
+  if (!is_valid(si))
     return vec4(0);
-
-  // Generate a directional sample towards an emitter.
+    
+  // Generate directional sample towards emitter
   EmitterSample es = sample_emitter(si, ss.wvls, next_3d(state));
-  return vec4(vec3(es.pdf), 1);
+  si = get_surface_info(es.ray);
+  // vec4 v = eval_emitter(es, vec4(0.2, 0.4, 0.6, 1.0), next_2d(state));
+
+  return vec4(si.n, 1);
 }
 
 vec4 Li(in SensorSample ss, in SamplerState state, out float alpha) {
@@ -61,9 +63,9 @@ vec4 Li(in SensorSample ss, in SamplerState state, out float alpha) {
       float em_pdf = prev_bs_is_delta ? 0.f : pdf_emitter(si);
 
       // No division by sample density, as this is incorporated in path throughput
-      vec4 s = Beta                       // throughput 
-             * eval_emitter(si, ss.wvls)  // emitted value
-             * mis_power(prev_bs_pdf, em_pdf); // mis weight
+      vec4 s = Beta                                      // path throughput 
+             * eval_emitter(si, ss.wvls, next_2d(state)) // emitter contribution
+             * mis_power(prev_bs_pdf, em_pdf);           // mis weight
 
       // Store current path query if requested
       path_query_finalize_direct(pt, s, ss.wvls);
@@ -92,17 +94,17 @@ vec4 Li(in SensorSample ss, in SamplerState state, out float alpha) {
         float mis_weight = es.is_delta ? 1.f : mis_power(es.pdf, bs_pdf);
 
         // Assemble path throughput
-        vec4 s = Beta                    // current path throughput
-               * eval_brdf(brdf, si, wo) // brdf response
-               * cos_theta(wo)           // cosine attenuation
-               * es.L                    // emitter response
-               * mis_weight              // mis weight
-               / es.pdf;                 // sample density
+        vec4 s = Beta                                      // path throughput
+               * eval_brdf(brdf, si, wo)                   // brdf response
+               * cos_theta(wo)                             // cosine attenuation
+               * eval_emitter(es, ss.wvls, next_2d(state)) // emitter contribution
+               * mis_weight                                // mis weight
+               / es.pdf;                                   // sample density
 
         // Store current path query if requested
         path_query_finalize_emitter(pt, es, s, ss.wvls);
 
-        // Add to output radiance
+        // Add to output radiances
         Li += s;
       }
     }

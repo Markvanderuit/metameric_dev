@@ -1,11 +1,17 @@
 #ifndef RENDER_EMITTER_RECTANGLE_GLSL_GUARD
 #define RENDER_EMITTER_RECTANGLE_GLSL_GUARD
 
-vec4 eval_emitter_rectangle(in EmitterInfo em, in SurfaceInfo si, in vec4 wvls) {
+vec4 eval_emitter_rectangle(in EmitterInfo em, in SurfaceInfo si, in vec4 wvls, in vec2 sample_2d) {
   // If normal is not inclined along the ray, return nothing
   if (cos_theta(si.wi) <= 0)
     return vec4(0);
-  return scene_illuminant(em.illuminant_i, wvls) * em.illuminant_scale;
+
+  // Sample either uplifted texture data, or a specified illuminant
+  vec4 L = em.spec_type == EmitterSpectrumTypeColor
+         ? texture_illuminant(record_get_emitter(si.data), si.tx, wvls, sample_2d)
+         : scene_illuminant(em.illuminant_i, wvls);
+  
+  return L * em.illuminant_scale;
 }
 
 float pdf_emitter_rectangle(in EmitterInfo em, in SurfaceInfo si) {
@@ -30,7 +36,6 @@ EmitterSample sample_emitter_rectangle(in EmitterInfo em, in SurfaceInfo si, in 
     return es;
   }
 
-  es.L        = scene_illuminant(em.illuminant_i, wvls) * em.illuminant_scale;
   es.pdf      = sdot(es.ray.t) / (length(em.trf[0]) * length(em.trf[1]) * dp);
   es.is_delta = false;
 

@@ -11,7 +11,7 @@
 
 BRDFInfo get_brdf(in SurfaceInfo si, vec4 wvls, in vec2 sample_2d) {
   BRDFInfo brdf;
-
+  
   if (is_object(si)) {
     ObjectInfo object = scene_object_info(record_get_object(si.data));
     brdf.type = object.brdf_type;

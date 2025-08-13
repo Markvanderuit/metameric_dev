@@ -49,6 +49,10 @@ namespace met {
       std::optional<ColorFormat> color_frmt = { };
     };
 
+    struct NormalizeInfo {
+      bool normalize_if_unsaturated = false;
+    };
+
   private: // Internal data
     PixelFormat            m_pixel_frmt;
     PixelType              m_pixel_type;
@@ -66,12 +70,16 @@ namespace met {
     bool operator==(const Image &o) const;
 
   public: // Pixel queries and format conversions
-    void         clear(eig::Array4f v, ColorFormat input_frmt = ColorFormat::eNone);
-    void         set_pixel(const eig::Array2u &xy, eig::Array4f v, ColorFormat input_frmt = ColorFormat::eNone);
-    eig::Array4f get_pixel(const eig::Array2u &xy, ColorFormat output_frmt = ColorFormat::eNone) const;
-    eig::Array4f sample(const eig::Array2f &uv, ColorFormat output_frmt = ColorFormat::eNone) const;
-    Image        convert(ConvertInfo info) const;
-    Image   	   flip(bool flip_x, bool flip_y) const;
+    void                    clear(eig::Array4f v, ColorFormat input_frmt = ColorFormat::eNone);
+    void                    set_pixel(uint i, eig::Array4f v, ColorFormat input_frmt = ColorFormat::eNone);
+    eig::Array4f            get_pixel(uint i, ColorFormat output_frmt = ColorFormat::eNone) const;
+    void                    set_pixel(const eig::Array2u &xy, eig::Array4f v, ColorFormat input_frmt = ColorFormat::eNone);
+    eig::Array4f            get_pixel(const eig::Array2u &xy, ColorFormat output_frmt = ColorFormat::eNone) const;
+    eig::Array4f            sample(const eig::Array2f &uv, ColorFormat output_frmt = ColorFormat::eNone) const;
+    Image                   convert(ConvertInfo info) const;
+    Image   	              flip(bool flip_x, bool flip_y) const;
+    std::pair<Image, float> normalize(NormalizeInfo info) const;
+    eig::Array2f            min_max_values() const;
     
   public: // Misc
     auto size()       const { return m_size;       }

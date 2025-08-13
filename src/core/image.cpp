@@ -334,8 +334,10 @@ namespace met {
   }
 
   void Image::set_pixel(const eig::Array2u &xy, eig::Array4f v, ColorFormat input_frmt) {
-    uint i = xy.y() * m_size.x() + xy.x();
+    set_pixel(xy.y() * m_size.x() + xy.x(), v, input_frmt);
+  }
 
+  void Image::set_pixel(uint i, eig::Array4f v, ColorFormat input_frmt) {
     uint type_size  = detail::size_from_type(m_pixel_type);
     uint frmt_size  = detail::size_from_format(m_pixel_frmt);
     auto src_range = eig::Array4u(0, 1, 2, 3).head(frmt_size).eval();
@@ -349,8 +351,10 @@ namespace met {
   }
 
   eig::Array4f Image::get_pixel(const eig::Array2u &xy, ColorFormat output_frmt) const {
-    uint i = xy.y() * m_size.x() + xy.x();
+    return get_pixel(xy.y() * m_size.x() + xy.x(), output_frmt);
+  }
 
+  eig::Array4f Image::get_pixel(uint i, ColorFormat output_frmt) const {
     uint type_size  = detail::size_from_type(m_pixel_type);
     uint frmt_size  = detail::size_from_format(m_pixel_frmt);
     auto dst_range  = eig::Array4u(0, 1, 2, 3).head(frmt_size).eval();
@@ -474,6 +478,64 @@ namespace met {
     }
 
     return output;
+  }
+
+  eig::Array2f Image::min_max_values() const {
+    met_trace();
+
+    // Indices for transform
+    std::vector<uint> idx(m_size.prod());
+    std::iota(range_iter(idx), 0u);
+    
+    // Determine maximum
+    float maxv = std::transform_reduce(std::execution::par_unseq, range_iter(idx), 0.f, 
+      [&](float a, float b) { return std::max(a, b); },
+      [&](uint i) { return get_pixel(i, m_color_frmt).maxCoeff(); });
+    
+    // Determine minimum
+    float minv = std::transform_reduce(std::execution::par_unseq, range_iter(idx), maxv, 
+      [&](float a, float b) { return std::min(a, b); },
+      [&](uint i) { return get_pixel(i, m_color_frmt).minCoeff(); });
+    
+    return { minv, maxv };
+  }
+
+  std::pair<Image, float> Image::normalize(NormalizeInfo info) const {
+    met_trace();
+
+    // Determine factor to normalize by
+    std::vector<uint> idx(m_size.prod());
+    std::iota(range_iter(idx), 0u);
+    float n = std::transform_reduce(std::execution::par_unseq, range_iter(idx), 0.f, 
+      [&](float a, float b) { return std::max(a, b); },
+      [&](uint i) { return get_pixel(i, m_color_frmt).maxCoeff(); });
+    
+    // Sanity check for unsaturated images
+    if (!info.normalize_if_unsaturated && n <= 1.f) {
+      return { *this, 1.f };
+    }
+    
+    // Initialize output image in requested format
+    Image output = {{ 
+      .pixel_frmt = m_pixel_frmt,
+      .pixel_type = m_pixel_type,
+      .color_frmt = m_color_frmt,
+      .size       = m_size
+    }};
+
+    // Apply normalization
+    float rcp = 1.f / n;
+    #pragma omp parallel for
+    for (int i = 0; i < m_size.prod(); ++i) {
+      auto v = get_pixel(i, m_color_frmt);
+      v.head<3>() *= rcp;
+      output.set_pixel(i, v, m_color_frmt);
+    }
+
+    fmt::print("Normalized image (size={}, fmt={}), n={}\n", 
+      m_size, static_cast<uint>(m_pixel_type), n);
+
+    return { std::move(output), n };
   }
 
   uint Image::channels() const {

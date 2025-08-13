@@ -8,6 +8,7 @@
 #include <render/sample.glsl>
 #include <render/surface.glsl>
 #include <render/warp.glsl>
+#include <render/texture.glsl>
 #include <render/shape/sphere.glsl>
 #include <render/shape/rectangle.glsl>
 #include <render/emitter/sphere.glsl>
@@ -15,21 +16,26 @@
 #include <render/emitter/point.glsl>
 #include <render/emitter/constant.glsl>
 
-vec4 eval_emitter(in SurfaceInfo si, in vec4 wvls) {
+vec4 eval_emitter(in SurfaceInfo si, in vec4 wvls, in vec2 sample_2d) {
   if (!is_emitter(si))
     return vec4(0);
   
   EmitterInfo em = scene_emitter_info(record_get_emitter(si.data));
   
   if (em.type == EmitterTypeSphere) {
-    return eval_emitter_sphere(em, si, wvls);
+    return eval_emitter_sphere(em, si, wvls, sample_2d);
   } else if (em.type == EmitterTypeRectangle) {
-    return eval_emitter_rectangle(em, si, wvls);
+    return eval_emitter_rectangle(em, si, wvls, sample_2d);
   } else if (em.type == EmitterTypePoint) {
-    return eval_emitter_point(em, si, wvls);
+    return eval_emitter_point(em, si, wvls, sample_2d);
   } else if (em.type == EmitterTypeConstant) {
-    return eval_emitter_constant(em, wvls, to_world(si, si.wi));
+    return eval_emitter_constant(em, si, wvls, sample_2d);
   }
+}
+
+vec4 eval_emitter(in EmitterSample es, in vec4 wvls, in vec2 sample_2d) {
+  SurfaceInfo si = get_surface_info(es.ray);
+  return eval_emitter(si, wvls, sample_2d);
 }
 
 float pdf_emitter(in SurfaceInfo si) {

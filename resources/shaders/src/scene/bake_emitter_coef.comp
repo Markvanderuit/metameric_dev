@@ -16,6 +16,7 @@ layout(std140) uniform;
 
 // Uniform buffer declarations
 layout(binding = 0) uniform b_buff_unif {
+  vec2 boundaries;
   uint emitter_i;
 } buff_unif;
 layout(binding = 1) uniform b_buff_atlas {
@@ -76,6 +77,10 @@ void main() {
     // Color value is specified directly
     p = record_get_direct_value(emitter.color_data);
   }
+
+  // Color value very likely exceeds [0, 1], so we scale it before searching for a spectrum
+  // p /= buff_unif.boundaries.y;
+  p = min(p, vec3(1));
   
   // Next, brute-force search for the corresponding barycentric weights and tetrahedron's index
   float result_err = FLT_MAX;
@@ -92,6 +97,7 @@ void main() {
     // Store better result if error is improved
     if (err > result_err)
       continue;
+    
     result_err  = err;
     result_bary = bary;
     result_indx = j;

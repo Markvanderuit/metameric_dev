@@ -340,7 +340,7 @@ namespace met::detail {
         auto imgf = img.convert({ .resize_to  = resrv.size,
                                   .pixel_frmt = Image::PixelFormat::eRGB,
                                   .pixel_type = Image::PixelType::eFloat,
-                                  .color_frmt = Image::ColorFormat::eLRGB });
+                                  .color_frmt = Image::ColorFormat::eLRGB })/* .normalize({}).first */;
         texture_atlas_3f.texture().set(imgf.data<float>(), 0,
           { resrv.size.x(), resrv.size.y(), 1             },
           { resrv.offs.x(), resrv.offs.y(), resrv.layer_i });

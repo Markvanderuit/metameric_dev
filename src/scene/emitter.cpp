@@ -97,7 +97,7 @@ namespace met {
             .type             = static_cast<uint>(emitter.type),
             .spec_type        = static_cast<uint>(emitter.spec_type),
             .illuminant_scale = emitter.illuminant_scale,
-            .color_data       = { 0, 0 },
+            .color_data       = pack_material_3f(emitter.color),
             .illuminant_i     = emitter.illuminant_i
           };
         } // for (uint i)
@@ -155,7 +155,6 @@ namespace met {
             break;
           }
         }
-        fmt::print("env present: {}\n", m_envm_info_data->envm_is_present);
         emitter_envm_info.flush();
       }
 
