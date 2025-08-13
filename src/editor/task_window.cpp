@@ -313,6 +313,10 @@ namespace met {
             handle.init<RenderExportTask>();
           }
         }
+
+        if (ImGui::MenuItem("Reload shaders", nullptr, nullptr)) {
+          info.global("cache").getw<gl::ProgramCache>().reload();
+        }
         
         ImGui::Separator();
 

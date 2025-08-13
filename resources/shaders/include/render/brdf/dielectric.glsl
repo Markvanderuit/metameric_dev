@@ -91,6 +91,7 @@ vec4 eval_brdf_dielectric(in BRDFInfo brdf, in SurfaceInfo si, in vec3 wo) {
   float cos_theta_t;
   float F = _brdf_dielectric_fresnel(cos_theta(si.wi), cos_theta_t, eta);
   
+  // Select a lobe based on opposing directions
   if (cos_theta(si.wi) * cos_theta(wo) >= 0) {
     // Scatter, reflect
     return vec4(F / abs(cos_theta(wo)));
