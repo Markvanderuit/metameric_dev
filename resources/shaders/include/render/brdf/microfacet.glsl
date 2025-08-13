@@ -13,7 +13,9 @@
 
 vec2 _microfacet_lobe_probs(in BRDFInfo brdf, in SurfaceInfo si) {  
   // Estimate fresnel for incident vector to establish probabilities
-  vec4 F0 = clamp(mix(vec4(eta_to_specular(get_microfacet_eta(brdf))), get_microfacet_r(brdf), get_microfacet_metallic(brdf)), 0.f, 1.f);
+  vec4 F0 = mix(vec4(sdot(get_microfacet_eta(brdf) - 1) / sdot(get_microfacet_eta(brdf) + 1) / 0.08f),
+                get_microfacet_r(brdf),
+                get_microfacet_metallic(brdf));
   vec4 F = schlick_fresnel(F0, cos_theta(si.wi));
   
   // Diffuse lobe probability mixed by metallic and the average of fresnel 
@@ -43,22 +45,27 @@ vec4 eval_brdf_microfacet(in BRDFInfo brdf, in SurfaceInfo si, in vec3 wo) {
   if (cos_theta(si.wi) <= 0.f || cos_theta(wo) <= 0.f)
     return vec4(0);
 
+  vec3 wh  = normalize(si.wi + wo);
+
+  vec4 F0 = mix(vec4(sdot(get_microfacet_eta(brdf) - 1) / sdot(get_microfacet_eta(brdf) + 1) / 0.08f),
+                get_microfacet_r(brdf),
+                get_microfacet_metallic(brdf));
+  vec4 F = schlick_fresnel(vec4(F0), vec4(1), cos_theta(si.wi)); 
+
   // Output value
   vec4 f = vec4(0);
   
   // Diffuse component
-  // Lambert, subdued by metallic for now
+  // Lambert, scaled by metallic and fresnel
   vec4 diffuse = (1.f - get_microfacet_metallic(brdf))
+               * (1.f - F) 
                * get_microfacet_r(brdf);
   f += diffuse;
 
   // Specular componennt
-  // Evaluate ggx and fresnel
-  vec3   wh = normalize(si.wi + wo);
-  float D_G = eval_microfacet(si, wh, wo, get_microfacet_alpha(brdf));
-  vec4  F0  = clamp(mix(vec4(eta_to_specular(get_microfacet_eta(brdf))), get_microfacet_r(brdf), get_microfacet_metallic(brdf)), 0.f, 1.f);
-  vec4  F   = schlick_fresnel(F0, max(0.f, dot(si.wi, wh)));
-  vec4 specular = D_G * F;
+  // Evaluate partial ggx and multiply by fresnel
+  float D_G = eval_microfacet_partial(si.wi, wh, wo, get_microfacet_alpha(brdf));
+  vec4 specular = F * D_G;
   f += specular;
 
   return f * M_PI_INV;
@@ -67,15 +74,15 @@ vec4 eval_brdf_microfacet(in BRDFInfo brdf, in SurfaceInfo si, in vec3 wo) {
 float pdf_brdf_microfacet(in BRDFInfo brdf, in SurfaceInfo si, in vec3 wo) {
   if (cos_theta(si.wi) <= 0.f || cos_theta(wo) <= 0.f)
     return 0.f;
-
+  
   vec2 lobe_probs = _microfacet_lobe_probs(brdf, si);
 
   // Output values
-  float specular_pdf = lobe_probs[0] * .5f * pdf_microfacet(si, normalize(si.wi + wo), get_microfacet_alpha(brdf));
-  float diffuse_pdf  = lobe_probs[1] * .5f * square_to_cos_hemisphere_pdf(wo);
+  float specular_pdf = lobe_probs[0] * pdf_microfacet(si.wi, normalize(si.wi + wo), get_microfacet_alpha(brdf));
+  float diffuse_pdf  = lobe_probs[1] * square_to_cos_hemisphere_pdf(wo);
 
   // Mix probabilities [spec, diffuse] for the two lobes
-  return (diffuse_pdf + specular_pdf);
+  return diffuse_pdf + specular_pdf;
 }
 
 BRDFSample sample_brdf_microfacet(in BRDFInfo brdf, in vec3 sample_3d, in SurfaceInfo si) {
@@ -85,24 +92,26 @@ BRDFSample sample_brdf_microfacet(in BRDFInfo brdf, in vec3 sample_3d, in Surfac
   // Return value
   BRDFSample bs;
   bs.is_spectral = false;
-  bs.is_delta = false;
+  bs.is_delta   = false;
   
   // Select a lobe based on sample probabilities [spec, diffuse]
   vec2 lobe_probs = _microfacet_lobe_probs(brdf, si);
   if (sample_3d.x < lobe_probs[0]) { // Specular lobe  microfacet sampling
     // Sample a microfacet normal to reflect with
-    MicrofacetSample ms = sample_microfacet(si, get_microfacet_alpha(brdf), sample_3d.yz);
+    MicrofacetSample ms = sample_microfacet(si.wi, get_microfacet_alpha(brdf), sample_3d.yz);
     bs.wo = reflect(-si.wi, ms.n);
+
     if (ms.pdf == 0.f || cos_theta(bs.wo) <= 0.f)
       return brdf_sample_zero();
   } else { // Diffuse lobe hemisphere sampling
     bs.wo  = square_to_cos_hemisphere(sample_3d.yz);
+
     if (cos_theta(bs.wo) <= 0.f)
       return brdf_sample_zero();
   }
-
-  bs.pdf = lobe_probs[0] * 2.f * pdf_microfacet(si, normalize(si.wi + bs.wo), get_microfacet_alpha(brdf))
-         + lobe_probs[1] * 2.f * square_to_cos_hemisphere_pdf(bs.wo);
+  
+  bs.pdf = lobe_probs[0] * pdf_microfacet(si.wi, normalize(si.wi + bs.wo), get_microfacet_alpha(brdf))
+         + lobe_probs[1] * square_to_cos_hemisphere_pdf(bs.wo);
 
   return bs;
 }
