@@ -39,6 +39,7 @@ float pdf_emitter(in SurfaceInfo si) {
   // Evaluate pdf from emitter
   EmitterInfo em = scene_emitter_info(record_get_emitter(si.data));
   float pdf = pdf_emitters_discrete(record_get_emitter(si.data));
+  
   if (em.type == EmitterTypeSphere) {
     pdf *= pdf_emitter_sphere(em, si);
   } else if (em.type == EmitterTypeRectangle) {
@@ -53,29 +54,35 @@ float pdf_emitter(in SurfaceInfo si) {
 }
 
 EmitterSample sample_emitter(in SurfaceInfo si, in vec4 wvls, in vec3 sample_3d) {
+  // Return value
+  EmitterSample es = emitter_sample_zero();
+
   // Sample specific emitter from distribution
   DistributionSampleDiscrete ds = sample_emitters_discrete(sample_3d.z);
-  EmitterInfo em = scene_emitter_info(record_get_emitter(ds.i));
-  
+  EmitterInfo em = scene_emitter_info(ds.i);
+
+  // Catch no emitters being active
+  if (!em.is_active)
+    return es;
+
   // Sample specific position on emitter
-  EmitterSample ps;
   if (em.type == EmitterTypeSphere) {
-    ps = sample_emitter_sphere(em, si, wvls, sample_3d.xy);
+    es = sample_emitter_sphere(em, si, wvls, sample_3d.xy);
   } else if (em.type == EmitterTypeRectangle) {
-    ps = sample_emitter_rectangle(em, si, wvls, sample_3d.xy);
+    es = sample_emitter_rectangle(em, si, wvls, sample_3d.xy);
   } else if (em.type == EmitterTypePoint) {
-    ps = sample_emitter_point(em, si, wvls, sample_3d.xy);
+    es = sample_emitter_point(em, si, wvls, sample_3d.xy);
   } else if (em.type == EmitterTypeConstant) {
-    ps = sample_emitter_constant(em, si, wvls, sample_3d.xy);
+    es = sample_emitter_constant(em, si, wvls, sample_3d.xy);
   }
 
   // Multiply sample pdfs
-  ps.pdf *= ds.pdf;
+  es.pdf *= ds.pdf;
 
   // Store emitter index in ray record
-  record_set_emitter(ps.ray.data, ds.i);
+  record_set_emitter(es.ray.data, ds.i);
 
-  return ps;
+  return es;
 }
 
 bool ray_intersect_emitter(inout Ray ray, in uint emitter_i) {
