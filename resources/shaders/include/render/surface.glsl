@@ -25,7 +25,7 @@ struct SurfaceInfo {
   // Surface information
   vec3 p;  // Surface position in world space
   vec2 tx; // Surface texture coordinates
-  vec3 n;  // Surface shading normal; defines local frame
+  vec3 n;  // Surface shading normal, defines local frame
  
   // Ray information
   vec3 wi; // Incident direction in local frame

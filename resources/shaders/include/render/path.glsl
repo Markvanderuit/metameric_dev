@@ -30,12 +30,12 @@ vec4 Li(in SensorSample ss, in SamplerState state, out float alpha) {
   vec4  Beta = vec4(1 / ss.pdfs); // Path throughput over density
 
   // Prior brdf sample data, default-initialized, kept for NEE and MIS
-  float bs_pdf         = 1.f;
-  bool  bs_is_delta    = true;
+  float prev_bs_pdf         = 1.f;
+  bool  prev_bs_is_delta    = true;
   bool  bs_is_spectral = false;
 
   // Iterate up to maximum depth
-  for (uint depth = 0; ; ++depth) {
+  for (uint depth = 0; /* ... */ ; ++depth) {
     guard_break(max_depth == 0 || depth < max_depth);
 
     // Ray-trace against scene first
@@ -54,12 +54,12 @@ vec4 Li(in SensorSample ss, in SamplerState state, out float alpha) {
     // If an emissive object is hit, add its contribution to the 
     // current path, and then terminate said path
     if (is_emitter(si)) {
-      float em_pdf = bs_is_delta ? 0.f : pdf_emitter(si);
+      float em_pdf = prev_bs_is_delta ? 0.f : pdf_emitter(si);
 
       // No division by sample density, as this is incorporated in path throughput
       vec4 s = Beta                       // throughput 
              * eval_emitter(si, ss.wvls)  // emitted value
-             * mis_power(bs_pdf, em_pdf); // mis weight
+             * mis_power(prev_bs_pdf, em_pdf); // mis weight
 
       // Store current path query if requested
       path_query_finalize_direct(pt, s, ss.wvls);
@@ -77,34 +77,29 @@ vec4 Li(in SensorSample ss, in SamplerState state, out float alpha) {
       // Generate directional sample towards emitter
       EmitterSample es = sample_emitter(si, ss.wvls, next_3d(state));
       
-      // Exitant direction in local frame
-      vec3 wo = to_local(si, es.ray.d);
-      
-      // Sample density of brdf for this sample
-      float brdf_pdf = bs_pdf * pdf_brdf(brdf, si, wo);
+      // BRDF sample density for exitant direction in local frame
+      vec3  wo     = to_local(si, es.ray.d);
+      float bs_pdf = pdf_brdf(brdf, si, wo);
 
-      // If the sample position has potential throughput, 
-      // evaluate a ray towards the position and add contribution to output
-      if (es.pdf > 0 && brdf_pdf > 0) {
-        // Test for any hit closer than sample position
-        if (!scene_intersect_any(es.ray)) {
-          // Avoid diracs when calculating mis weight
-          float mis_weight = es.is_delta ? 1.f : mis_power(es.pdf, brdf_pdf);
+      // If the sample has throughput, test for occluder closer 
+      // than sample position and add contribution
+      if (es.pdf > 0 && bs_pdf > 0 && !scene_intersect_any(es.ray)) {
+        // Avoid diracs when calculating mis weight
+        float mis_weight = es.is_delta ? 1.f : mis_power(es.pdf, bs_pdf);
 
-          // Assemble path throughput
-          vec4 s = Beta                    // current path throughput
-                 * eval_brdf(brdf, si, wo) // brdf response
-                 * cos_theta(wo)           // cosine attenuation
-                 * es.L                    // emitter response
-                 * mis_weight              // mis weight
-                 / es.pdf;                 // sample density
+        // Assemble path throughput
+        vec4 s = Beta                    // current path throughput
+               * eval_brdf(brdf, si, wo) // brdf response
+               * cos_theta(wo)           // cosine attenuation
+               * es.L                    // emitter response
+               * mis_weight              // mis weight
+               / es.pdf;                 // sample density
 
-          // Store current path query if requested
-          path_query_finalize_emitter(pt, es, s, ss.wvls);
+        // Store current path query if requested
+        path_query_finalize_emitter(pt, es, s, ss.wvls);
 
-          // Add to output radiance
-          Li += s;
-        }
+        // Add to output radiance
+        Li += s;
       }
     }
 
@@ -122,9 +117,9 @@ vec4 Li(in SensorSample ss, in SamplerState state, out float alpha) {
             * abs(cos_theta(bs.wo))      // cosine attenuation
             / bs.pdf;
 
-      // Store last brdf sample information for NEE
-      bs_pdf      = bs.pdf;
-      bs_is_delta = bs.is_delta;
+      // Retain last brdf density for direct emitter MIS weight
+      prev_bs_pdf      = bs.pdf;
+      prev_bs_is_delta = bs.is_delta;
 
       // Handle wavelength-dependence in the BRDF by terminating secondary wavelengths
       if (!bs_is_spectral && bs.is_spectral) {

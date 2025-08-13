@@ -26,9 +26,12 @@ void detail_fill_surface_info_object(inout SurfaceInfo si, in Ray ray) {
   vec3 p = (inverse(object_info.trf) * vec4(ray_get_position(ray), 1)).xyz;
   vec3 b = detail_gen_barycentric_coords(p, prim);
   si.p  = b.x * prim.v0.p  + b.y * prim.v1.p  + b.z * prim.v2.p;
-  si.n = b.x * prim.v0.n  + b.y * prim.v1.n  + b.z * prim.v2.n;
+  si.n  = b.x * prim.v0.n  + b.y * prim.v1.n  + b.z * prim.v2.n;
   si.tx = b.x * prim.v0.tx + b.y * prim.v1.tx + b.z * prim.v2.tx;
   
+   // Compute geometric normal
+  // si.ng = cross(prim.v1.p - prim.v0.p, prim.v2.p - prim.v1.p);
+
   // Offset surface position as shading point, as per
   // "Hacking the Shadow Terminator, Hanika, 2021"
   /* {
@@ -47,7 +50,7 @@ void detail_fill_surface_info_object(inout SurfaceInfo si, in Ray ray) {
   } */
 
   // Transform relevant data to world-space
-  si.p  =          (object_info.trf * vec4(si.p,  1)).xyz;
+  si.p =          (object_info.trf * vec4(si.p, 1)).xyz;
   si.n = normalize(object_info.trf * vec4(si.n, 0)).xyz;
 
   // Generate shading frame based on shading normal
@@ -64,10 +67,10 @@ void detail_fill_surface_info_emitter(inout SurfaceInfo si, in Ray ray) {
 
   // Fill data based on type of area emitters
   if (em.type == EmitterTypeSphere) {
-    si.n = normalize(si.p - em.trf[3].xyz);
+    si.n  = normalize(si.p - em.trf[3].xyz);
     si.tx = vec2(atan(length(si.n.xy) / si.n.z), atan(si.n.y / si.n.x));
   } else if (em.type == EmitterTypeRectangle) {
-    si.n = normalize(em.trf[2].xyz);
+    si.n  = normalize(em.trf[2].xyz);
     si.tx = 0.5 + (inverse(em.trf) * vec4(si.p, 1)).xy;
   }
 
