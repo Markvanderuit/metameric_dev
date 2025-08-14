@@ -9,6 +9,7 @@
                                    scene_txtr_object_coef_data,              \
                                    scene_txtr_object_brdf_data,              \
                                    scene_txtr_emitter_coef_data,             \
+                                   scene_txtr_emitter_scle_data,             \
                                    scene_txtr_bsis_data)                     \
   AtlasInfo scene_texture_object_coef_info(uint object_i) {                  \
     return scene_buff_object_coef_info[object_i];                            \
@@ -39,7 +40,9 @@
   uvec4 scene_texture_emitter_coef_fetch(ivec3 p) {                          \
     return floatBitsToUint(texelFetch(scene_txtr_emitter_coef_data, p, 0));  \
   }                                                                          \
-                                                                             \
+  float scene_texture_emitter_scle_fetch(ivec3 p) {                          \
+    return texelFetch(scene_txtr_emitter_scle_data, p, 0).x;                 \
+  }                                                                          \
   float scene_texture_basis_sample(float wvl, uint j) {                      \
     return texture(scene_txtr_bsis_data, vec2(wvl, j)).x;                    \
   }

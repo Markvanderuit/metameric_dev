@@ -45,6 +45,7 @@ uint scene_object_count()            { return 0;               }
   uvec4     scene_texture_object_coef_fetch(ivec3 p)      { return uvec4(0);       }
   uint      scene_texture_object_brdf_fetch(ivec3 p)      { return 0u;             }
   uvec4     scene_texture_emitter_coef_fetch(ivec3 p)     { return uvec4(0);       }
+  float     scene_texture_emitter_scle_fetch(ivec3 p)     { return 0.f;            }
   float     scene_texture_basis_sample(float wvl, uint j) { return 0.f;            }
 #endif // !SCENE_DATA_TEXTURE
 

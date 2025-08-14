@@ -50,31 +50,6 @@ vec3 tx_to_emitter_coef_atlas_tx(in uint emitter_i, in vec2 tx2) {
   return tx2_to_atlas_tx3(atlas_info, tx2, scene_texture_emitter_coef_size());
 }
 
-/* // Translate emitter texture coordinates to coordinates suited for a texture atlas;
-// baked spectral texture coefficients live in an atlas in this implementation, 
-// so this step is necessary.
-vec3 si_to_envmap_coef_atlas_tx(in EmitterInfo emitter_info, in vec3 d) {
-  // Load relevant info
-  AtlasInfo  atlas_info  = scene_texture_emitter_coef_info(scene_envm_emitter_idx());
-  
-  // Transform directional vector to spherical coordinates, or set to 0.5 if
-  // a single value is specified
-  // vec2 tx2 = vec2(acos(d.z), atan(d.y, d.x));
-
-  // Obtain uv coordinates, or set to 0.5 if the albedo value is specified
-  vec2 tx2 = record_is_sampled(object_info.albedo_data) ? si.tx : vec2(0.5f);
-
-  // Translate to texture atlas patch
-  vec3 tx3 = vec3(atlas_info.uv0 + atlas_info.uv1 * tx2, atlas_info.layer);
-  tx3.xy *= scene_texture_object_coef_size(); // Scale [0,1] to texture size
-  tx3.xy -= 0.5f;                            // Offset by half a pixel
-
-  // Clamp to texture atlas patch
-  tx3.xy = clamp(tx3.xy, vec2(atlas_info.offs), vec2(atlas_info.offs + atlas_info.size - 1));
-
-  return tx3;
-} */
-
 // Sample four-wavelength surface reflectances using stochastic sampling; we avoid
 // doing four texel fetches + unpacking, and instead do simple stochastic filtering
 vec4 texture_reflectance(in SurfaceInfo si, in vec4 wvls, in vec2 sample_2d) {
@@ -142,7 +117,7 @@ vec4 texture_illuminant(in uint emitter_i, in vec2 tx2, in vec4 wvls, in vec2 sa
       e[j] += a * scene_texture_basis_sample(wvls[j], k);
   } // for (uint k)
 
-  return e;
+  return e * scene_texture_emitter_scle_fetch(ivec3(tx) + ivec3(tx_offsets[i], 0));
 }
 
 vec4 texture_illuminant(in SurfaceInfo si, in vec4 wvls, in vec2 sample_2d) {

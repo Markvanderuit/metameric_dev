@@ -327,6 +327,8 @@ namespace met {
         texture_object_coef.set_invalitated(false);
       if (texture_emitter_coef.is_init())
         texture_emitter_coef.set_invalitated(false);
+      if (texture_emitter_scle.is_init())
+        texture_emitter_scle.set_invalitated(false);
 
       // Check for atlas resize (objects)
       if (upliftings || objects || settings.state.texture_size || !texture_object_coef.is_init()) {
@@ -369,6 +371,8 @@ namespace met {
         // First, ensure atlas exists for us to operate on
         if (!texture_emitter_coef.is_init())
           texture_emitter_coef = {{ .levels  = 1, .padding = 0 }};
+        if (!texture_emitter_scle.is_init())
+          texture_emitter_scle = {{ .levels  = 1, .padding = 0 }};
 
         // Gather indices of emitters that need uplifting
         // Gather necessary texture sizes for each object
@@ -391,9 +395,10 @@ namespace met {
         
         // Regenerate atlas if inputs don't match the atlas' current layout
         // Note; barycentric weights will need a full rebuild, which is detected
-        //       by the nr. of objects changing or the texture setting changing. A bit spaghetti-y :S
+        // by the nr. of objects changing or the texture setting changing. A bit spaghetti-y :S
         texture_emitter_coef.resize(inputs);
-        if (texture_emitter_coef.is_invalitated()) {
+        texture_emitter_scle.resize(inputs);
+        if (texture_emitter_coef.is_invalitated() || texture_emitter_scle.is_invalitated()) {
           // The barycentric texture was re-allocated, which means underlying memory was all invalidated.
           // So in a case of really bad spaghetti-code, we force object-dependent parts to update
           auto &e_scene = const_cast<Scene &>(scene);
@@ -750,7 +755,7 @@ namespace met {
         || scene.resources.images       // User loaded/deleted a image;
         || settings.state.texture_size; // Texture size setting changed
       guard(is_active);
-      fmt::print("Uplifting {}: baked object {}\n", object->uplifting_i, m_object_i);
+      fmt::print("Uplifting {}: baking object reflectances {}\n", object->uplifting_i, m_object_i);
 
       // Get relevant program handle, bind, then bind resources to corresponding targets
       auto &cache = scene.m_cache_handle.getw<gl::ProgramCache>();
@@ -818,9 +823,11 @@ namespace met {
       // Check that the emitter even necessitates uplifting
       guard(emitter->spec_type == Emitter::SpectrumType::eColr);
 
-      // Find relevant patch in the texture atlas
-      const auto &atlas = scene.components.upliftings.gl.texture_emitter_coef;
-      const auto &patch = atlas.patch(m_emitter_i);
+      // Find relevant patch in the texture atlas;
+      // We assume both atlases are layed out identically
+      const auto &atlas_coef = scene.components.upliftings.gl.texture_emitter_coef;
+      const auto &atlas_scle = scene.components.upliftings.gl.texture_emitter_scle;
+      const auto &patch = atlas_coef.patch(m_emitter_i);
 
       // Check that a patch is actually used
       guard(!patch.size.isApprox(eig::Array2u(0)));
@@ -830,15 +837,15 @@ namespace met {
       // this case means "ewwwwwww"
       bool is_active 
          = m_is_first_update            // First run, demands render anyways
-        || atlas.is_invalitated()       // Texture atlas re-allocated, demands re-render
+        || atlas_coef.is_invalitated()  // Texture atlas re-allocated, demands re-bake
+        || atlas_scle.is_invalitated()  // Texture atlas re-allocated, demands re-bake
         || emitter.state.color          // Different color value set on emitter
-        // || emitter.state.type           // Different type set on emitter
         || emitter.state.spec_type      // Different type set on emitter
         || uplifting                    // Uplifting was changed
         || scene.resources.images       // User loaded/deleted a image;
         || settings.state.texture_size; // Texture size setting changed
       guard(is_active);
-      fmt::print("Uplifting {}: baking emitter {}\n", 0, m_emitter_i);
+      fmt::print("Uplifting {}: baking emitter spectra {}\n", 0, m_emitter_i);
 
       // Determine color boundaries for scaling hdr data
       // TODO precompute
@@ -848,16 +855,15 @@ namespace met {
       };
       m_buffer.flush();
 
-      fmt::print("Boundaries: {}\n", m_buffer_map->boundaries);
-
       // Get relevant program handle, bind, then bind resources to corresponding targets
       auto &cache = scene.m_cache_handle.getw<gl::ProgramCache>();
       auto &program = cache.at(m_program_key);
       program.bind();
       program.bind("b_buff_unif",        m_buffer);
       program.bind("b_buff_emitters",    scene.components.emitters.gl.emitter_info);
-      program.bind("b_buff_atlas",       atlas.buffer());
-      program.bind("b_atlas",            atlas.texture());
+      program.bind("b_buff_atlas",       atlas_coef.buffer());
+      program.bind("b_atlas_coef",       atlas_coef.texture());
+      program.bind("b_atlas_scle",       atlas_scle.texture());
       program.bind("b_buff_uplift_coef", uplifting_gl.buffer_coef);
       program.bind("b_buff_uplift_bary", uplifting_gl.buffer_bary);
       if (!scene.resources.images.empty()) {

@@ -43,10 +43,11 @@ namespace met {
       // Then, spawn a combobox to switch between the variant's types
       ImGui::SameLine();
       ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-      if (ImGui::BeginCombo(fmt::format("##_{}_data", title).c_str(), title.c_str())) {
-        if (ImGui::Selectable("Value", std::holds_alternative<Colr>(variant)))
+      std::array<std::string, 2> select_titles = { "Value", "Texture" };
+      if (ImGui::BeginCombo(fmt::format("##_{}_data", title).c_str(), select_titles[variant.index()].c_str())) {
+        if (ImGui::Selectable(select_titles[0].c_str(), std::holds_alternative<Colr>(variant)))
           variant = Colr(1);
-        if (ImGui::Selectable("Texture", std::holds_alternative<uint>(variant)))
+        if (ImGui::Selectable(select_titles[1].c_str(), std::holds_alternative<uint>(variant)))
           variant = uint(0u);
         ImGui::EndCombo();
       } // If (BeginCombo)
@@ -359,7 +360,7 @@ namespace met {
       }
     };
 
-    // Default implementation of editing visitor for Emitter components
+    // Default implementation of editing visitor for view components
     template <>
     void edit_visitor_default(SchedulerHandle &info, uint i, Component<View> &component) {
       // Get external resources and shorthands

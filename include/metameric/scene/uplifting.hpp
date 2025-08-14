@@ -272,16 +272,17 @@ namespace met {
       };
 
     public:
-      // Object caches; these help generate uplifting data and bake object textures, and
-      // are exposed so the editor can access their data
+      // Helpers/caches; these generate some uplifting data and then bake the upliftg into
+      // texture atlas patches. They are exposed as some places might access their data
       std::vector<UpliftingData> uplifting_data;
       std::vector<ObjectData>    object_data;
       std::vector<EmitterData>   emitter_data;
 
-      // Atlas textures; each uplifted object/emitter has a patch in the atlas for some material parameters
-      // Stores packed linear coefficients representing spectral functions in basis
+      // Atlas textures; each uplifted object/emitter has a patch in the atlas for uplifting
+      // coeffs. Stores packed linear coefficients representing spectral functions in basis.
       detail::TextureAtlas2d4f texture_object_coef; 
       detail::TextureAtlas2d4f texture_emitter_coef;
+      detail::TextureAtlas2d1f texture_emitter_scle; // Emitters track a single per-pixel scalar for hdr data
 
       // Array texture; each layer holds one of 12 basis function spectra
       gl::TextureArray1d1f texture_basis;

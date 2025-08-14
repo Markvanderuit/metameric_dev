@@ -218,6 +218,7 @@ namespace met {
     program.bind("b_object_brdf_2f",         scene.components.objects.gl.texture_brdf.texture(), m_sampler);
     program.bind("b_object_coef_4f",         scene.components.upliftings.gl.texture_object_coef.texture(), m_sampler);
     program.bind("b_emitter_coef_4f",        scene.components.upliftings.gl.texture_emitter_coef.texture(), m_sampler);
+    program.bind("b_emitter_scle_1f",        scene.components.upliftings.gl.texture_emitter_scle.texture(), m_sampler);
     program.bind("b_cmfs_3f",                scene.resources.observers.gl.cmfs_texture, m_sampler);
     
     if (!scene.resources.meshes.empty()) {

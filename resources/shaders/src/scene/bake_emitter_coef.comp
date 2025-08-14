@@ -42,9 +42,10 @@ layout(binding = 0) restrict readonly buffer b_buff_uplift_coef {
 } buff_uplift_coef;
 
 // Image/sampler declarations
-layout(binding = 0)          uniform sampler2DArray                  b_txtr_3f; // Input 3-component textures
-layout(binding = 1)          uniform sampler2DArray                  b_txtr_1f; // Input 1-component textures
-layout(binding = 0, rgba32f) uniform restrict writeonly image2DArray b_atlas;   // Output coefficient texture atlas
+layout(binding = 0)          uniform sampler2DArray                  b_txtr_3f;    // Input 3-component textures
+layout(binding = 1)          uniform sampler2DArray                  b_txtr_1f;    // Input 1-component textures
+layout(binding = 0, rgba32f) uniform restrict writeonly image2DArray b_atlas_coef; // Output coefficient texture atlas
+layout(binding = 1, rgba32f) uniform restrict writeonly image2DArray b_atlas_scle; // Output scaling for clipped hdr
 
 void main() {
   // Load relevant object/patch data
@@ -78,9 +79,14 @@ void main() {
     p = record_get_direct_value(emitter.color_data);
   }
 
-  // Color value very likely exceeds [0, 1], so we scale it before searching for a spectrum
-  // p /= buff_unif.boundaries.y;
-  p = min(p, vec3(1));
+  // If color value exceeds 1, we scale it down and store this scale value.
+  // So much for treating hdr image data with care :D
+  float scale = 1.f;
+  if (any(greaterThan(p, vec3(1)))) {
+    scale = hmax(p);
+    p /= scale;
+  }
+  imageStore(b_atlas_scle, ivec3(px_out, atlas.layer), vec4(scale));
   
   // Next, brute-force search for the corresponding barycentric weights and tetrahedron's index
   float result_err = FLT_MAX;
@@ -112,5 +118,5 @@ void main() {
   } // for (uint i)
 
   // Finally, write result out to atlas
-  imageStore(b_atlas, ivec3(px_out, atlas.layer), uintBitsToFloat(pack_basis_coeffs(coef)));
+  imageStore(b_atlas_coef, ivec3(px_out, atlas.layer), uintBitsToFloat(pack_basis_coeffs(coef)));
 }
