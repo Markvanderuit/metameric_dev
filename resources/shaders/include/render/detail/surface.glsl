@@ -53,7 +53,7 @@ void detail_fill_surface_info_object(inout SurfaceInfo si, in Ray ray) {
   si.p =          (object_info.trf * vec4(si.p, 1)).xyz;
   si.n = normalize(object_info.trf * vec4(si.n, 0)).xyz;
 
-  // Generate shading frame based on shading normal
+  // Store incident ray data
   si.wi = to_local(get_frame(si.n), -ray.d);
   si.t  = ray.t;
 }

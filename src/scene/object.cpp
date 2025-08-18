@@ -42,6 +42,10 @@ namespace met {
       case 0: guard(std::get<float>(roughness) == std::get<float>(o.roughness), false); break;
       case 1: guard(std::get<uint>(roughness) == std::get<uint>(o.roughness), false); break;
     }
+
+    guard(normalmap == o.normalmap, false);
+    if (normalmap)
+      guard(*normalmap == *o.normalmap, false);
    
     return true;
   }
@@ -73,6 +77,16 @@ namespace met {
       } else {
         u = (0x0000FFFF & detail::to_float16(std::get<0>(v)));
       }
+      return u;
+    }
+
+    // Helper to pack uint optional
+    inline
+    uint pack_optional_1u(const std::optional<uint> &v) {
+      met_trace();
+      uint u = 0;
+      if (v.has_value())
+        u = (0x0FFFFFFF & static_cast<ushort>(*v)) | 0x10000000;
       return u;
     }
 
@@ -121,7 +135,8 @@ namespace met {
             .metallic_data  = pack_material_1f(object.metallic),
             .roughness_data = pack_material_1f(object.roughness),
             .eta_minmax     = object.eta_minmax,
-            .absorption     = object.absorption
+            .absorption     = object.absorption,
+            .normalmap_data = pack_optional_1u(object.normalmap)
           };
         } // for (uint i)
         

@@ -157,6 +157,7 @@ namespace met {
     js["diffuse"]   = {{ "index", object.diffuse.index() },   { "variant", object.diffuse   }};
     js["roughness"] = {{ "index", object.roughness.index() }, { "variant", object.roughness }};
     js["metallic"]  = {{ "index", object.metallic.index() },  { "variant", object.metallic  }};
+    js["normalmap"] = {{ "has_value", object.normalmap.has_value() },  { "value", object.normalmap.value_or(0u) }};
   }
 
   void from_json(const json &js, Object &object) {
@@ -194,6 +195,9 @@ namespace met {
     }
     if (js.contains("absorption")) {
       js.at("absorption").get_to(object.absorption);
+    }
+    if (js.contains("normalmap") && js.at("normalmap").at("has_value").get<bool>()) {
+      object.normalmap = js.at("normalmap").at("value").get<uint>();
     }
   }
 

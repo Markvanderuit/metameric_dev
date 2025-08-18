@@ -28,6 +28,7 @@ struct ObjectInfo {
   uint  roughness_data;
   vec2  eta_minmax;
   float absorption;
+  uint  normalmap_data;
 };
 
 // Info object for referred patch from texture atlas

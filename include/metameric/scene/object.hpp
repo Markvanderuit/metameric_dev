@@ -50,6 +50,7 @@ namespace met {
     std::variant<float, uint> roughness  = 0.1f;             // for microfacet brdf
     eig::Array2f              eta_minmax = { 1.25f, 1.25f }; // for dielectric brdf
     float                     absorption = 0.f;              // for dielectric brdf
+    std::optional<uint>       normalmap;                     // optional normalmap texture inndex
 
   public: // Boilerplate
     bool operator==(const Object &o) const;
@@ -102,6 +103,7 @@ namespace met {
         // ---
         alignas(8)  eig::Array2f  eta_minmax;
         alignas(4)  float         absorption;
+        alignas(4)  uint          normalmap_data;
       };
       static_assert(sizeof(BlockLayout) == 112);
 
@@ -141,6 +143,7 @@ namespace met {
       SceneStateHandler<decltype(Object::roughness)>   roughness;
       SceneStateHandler<decltype(Object::eta_minmax)>  eta_minmax;
       SceneStateHandler<decltype(Object::absorption)>  absorption;
+      SceneStateHandler<decltype(Object::normalmap)>   normalmap;
 
     public:
       bool update(const Object &o) override {
@@ -156,6 +159,7 @@ namespace met {
         | roughness.update(o.roughness)
         | eta_minmax.update(o.eta_minmax)
         | absorption.update(o.absorption)
+        | normalmap.update(o.normalmap)
         );
       }
     };

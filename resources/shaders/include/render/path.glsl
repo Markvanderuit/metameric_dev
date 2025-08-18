@@ -18,12 +18,9 @@ vec4 Li_debug(in SensorSample ss, in SamplerState state) {
   if (!is_valid(si))
     return vec4(0);
     
-  // Generate directional sample towards emitter
-  EmitterSample es = sample_emitter(si, ss.wvls, next_3d(state));
-  si = get_surface_info(es.ray);
-  // vec4 v = eval_emitter(es, vec4(0.2, 0.4, 0.6, 1.0), next_2d(state));
-
-  return vec4(si.n, 1);
+  Frame frame = get_frame(si.n);
+  
+  return vec4(frame.n, 1);
 }
 
 vec4 Li(in SensorSample ss, in SamplerState state, out float alpha) {
