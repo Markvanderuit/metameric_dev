@@ -8,8 +8,8 @@
 #define get_dielectric_cauchy_b(brdf)      brdf.data.x
 #define get_dielectric_cauchy_c(brdf)      brdf.data.y
 #define get_dielectric_eta(brdf)           brdf.data.x
-#define get_dielectric_is_dispersive(brdf) (brdf.data.y != 0)
 #define get_dielectric_absorption(brdf)    brdf.data.z
+#define get_dielectric_is_dispersive(brdf) (brdf.data.y != 0)
 
 // Source, Mitsuba 0.5, util.cpp, line 651
 float _brdf_dielectric_fresnel(in float cos_theta_i, inout float cos_theta_t, in float eta) {
@@ -112,7 +112,7 @@ BRDFSample sample_brdf_dielectric(in BRDFInfo brdf, in vec3 sample_3d, in Surfac
     bs.pdf         = F;
   } else {
     // Transmit
-    bs.is_spectral = true;
+    bs.is_spectral = get_dielectric_is_dispersive(brdf);
     bs.wo          = local_refract(si.wi, cos_theta_t, eta);
     bs.pdf         = 1.f - F;
   }
