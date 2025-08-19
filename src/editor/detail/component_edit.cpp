@@ -53,6 +53,20 @@ namespace met {
       } // If (BeginCombo)
     }
 
+    constexpr
+    void push_texture_optional_selector(const std::string &title, const auto &resources, auto &j) {
+      auto name = j.transform([&](uint j) { return resources[j].name.c_str(); }) .value_or("None");
+
+      if (ImGui::BeginCombo(title.data(), name)) {
+        if (ImGui::Selectable("None", !j))
+          j = {};
+        for (uint i = 0; i < resources.size(); ++i)
+          if (ImGui::Selectable(resources[i].name.c_str(), j && (*j == i)))
+            j = i;
+        ImGui::EndCombo();
+      } // if (BeginCombo)
+    }
+
     // Helper function; given a title, access to a set of textures, and a modifiable variant
     // representing a color or a texture, spawn a combo box for texture/color selection
     constexpr
@@ -134,6 +148,10 @@ namespace met {
         ImGui::SliderFloat2("Eta (min, max)", value.eta_minmax.data(), 1.001f, 2.0f);
         ImGui::SliderFloat("Absorption", &value.absorption, 1.f, 100.0f);
       }
+
+      ImGui::Separator();
+      
+      push_texture_optional_selector("Normalmap", scene.resources.images, value.normalmap);
     };
 
     // Default implementation of editing visitor for Emitter components
