@@ -29,6 +29,9 @@ void detail_fill_surface_info_object(inout SurfaceInfo si, in Ray ray) {
   si.n  = b.x * prim.v0.n  + b.y * prim.v1.n  + b.z * prim.v2.n;
   si.tx = b.x * prim.v0.tx + b.y * prim.v1.tx + b.z * prim.v2.tx;
   
+  // Read normalmap data
+  // vec3 nm = texture_normal(si, )
+
    // Compute geometric normal
   // si.ng = cross(prim.v1.p - prim.v0.p, prim.v2.p - prim.v1.p);
 

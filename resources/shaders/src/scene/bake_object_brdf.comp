@@ -26,9 +26,9 @@ layout(binding = 3) uniform b_buff_textures {
 } buff_textures;
 
 // Image/sampler declarations
-layout(binding = 0)       uniform sampler2DArray                 b_txtr_3f; // Input 3-component textures
-layout(binding = 1)       uniform sampler2DArray                 b_txtr_1f; // Input 1-component textures
-layout(binding = 0, r32f) uniform restrict writeonly image2DArray b_atlas;   // Output coefficient texture atlas
+layout(binding = 0)          uniform sampler2DArray                  b_txtr_3f; // Input 3-component textures
+layout(binding = 1)          uniform sampler2DArray                  b_txtr_1f; // Input 1-component textures
+layout(binding = 0, rgba32f) uniform restrict writeonly image2DArray b_atlas;   // Output coefficient texture atlas
 
 void main() {
   // Load relevant object/patch data
@@ -42,6 +42,7 @@ void main() {
 
   // Output value; [roughness, metallic]
   vec2 p;
+  vec3 n;
 
   // First, sample roughness value from object
   if (record_is_sampled(object.roughness_data)) {
@@ -69,7 +70,7 @@ void main() {
     TextureInfo txtr = buff_textures.data[record_get_sampler_index(object.metallic_data)];
     const uvec2 px_in = clamp(gl_GlobalInvocationID.xy + txtr.offs, txtr.offs, txtr.offs + txtr.size - 1);
 
-    // Value is supplied by scene texture; could be b_txtr_3f or b_txtr_1f
+    // Value is supplied by scene texture; could be b_txtr_3f.x or b_txtr_1f
     if (txtr.is_3f) {
       const vec2 tx_in = clamp((vec2(px_in) + 0.5f)
                        / textureSize(b_txtr_3f, 0).xy, vec2(0), vec2(1));
@@ -83,6 +84,27 @@ void main() {
     p.y =  record_get_direct_value(object.metallic_data);
   }
 
+  // Then, query normalmap data from object
+  if (record_is_optional_set(object.normalmap_data)) {
+    TextureInfo txtr  = buff_textures.data[record_get_optional_value(object.normalmap_data)];
+    const uvec2 px_in = clamp(gl_GlobalInvocationID.xy + txtr.offs, txtr.offs, txtr.offs + txtr.size - 1);
+    
+    // Value is supplied by scene texture; should only allow b_txtr_3f
+    if (txtr.is_3f) {
+      const vec2 tx_in = clamp((vec2(px_in) + 0.5f)
+                       / textureSize(b_txtr_3f, 0).xy, vec2(0), vec2(1));
+      n = texture(b_txtr_3f, vec3(tx_in, txtr.layer)).xyz;
+    } else {
+      // Fallback
+      n = vec3(0, 0, 1);
+    }
+  } else {
+    // Fallback
+    n = vec3(0, 0, 1);
+  }
+
   // Finally, write packed result out to atlas
-  imageStore(b_atlas, ivec3(px_out, atlas.layer), uintBitsToFloat(uvec4(packHalf2x16(p), 1, 1, 1)));
+  vec4 v = vec4(p, pack_normal_octahedral(n));
+  imageStore(b_atlas, ivec3(px_out, atlas.layer), v);
+  // imageStore(b_atlas, ivec3(px_out, atlas.layer), uintBitsToFloat(uvec4(packHalf2x16(p), 1, 1, 1)));
 }

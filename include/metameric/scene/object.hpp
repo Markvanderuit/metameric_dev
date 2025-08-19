@@ -120,8 +120,8 @@ namespace met {
       // Stores one instance of BlockLayout per object component
       gl::Buffer object_info;
 
-      // Stores packing of some brdf parameters (roughness, metallic at fp16)
-      detail::TextureAtlas2d1f texture_brdf; 
+      // Stores packing of some brdf parameters (roughness, metallic, normalmap)
+      detail::TextureAtlas2d4f texture_brdf; 
     
     public:
       // Class constructor and update function handle GL-side data

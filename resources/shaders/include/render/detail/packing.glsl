@@ -190,4 +190,21 @@ uvec4 pack_basis_coeffs(in float[wavelength_bases] v) {
   return p;
 }
 
+vec2 pack_normal_octahedral(vec3 n) {
+ n /= (abs(n.x) + abs(n.y) + abs(n.z));
+ n.xy = n.z >= 0.f
+      ? n.xy
+      : (1.f - abs(n.yx)) * mix(vec2(-1.f), vec2(1.f), greaterThanEqual(n.xy, vec2(0)));
+ n.xy = n.xy * .5f + .5f;
+ return n.xy; 
+}
+
+vec3 unpack_normal_octahedral(vec2 p) {
+ p = p * 2.f - 1.f;
+ vec3  n = vec3(p.xy, 1.f - abs(p.x) - abs(p.y));
+ float t = clamp(-n.z, 0.f, 1.f);
+ n.xy += mix(vec2(-t), vec2(t), greaterThanEqual(n.xy, vec2(0)));
+ return normalize(n);
+}
+
 #endif // RENDER_DETAIL_PACKING_GLSL_GUARD

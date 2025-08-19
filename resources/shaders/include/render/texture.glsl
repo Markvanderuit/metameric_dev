@@ -87,11 +87,23 @@ vec2 texture_brdf(in SurfaceInfo si, in vec2 sample_2d) {
   // the sampling density, so we can elimitate both it and the density from further computation
   uint i = hsum(mix(uvec2(0), uvec2(1, 2), greaterThanEqual(sample_2d, vec2(1) - fract(tx.xy))));
   
-  // Load packed brdf data for a particular corner
-  uint pack = scene_texture_object_brdf_fetch(ivec3(tx) + ivec3(tx_offsets[i], 0));
-
-  return unpackHalf2x16(pack);
+  // Load brdf data for a particular corner
+  vec4 data = scene_texture_object_brdf_fetch(ivec3(tx) + ivec3(tx_offsets[i], 0));
+  return data.xy;
 }
+
+/* vec3 texture_normal(in SurfaceInfo si, in vec2 sample_2d) {
+  // Translate surface uv data to texture atlas uv
+  vec3 tx = si_to_object_brdf_atlas_tx(si);
+
+  // Sample a texel offset for stochastic mixing; the interpolation weight of that texel equals
+  // the sampling density, so we can elimitate both it and the density from further computation
+  uint i = hsum(mix(uvec2(0), uvec2(1, 2), greaterThanEqual(sample_2d, vec2(1) - fract(tx.xy))));
+  
+  // Load normalmap data for a particular corner
+  vec4 data = scene_texture_object_brdf_fetch(ivec3(tx) + ivec3(tx_offsets[i], 0));
+  return unpack_normal_octahedral(data.yz);
+} */
 
 vec4 texture_illuminant(in uint emitter_i, in vec2 tx2, in vec4 wvls, in vec2 sample_2d) {
   // Translate provided uv data to texture atlas uv

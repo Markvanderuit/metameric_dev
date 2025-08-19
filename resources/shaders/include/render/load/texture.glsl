@@ -34,8 +34,8 @@
   uvec4 scene_texture_object_coef_fetch(ivec3 p) {                           \
     return floatBitsToUint(texelFetch(scene_txtr_object_coef_data, p, 0));   \
   }                                                                          \
-  uint scene_texture_object_brdf_fetch(ivec3 p) {                            \
-    return floatBitsToUint(texelFetch(scene_txtr_object_brdf_data, p, 0).x); \
+  vec4 scene_texture_object_brdf_fetch(ivec3 p) {                            \
+    return texelFetch(scene_txtr_object_brdf_data, p, 0);                    \
   }                                                                          \
   uvec4 scene_texture_emitter_coef_fetch(ivec3 p) {                          \
     return floatBitsToUint(texelFetch(scene_txtr_emitter_coef_data, p, 0));  \

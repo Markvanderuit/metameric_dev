@@ -215,7 +215,7 @@ namespace met {
     program.bind("b_buff_emitters_distr",    scene.components.emitters.gl.emitter_distr_buffer);
     program.bind("b_illm_1f",                scene.resources.illuminants.gl.spec_texture, m_sampler);
     program.bind("b_bsis_1f",                scene.components.upliftings.gl.texture_basis, m_sampler);
-    program.bind("b_object_brdf_2f",         scene.components.objects.gl.texture_brdf.texture(), m_sampler);
+    program.bind("b_object_brdf_4f",         scene.components.objects.gl.texture_brdf.texture(), m_sampler);
     program.bind("b_object_coef_4f",         scene.components.upliftings.gl.texture_object_coef.texture(), m_sampler);
     program.bind("b_emitter_coef_4f",        scene.components.upliftings.gl.texture_emitter_coef.texture(), m_sampler);
     program.bind("b_emitter_scle_1f",        scene.components.upliftings.gl.texture_emitter_scle.texture(), m_sampler);
