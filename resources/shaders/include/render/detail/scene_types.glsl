@@ -10,7 +10,7 @@ const uint met_max_textures    = MET_SUPPORTED_TEXTURES;
 
 // Info object to gather Scene::Object data
 // Material data is unpacked when necessary; see record.glsl
-struct ObjectInfo {
+struct Object {
   // Transform and inverse transform data
   mat4 trf;
 
@@ -31,6 +31,43 @@ struct ObjectInfo {
   uint  normalmap_data;
 };
 
+// Info object to gather Scene::Emitter data
+// Given the lack of unions, emitters store additional data
+// Illuminant data is unpacked when necessary; see record.glsl
+struct Emitter {
+  #define EmitterTypeConstant           0
+  #define EmitterTypePoint              1
+  #define EmitterTypeSphere             2
+  #define EmitterTypeRectangle          3
+  #define EmitterSpectrumTypeIlluminant 0
+  #define EmitterSpectrumTypeColor      1
+
+  // Transform data; sphere/rect position are extracted
+  mat4 trf;
+
+  // Shape data
+  bool is_active; // Should the emitter be interacted with?
+  uint type;      // Type of emitter; constant, point, sphere, rect
+  uint spec_type; // Type of spectral source: distribution, uplifted color
+
+  // Spectral data
+  float illuminant_scale; // Scalar multiplier applied to values  
+  uvec2 color_data;       // Packed data of uplifted color
+  uint  illuminant_i;     // Index of spd
+};
+
+// Info object to gather surface brdf data
+struct BRDF {
+  #define BRDFTypeNull       0
+  #define BRDFTypeDiffuse    1
+  #define BRDFTypeMicrofacet 2
+  #define BRDFTypeDielectric 3
+
+  uint type; // One of the above values
+  vec4 r;    // Underlying reflectance or transmittances on 4 wvls
+  vec4 data; // Supplemental values for principled/dielectric brdfs
+};
+
 // Info object for referred patch from texture atlas
 struct TextureInfo {
   bool is_3f; // Is the patch in the atlas_3f texture sampler, or in atlas_1f?
@@ -48,44 +85,6 @@ struct AtlasInfo {
   uvec2 size;  // Size of patch pixel region
   vec2  uv0;   // Minimum uv value, at region's offset
   vec2  uv1;   // Maximum uv value, at region's offset + size
-};
-
-// Info object to gather Scene::Emitter data
-// Given the lack of unions, emitters store additional data
-// Illuminant data is unpacked when necessary; see record.glsl
-struct EmitterInfo {
-  #define EmitterTypeConstant           0
-  #define EmitterTypePoint              1
-  #define EmitterTypeSphere             2
-  #define EmitterTypeRectangle          3
-  #define EmitterSpectrumTypeIlluminant 0
-  #define EmitterSpectrumTypeColor      1
-
-  // Transform data; sphere/rect position are extracted
-  mat4 trf;                
-
-  // Shape data
-  bool is_active; // Should the emitter be interacted with?
-  uint type;      // Type of emitter; constant, point, sphere, rect
-  uint spec_type; // Type of spectral source: distribution, uplifted color
-
-  // Spectral data
-  float illuminant_scale; // Scalar multiplier applied to values  
-  uvec2 color_data;       // Packed data of uplifted color
-  uint  illuminant_i;     // Index of spd
-};
-
-// Info object to gather brdf data locally
-struct BRDFInfo {
-  #define BRDFTypeNull       0
-  #define BRDFTypeDiffuse    1
-  #define BRDFTypeMicrofacet 2
-  #define BRDFTypeDielectric 3
-
-  uint  type; // Type of BRDF: one of the above values
-  vec4  wvls; // 4 wavelengths for which the BRDF is evaluated
-  vec4  r;    // Underlying reflectance or transmittances on 4 wvls
-  vec4  data; // Supplemental values for principled/dielectric brdfs
 };
 
 // Info object for referred BLAS data

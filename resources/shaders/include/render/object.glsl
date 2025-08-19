@@ -2,7 +2,7 @@
 #define RENDER_OBJECT_GLSL_GUARD
 
 bool ray_intersect_object(inout Ray ray, uint object_i) {
-  ObjectInfo object_info = scene_object_info(object_i);
+  Object object_info = scene_object_info(object_i);
   if (!object_info.is_active)
     return false;
 
@@ -23,7 +23,7 @@ bool ray_intersect_object(inout Ray ray, uint object_i) {
 }
 
 bool ray_intersect_object_any(in Ray ray, uint object_i) {
-  ObjectInfo object_info = scene_object_info(object_i);
+  Object object_info = scene_object_info(object_i);
   if (!object_info.is_active)
     return false;
   

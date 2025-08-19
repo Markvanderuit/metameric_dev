@@ -22,7 +22,7 @@ BVHNodePack  scene_tlas_node(uint i) { BVHNodePack d; return d; }
 #endif // !SCENE_DATA_TLAS
 
 #ifndef SCENE_DATA_EMITTER
-EmitterInfo scene_emitter_info(uint i) { EmitterInfo d; return d; }
+Emitter scene_emitter_info(uint i) { Emitter d; return d; }
 uint scene_emitter_count()             { return 0;                } 
 bool scene_has_envm_emitter() { return false;                     }
 uint scene_envm_emitter_idx() { return 0;                         }
@@ -31,7 +31,7 @@ declare_distr_sampler_default(emitters);
 #endif // !SCENE_DATA_EMITTER
 
 #ifndef SCENE_DATA_OBJECT
-ObjectInfo scene_object_info(uint i) { ObjectInfo d; return d; }
+Object scene_object_info(uint i) { Object d; return d; }
 uint scene_object_count()            { return 0;               }
 #endif // !SCENE_DATA_OBJECT
 

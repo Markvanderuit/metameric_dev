@@ -4,13 +4,13 @@
 #include <render/record.glsl>
 #include <render/microfacet.glsl>
 
-// Accessors to BRDFInfo data
+// Accessors to BRDF data
 #define get_microfacet_r(brdf)        brdf.r
 #define get_microfacet_alpha(brdf)    brdf.data.x
 #define get_microfacet_metallic(brdf) brdf.data.y
 #define get_microfacet_eta(brdf)      brdf.data.z
 
-vec2 _microfacet_lobe_probs(in BRDFInfo brdf, in SurfaceInfo si) {  
+vec2 _microfacet_lobe_probs(in BRDF brdf, in Interaction si) {  
   // Estimate fresnel for incident vector to establish probabilities
   vec4 F0 = mix(vec4(sdot(get_microfacet_eta(brdf) - 1) / sdot(get_microfacet_eta(brdf) + 1) / 0.08f),
                 get_microfacet_r(brdf),
@@ -32,15 +32,7 @@ vec2 _microfacet_lobe_probs(in BRDFInfo brdf, in SurfaceInfo si) {
   return vec2(prob_spec, prob_diff);
 }
 
-void init_brdf_microfacet(in ObjectInfo object, inout BRDFInfo brdf, in SurfaceInfo si, vec4 wvls, in vec2 sample_2d) {
-  vec2 brdf_data = texture_brdf(si, sample_2d);
-  get_microfacet_r(brdf)         = texture_reflectance(si, wvls, sample_2d);
-  get_microfacet_alpha(brdf)     = max(1e-3, brdf_data.x);
-  get_microfacet_metallic(brdf)  = brdf_data.y;
-  get_microfacet_eta(brdf)       = object.eta_minmax.x;
-}
-
-vec4 eval_brdf_microfacet(in BRDFInfo brdf, in SurfaceInfo si, in vec3 wo) {
+vec4 eval_brdf_microfacet(in BRDF brdf, in Interaction si, in vec3 wo, in vec4 wvls) {
   if (cos_theta(si.wi) <= 0.f || cos_theta(wo) <= 0.f)
     return vec4(0);
 
@@ -70,7 +62,7 @@ vec4 eval_brdf_microfacet(in BRDFInfo brdf, in SurfaceInfo si, in vec3 wo) {
   return f * M_PI_INV;
 }
 
-float pdf_brdf_microfacet(in BRDFInfo brdf, in SurfaceInfo si, in vec3 wo) {
+float pdf_brdf_microfacet(in BRDF brdf, in Interaction si, in vec3 wo) {
   if (cos_theta(si.wi) <= 0.f || cos_theta(wo) <= 0.f)
     return 0.f;
   
@@ -84,7 +76,7 @@ float pdf_brdf_microfacet(in BRDFInfo brdf, in SurfaceInfo si, in vec3 wo) {
   return diffuse_pdf + specular_pdf;
 }
 
-BRDFSample sample_brdf_microfacet(in BRDFInfo brdf, in vec3 sample_3d, in SurfaceInfo si) {
+BRDFSample sample_brdf_microfacet(in BRDF brdf, in vec3 sample_3d, in Interaction si, in vec4 wvls) {
   if (cos_theta(si.wi) <= 0.f)
     return brdf_sample_zero();
 

@@ -1,5 +1,5 @@
-#ifndef GLSL_SURFACE_DETAIL_GUARD
-#define GLSL_SURFACE_DETAIL_GUARD
+#ifndef GLSL_INTERACTION_DETAIL_GUARD
+#define GLSL_INTERACTION_DETAIL_GUARD
 
 #include <render/shape/primitive.glsl>
 
@@ -15,9 +15,9 @@ vec3 detail_gen_barycentric_coords(in vec3 p, in Primitive prim) {
   return vec3(a_bc, a_ac, a_ab) / a_tri;
 }
 
-void detail_fill_surface_info_object(inout SurfaceInfo si, in Ray ray) {
+void detail_fill_interaction_object(inout Interaction si, in Ray ray) {
   // On a valid surface, fill in surface info
-  ObjectInfo object_info = scene_object_info(record_get_object(si.data));
+  Object object_info = scene_object_info(record_get_object(si.data));
   
   // Obtain and unpack intersected primitive data
   Primitive prim = unpack(scene_blas_prim(record_get_object_primitive(ray.data)));
@@ -61,9 +61,9 @@ void detail_fill_surface_info_object(inout SurfaceInfo si, in Ray ray) {
   si.t  = ray.t;
 }
 
-void detail_fill_surface_info_emitter(inout SurfaceInfo si, in Ray ray) {
+void detail_fill_interaction_emitter(inout Interaction si, in Ray ray) {
   // On a valid emitter, fill in surface info
-  EmitterInfo em = scene_emitter_info(record_get_emitter(si.data));
+  Emitter em = scene_emitter_info(record_get_emitter(si.data));
   
   // Fill positional data from ray hit
   si.p = ray_get_position(ray);
@@ -85,4 +85,4 @@ void detail_fill_surface_info_emitter(inout SurfaceInfo si, in Ray ray) {
   si.t  = ray.t;
 }
 
-#endif // GLSL_SURFACE_DETAIL_GUARD
+#endif // GLSL_INTERACTION_DETAIL_GUARD

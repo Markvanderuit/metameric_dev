@@ -18,7 +18,7 @@ layout(binding = 1) uniform b_buff_atlas {
 } buff_atlas;
 layout(binding = 2) uniform b_buff_objects {
   uint n;
-  ObjectInfo data[met_max_objects];
+  Object data[met_max_objects];
 } buff_objects;
 layout(binding = 3) uniform b_buff_textures {
   uint n;
@@ -32,7 +32,7 @@ layout(binding = 0, rgba32f) uniform restrict writeonly image2DArray b_atlas;   
 
 void main() {
   // Load relevant object/patch data
-  ObjectInfo object = buff_objects.data[buff_unif.object_i];
+  Object object = buff_objects.data[buff_unif.object_i];
   AtlasInfo  atlas  = buff_atlas.data[buff_unif.object_i];
   
   // Determine pixel location in padded patch, then clamp invocations to
@@ -40,7 +40,7 @@ void main() {
   const uvec2 px_out = gl_GlobalInvocationID.xy + atlas.offs;
   guard(clamp(px_out, atlas.offs, atlas.offs + atlas.size - 1) == px_out);
 
-  // Output value; [roughness, metallic]
+  // Output value; [roughness, metallic], [normal]
   vec2 p;
   vec3 n;
 
@@ -93,7 +93,7 @@ void main() {
     if (txtr.is_3f) {
       const vec2 tx_in = clamp((vec2(px_in) + 0.5f)
                        / textureSize(b_txtr_3f, 0).xy, vec2(0), vec2(1));
-      n = texture(b_txtr_3f, vec3(tx_in, txtr.layer)).xyz;
+      n = normalize(texture(b_txtr_3f, vec3(tx_in, txtr.layer)).xyz * 2.f - 1.f);
     } else {
       // Fallback
       n = vec3(0, 0, 1);

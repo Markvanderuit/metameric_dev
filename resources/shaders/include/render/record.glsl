@@ -37,7 +37,7 @@ void record_set_anyhit(inout uint rc, in bool hit) {
   rc = uint(hit); 
 }
 
-// Getters to read packed Ray/SurfaceInfo data;
+// Getters to read packed Ray/Interaction data;
 // uint records are used by intersection tests to store type and index of a hit
 bool record_is_valid(in uint rc)             { return rc != RECORD_INVALID_DATA;       }
 bool record_is_emitter(in uint rc)           { return (rc & RECORD_EMITTER_FLAG) != 0; }

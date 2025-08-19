@@ -43,7 +43,7 @@ layout(binding = 1) uniform b_buff_query {
 } buff_query;
 layout(binding = 2) uniform b_buff_object_info {
   uint n;
-  ObjectInfo data[met_max_objects];
+  Object data[met_max_objects];
 } buff_objects;
 layout(binding = 3) uniform b_buff_blas_info {
   uint n;
@@ -51,7 +51,7 @@ layout(binding = 3) uniform b_buff_blas_info {
 } buff_blas_info;
 layout(binding = 4) uniform b_buff_emitter_info {
   uint n;
-  EmitterInfo data[met_max_emitters];
+  Emitter data[met_max_emitters];
 } buff_emitter_info;
 layout(binding = 5) uniform b_buff_wvls_distr {
   WavelengthDistribution data;

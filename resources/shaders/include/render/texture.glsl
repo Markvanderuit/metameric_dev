@@ -23,9 +23,9 @@ vec3 tx2_to_atlas_tx3(in AtlasInfo atlas_patch, in vec2 tx2, in vec2 atlas_size)
 // Translate object texture coordinates to coordinates suited for a texture atlas;
 // baked spectral texture coefficients live in an atlas in this implementation, 
 // so this step is necessary.
-vec3 si_to_object_coef_atlas_tx(in SurfaceInfo si) {
+vec3 si_to_object_coef_atlas_tx(in Interaction si) {
   // Obtain uv coordinates, or set to 0.5 if the albedo value is specified
-  ObjectInfo object_info = scene_object_info(record_get_object(si.data));
+  Object object_info = scene_object_info(record_get_object(si.data));
   vec2 tx2 = record_is_sampled(object_info.albedo_data) ? si.tx : vec2(0.5f);
 
   // Return coordinates in texture atlas
@@ -34,10 +34,10 @@ vec3 si_to_object_coef_atlas_tx(in SurfaceInfo si) {
 }
 
 // Same as above, different atlas
-vec3 si_to_object_brdf_atlas_tx(in SurfaceInfo si) {
+vec3 si_to_object_brdf_atlas_tx(in Interaction si) {
   // Obtain uv coordinates, or set to 0.5 if the albedo value is specified
-  ObjectInfo object_info = scene_object_info(record_get_object(si.data));
-  vec2 tx2 = record_is_sampled(object_info.albedo_data) ? si.tx : vec2(0.5f);
+  Object object_info = scene_object_info(record_get_object(si.data));
+  vec2 tx2 = si.tx; // record_is_sampled(object_info.albedo_data) ? si.tx : vec2(0.5f);
 
   // Return coordinates in texture atlas
   AtlasInfo atlas_info = scene_texture_object_brdf_info(record_get_object(si.data));
@@ -52,7 +52,7 @@ vec3 tx_to_emitter_coef_atlas_tx(in uint emitter_i, in vec2 tx2) {
 
 // Sample four-wavelength surface reflectances using stochastic sampling; we avoid
 // doing four texel fetches + unpacking, and instead do simple stochastic filtering
-vec4 texture_reflectance(in SurfaceInfo si, in vec4 wvls, in vec2 sample_2d) {
+vec4 texture_reflectance(in Interaction si, in vec4 wvls, in vec2 sample_2d) {
   // Translate surface uv data to texture atlas uv
   vec3 tx = si_to_object_coef_atlas_tx(si);
   
@@ -79,9 +79,11 @@ vec4 texture_reflectance(in SurfaceInfo si, in vec4 wvls, in vec2 sample_2d) {
   return r;
 }
 
-vec2 texture_brdf(in SurfaceInfo si, in vec2 sample_2d) {
+vec4 texture_brdf(in Interaction si, in vec2 sample_2d) {
   // Translate surface uv data to texture atlas uv
   vec3 tx = si_to_object_brdf_atlas_tx(si);
+
+  /* return scene_texture_object_brdf_fetch(ivec3(tx) + ivec3(tx_offsets[0], 0)); */
 
   // Sample a texel offset for stochastic mixing; the interpolation weight of that texel equals
   // the sampling density, so we can elimitate both it and the density from further computation
@@ -89,21 +91,8 @@ vec2 texture_brdf(in SurfaceInfo si, in vec2 sample_2d) {
   
   // Load brdf data for a particular corner
   vec4 data = scene_texture_object_brdf_fetch(ivec3(tx) + ivec3(tx_offsets[i], 0));
-  return data.xy;
+  return data;
 }
-
-/* vec3 texture_normal(in SurfaceInfo si, in vec2 sample_2d) {
-  // Translate surface uv data to texture atlas uv
-  vec3 tx = si_to_object_brdf_atlas_tx(si);
-
-  // Sample a texel offset for stochastic mixing; the interpolation weight of that texel equals
-  // the sampling density, so we can elimitate both it and the density from further computation
-  uint i = hsum(mix(uvec2(0), uvec2(1, 2), greaterThanEqual(sample_2d, vec2(1) - fract(tx.xy))));
-  
-  // Load normalmap data for a particular corner
-  vec4 data = scene_texture_object_brdf_fetch(ivec3(tx) + ivec3(tx_offsets[i], 0));
-  return unpack_normal_octahedral(data.yz);
-} */
 
 vec4 texture_illuminant(in uint emitter_i, in vec2 tx2, in vec4 wvls, in vec2 sample_2d) {
   // Translate provided uv data to texture atlas uv
@@ -132,7 +121,7 @@ vec4 texture_illuminant(in uint emitter_i, in vec2 tx2, in vec4 wvls, in vec2 sa
   return e * scene_texture_emitter_scle_fetch(ivec3(tx) + ivec3(tx_offsets[i], 0));
 }
 
-vec4 texture_illuminant(in SurfaceInfo si, in vec4 wvls, in vec2 sample_2d) {
+vec4 texture_illuminant(in Interaction si, in vec4 wvls, in vec2 sample_2d) {
   return texture_illuminant(record_get_emitter(si.data), si.tx, wvls, sample_2d);
 }
 

@@ -169,10 +169,14 @@ namespace met {
             [&](float f) { return eig::Array2u { 16, 16 }; },
           };
           auto roughness_size = object->roughness | visit {
-            [&](uint  i) {  return images.gl.m_texture_info_map->data[i].size; },
+            [&](uint  i) { return images.gl.m_texture_info_map->data[i].size; },
             [&](float f) { return eig::Array2u { 16, 16 }; },
           };
-          return metallic_size.cwiseMax(roughness_size).eval();
+          auto normal_size = object->normalmap | visit {
+            [&](uint i) { return images.gl.m_texture_info_map->data[i].size; },
+            [&]()       { return eig::Array2u { 16, 16 }; }
+          };
+          return metallic_size.cwiseMax(roughness_size).cwiseMax(normal_size).eval();
         });
 
         // Scale atlas inputs to respect the maximum texture size set in Settings::texture_size
@@ -251,6 +255,7 @@ namespace met {
         || atlas.is_invalitated()       // Texture atlas re-allocated, demands re-render
         || object.state.roughness       // Different albedo value set on object
         || object.state.metallic        // Different value set on object
+        || object.state.normalmap       // Different value set on object
         || object.state.eta_minmax      // Different value set on object
         || object.state.mesh_i          // Different mesh attached to object
         || object.state.absorption      // Different value set on object
@@ -259,6 +264,8 @@ namespace met {
         || scene.resources.images       // User loaded/deleted an image;
         || settings.state.texture_size; // Texture size setting changed
       guard(is_active);
+      fmt::print("Object {}: baking object brdf data ({}x{})\n", 
+        m_object_i, patch.size.x(), patch.size.y());
 
       // Get relevant program handle, bind, then bind resources to corresponding targets
       auto &cache = scene.m_cache_handle.getw<gl::ProgramCache>();
@@ -270,10 +277,8 @@ namespace met {
       program.bind("b_atlas",           atlas.texture());
       if (!scene.resources.images.empty()) {
         program.bind("b_buff_textures",  scene.resources.images.gl.texture_info);
-        program.bind("b_txtr_3f",        scene.resources.images.gl.texture_atlas_3f.texture());
-        program.bind("b_txtr_3f",        m_sampler);  
-        program.bind("b_txtr_1f",        scene.resources.images.gl.texture_atlas_1f.texture());
-        program.bind("b_txtr_1f",        m_sampler);  
+        program.bind("b_txtr_3f",        scene.resources.images.gl.texture_atlas_3f.texture(), m_sampler);  
+        program.bind("b_txtr_1f",        scene.resources.images.gl.texture_atlas_1f.texture(), m_sampler);  
       }
 
       // Insert relevant barriers

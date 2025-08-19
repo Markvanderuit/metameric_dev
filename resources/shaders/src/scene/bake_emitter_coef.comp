@@ -25,7 +25,7 @@ layout(binding = 1) uniform b_buff_atlas {
 } buff_atlas;
 layout(binding = 2) uniform b_buff_emitters {
   uint n;
-  EmitterInfo data[met_max_emitters];
+  Emitter data[met_max_emitters];
 } buff_emitters;
 layout(binding = 3) uniform b_buff_textures {
   uint n;
@@ -49,7 +49,7 @@ layout(binding = 1, rgba32f) uniform restrict writeonly image2DArray b_atlas_scl
 
 void main() {
   // Load relevant object/patch data
-  EmitterInfo emitter = buff_emitters.data[buff_unif.emitter_i];
+  Emitter emitter = buff_emitters.data[buff_unif.emitter_i];
   AtlasInfo   atlas   = buff_atlas.data[buff_unif.emitter_i];
   
   // Determine pixel location in padded patch, then clamp invocations to

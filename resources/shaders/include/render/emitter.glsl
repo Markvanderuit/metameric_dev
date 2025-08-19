@@ -6,7 +6,7 @@
 #include <render/ray.glsl>
 #include <render/frame.glsl>
 #include <render/sample.glsl>
-#include <render/surface.glsl>
+#include <render/interaction.glsl>
 #include <render/warp.glsl>
 #include <render/texture.glsl>
 #include <render/shape/sphere.glsl>
@@ -16,11 +16,11 @@
 #include <render/emitter/point.glsl>
 #include <render/emitter/constant.glsl>
 
-vec4 eval_emitter(in SurfaceInfo si, in vec4 wvls, in vec2 sample_2d) {
+vec4 eval_emitter(in Interaction si, in vec4 wvls, in vec2 sample_2d) {
   if (!is_emitter(si))
     return vec4(0);
   
-  EmitterInfo em = scene_emitter_info(record_get_emitter(si.data));
+  Emitter em = scene_emitter_info(record_get_emitter(si.data));
   
   if (em.type == EmitterTypeSphere) {
     return eval_emitter_sphere(em, si, wvls, sample_2d);
@@ -34,16 +34,16 @@ vec4 eval_emitter(in SurfaceInfo si, in vec4 wvls, in vec2 sample_2d) {
 }
 
 vec4 eval_emitter(in EmitterSample es, in vec4 wvls, in vec2 sample_2d) {
-  SurfaceInfo si = get_surface_info(es.ray);
+  Interaction si = get_interaction(es.ray);
   return eval_emitter(si, wvls, sample_2d);
 }
 
-float pdf_emitter(in SurfaceInfo si) {
+float pdf_emitter(in Interaction si) {
   if (!is_emitter(si))
     return 0.f;
 
   // Evaluate pdf from emitter
-  EmitterInfo em = scene_emitter_info(record_get_emitter(si.data));
+  Emitter em = scene_emitter_info(record_get_emitter(si.data));
   float pdf = pdf_emitters_discrete(record_get_emitter(si.data));
   
   if (em.type == EmitterTypeSphere) {
@@ -59,19 +59,15 @@ float pdf_emitter(in SurfaceInfo si) {
   return pdf;
 }
 
-EmitterSample sample_emitter(in SurfaceInfo si, in vec4 wvls, in vec3 sample_3d) {
-  // Return value
-  EmitterSample es = emitter_sample_zero();
-
+EmitterSample sample_emitter(in Interaction si, in vec4 wvls, in vec3 sample_3d) {
   // Sample specific emitter from distribution
   DistributionSampleDiscrete ds = sample_emitters_discrete(sample_3d.z);
-  EmitterInfo em = scene_emitter_info(ds.i);
-
-  // Catch no emitters being active
+  Emitter em = scene_emitter_info(ds.i);
   if (!em.is_active)
-    return es;
+    return emitter_sample_zero();
 
   // Sample specific position on emitter
+  EmitterSample es;
   if (em.type == EmitterTypeSphere) {
     es = sample_emitter_sphere(em, si, wvls, sample_3d.xy);
   } else if (em.type == EmitterTypeRectangle) {
@@ -92,7 +88,7 @@ EmitterSample sample_emitter(in SurfaceInfo si, in vec4 wvls, in vec3 sample_3d)
 }
 
 bool ray_intersect_emitter(inout Ray ray, in uint emitter_i) {
-  EmitterInfo em = scene_emitter_info(emitter_i);
+  Emitter em = scene_emitter_info(emitter_i);
   if (!em.is_active)
     return false;
 
@@ -116,7 +112,7 @@ bool ray_intersect_emitter(inout Ray ray, in uint emitter_i) {
 }
 
 bool ray_intersect_emitter_any(in Ray ray, in uint emitter_i) {
-  EmitterInfo em = scene_emitter_info(emitter_i);
+  Emitter em = scene_emitter_info(emitter_i);
   if (!em.is_active)
     return false;
   

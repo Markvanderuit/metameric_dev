@@ -3,7 +3,7 @@
 
 #include <render/record.glsl>
 
-// Accessors to BRDFInfo data
+// Accessors to BRDF data
 #define get_dielectric_r(brdf)             brdf.r
 #define get_dielectric_cauchy_b(brdf)      brdf.data.x
 #define get_dielectric_cauchy_c(brdf)      brdf.data.y
@@ -35,7 +35,7 @@ float _brdf_dielectric_fresnel(in float cos_theta_i, inout float cos_theta_t, in
   return 0.5f * (rs * rs + rp * rp);
 }
 
-float _brdf_eta_dispersive(in BRDFInfo brdf, in float x) {
+float _brdf_eta_dispersive(in BRDF brdf, in float x) {
   if (get_dielectric_is_dispersive(brdf)) {
     // Cauchy's equation
     return get_dielectric_cauchy_b(brdf) + get_dielectric_cauchy_c(brdf) / sdot(sample_to_wavelength(x));
@@ -44,7 +44,7 @@ float _brdf_eta_dispersive(in BRDFInfo brdf, in float x) {
   }
 }
 
-void init_brdf_dielectric(in ObjectInfo object, inout BRDFInfo brdf, in SurfaceInfo si, vec4 wvls, in vec2 sample_2d) {
+void init_brdf_dielectric(in Object object, inout BRDF brdf, in Interaction si, vec4 wvls, in vec2 sample_2d) {
   get_dielectric_r(brdf)          = texture_reflectance(si, wvls, sample_2d);
   get_dielectric_absorption(brdf) = object.absorption;
 
@@ -64,10 +64,10 @@ void init_brdf_dielectric(in ObjectInfo object, inout BRDFInfo brdf, in SurfaceI
   }
 }
 
-BRDFSample sample_brdf_dielectric(in BRDFInfo brdf, in vec3 sample_3d, in SurfaceInfo si) {
+BRDFSample sample_brdf_dielectric(in BRDF brdf, in vec3 sample_3d, in Interaction si) {
   // Compute eta for hero wavelength only, the rest gets killed later on
   // Compute fresnel, angle of transmission
-  float eta = _brdf_eta_dispersive(brdf, brdf.wvls.x);
+  float eta = _brdf_eta_dispersive(brdf, wvls.x);
   float cos_theta_t;
   float F = _brdf_dielectric_fresnel(cos_theta(si.wi), cos_theta_t, eta);
 
@@ -84,10 +84,10 @@ BRDFSample sample_brdf_dielectric(in BRDFInfo brdf, in vec3 sample_3d, in Surfac
   return bs;
 }
 
-vec4 eval_brdf_dielectric(in BRDFInfo brdf, in SurfaceInfo si, in vec3 wo) {
+vec4 eval_brdf_dielectric(in BRDF brdf, in Interaction si, in vec3 wo) {
   // Compute eta for hero wavelength only, the rest gets killed later on
   // Compute fresnel, angle of transmission
-  float eta = _brdf_eta_dispersive(brdf, brdf.wvls.x);
+  float eta = _brdf_eta_dispersive(brdf, wvls.x);
   float cos_theta_t;
   float F = _brdf_dielectric_fresnel(cos_theta(si.wi), cos_theta_t, eta);
   
@@ -105,7 +105,7 @@ vec4 eval_brdf_dielectric(in BRDFInfo brdf, in SurfaceInfo si, in vec3 wo) {
   }
 }
 
-float pdf_brdf_dielectric(in BRDFInfo brdf, in SurfaceInfo si, in vec3 wo) {
+float pdf_brdf_dielectric(in BRDF brdf, in Interaction si, in vec3 wo) {
   return 0.f;
 }
 

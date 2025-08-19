@@ -3,11 +3,7 @@
 
 #include <render/record.glsl>
 
-void init_brdf_null(inout BRDFInfo brdf, in SurfaceInfo si, vec4 wvls) {
-  brdf.r = vec4(1);
-}
-
-BRDFSample sample_brdf_null(in BRDFInfo brdf, in vec3 sample_3d, in SurfaceInfo si) {
+BRDFSample sample_brdf_null(in BRDF brdf, in vec3 sample_3d, in Interaction si, in vec4 wvls) {
   BRDFSample bs;
 
   bs.is_spectral = false;
@@ -18,11 +14,11 @@ BRDFSample sample_brdf_null(in BRDFInfo brdf, in vec3 sample_3d, in SurfaceInfo 
   return bs;
 }
 
-vec4 eval_brdf_null(in BRDFInfo brdf, in SurfaceInfo si, in vec3 wo) {
+vec4 eval_brdf_null(in BRDF brdf, in Interaction si, in vec3 wo, in vec4 wvls) {
   return vec4(0);
 }
 
-float pdf_brdf_null(in BRDFInfo brdf, in SurfaceInfo si, in vec3 wo) {
+float pdf_brdf_null(in BRDF brdf, in Interaction si, in vec3 wo) {
   return 0.f;
 }
 

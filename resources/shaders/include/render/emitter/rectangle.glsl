@@ -1,7 +1,7 @@
 #ifndef RENDER_EMITTER_RECTANGLE_GLSL_GUARD
 #define RENDER_EMITTER_RECTANGLE_GLSL_GUARD
 
-vec4 eval_emitter_rectangle(in EmitterInfo em, in SurfaceInfo si, in vec4 wvls, in vec2 sample_2d) {
+vec4 eval_emitter_rectangle(in Emitter em, in Interaction si, in vec4 wvls, in vec2 sample_2d) {
   // If normal is not inclined along the ray, return nothing
   if (cos_theta(si.wi) <= 0)
     return vec4(0);
@@ -14,11 +14,11 @@ vec4 eval_emitter_rectangle(in EmitterInfo em, in SurfaceInfo si, in vec4 wvls, 
   return L * em.illuminant_scale;
 }
 
-float pdf_emitter_rectangle(in EmitterInfo em, in SurfaceInfo si) {
+float pdf_emitter_rectangle(in Emitter em, in Interaction si) {
   return sdot(si.t) / (length(em.trf[0]) * length(em.trf[1]) * cos_theta(si.wi));
 }
 
-EmitterSample sample_emitter_rectangle(in EmitterInfo em, in SurfaceInfo si, in vec4 wvls, in vec2 sample_2d) {
+EmitterSample sample_emitter_rectangle(in Emitter em, in Interaction si, in vec4 wvls, in vec2 sample_2d) {
   // Sample position on rectangle, with (0, 0) at its center
   vec3 p = (em.trf * vec4(sample_2d - .5f, 0, 1)).xyz;
 

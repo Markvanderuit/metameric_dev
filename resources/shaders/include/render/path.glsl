@@ -3,7 +3,7 @@
 
 #include <sampler/uniform.glsl>
 #include <render/scene.glsl>
-#include <render/surface.glsl>
+#include <render/interaction.glsl>
 #include <render/sensor.glsl>
 #include <render/brdf.glsl>
 #include <render/detail/path_query.glsl>
@@ -11,16 +11,17 @@
 vec4 Li_debug(in SensorSample ss, in SamplerState state) {
   // Ray-trace first. If no surface is intersected by the ray, return early
   if (!scene_intersect(ss.ray))
-    return vec4(1);
+    return vec4(0);
 
   // Get info about the intersected surface; if an emitter was intersected, return early
-  SurfaceInfo si = get_surface_info(ss.ray);
-  if (!is_valid(si))
-    return vec4(0);
-    
-  Frame frame = get_frame(si.n);
+  Interaction si = get_interaction(ss.ray);
+  if (!is_object(si))
+    return vec4(1);
+
+  // Construct the underlying BRDF at the intersected surface
+  BRDF brdf = get_brdf(si, ss.wvls, next_2d(state));
   
-  return vec4(frame.n, 1);
+  return vec4(si.n, 1);
 }
 
 vec4 Li(in SensorSample ss, in SamplerState state, out float alpha) {
@@ -28,8 +29,8 @@ vec4 Li(in SensorSample ss, in SamplerState state, out float alpha) {
   path_query_initialize(pt);
   
   // Path throughput information; we track 4 wavelengths simultaneously
-  vec4  Li   = vec4(0);           // Accumulated spectrum
-  vec4  Beta = vec4(1 / ss.pdfs); // Path throughput over density
+  vec4 Li   = vec4(0);           // Accumulated spectrum
+  vec4 Beta = vec4(1 / ss.pdfs); // Path throughput over density
 
   // Prior brdf sample data, default-initialized, kept for NEE and MIS
   float prev_bs_pdf         = 1.f;
@@ -51,11 +52,11 @@ vec4 Li(in SensorSample ss, in SamplerState state, out float alpha) {
     }
 
     // Get info about the intersected surface or lack thereof
-    SurfaceInfo si = get_surface_info(ss.ray);
+    Interaction si = get_interaction(ss.ray);
     guard_break(is_valid(si));
 
     // If an emissive object or envmap is hit, add its contribution to the 
-    // current path, and then terminate said path
+    // current path, and then terminate
     if (is_emitter(si)) {
       float em_pdf = prev_bs_is_delta ? 0.f : pdf_emitter(si);
 
@@ -73,7 +74,7 @@ vec4 Li(in SensorSample ss, in SamplerState state, out float alpha) {
     }
 
     // Construct the underlying BRDF at the intersected surface
-    BRDFInfo brdf = get_brdf(si, ss.wvls, next_2d(state));
+    BRDF brdf = get_brdf(si, ss.wvls, next_2d(state));
     
     // Emitter sampling
     {
@@ -92,7 +93,7 @@ vec4 Li(in SensorSample ss, in SamplerState state, out float alpha) {
 
         // Assemble path throughput
         vec4 s = Beta                                      // path throughput
-               * eval_brdf(brdf, si, wo)                   // brdf response
+               * eval_brdf(brdf, si, wo, ss.wvls)          // brdf response
                * cos_theta(wo)                             // cosine attenuation
                * eval_emitter(es, ss.wvls, next_2d(state)) // emitter contribution
                * mis_weight                                // mis weight
@@ -109,15 +110,15 @@ vec4 Li(in SensorSample ss, in SamplerState state, out float alpha) {
     // BRDF sampling
     {
       // Importance sample brdf direction
-      BRDFSample bs = sample_brdf(brdf, next_3d(state), si);
+      BRDFSample bs = sample_brdf(brdf, next_3d(state), si, ss.wvls);
 
       // Early exit on zero brdf density
       if (bs.pdf == 0.f)
         break;
       
       // Update throughput, sample density
-      Beta *= eval_brdf(brdf, si, bs.wo) // brdf throughput
-            * abs(cos_theta(bs.wo))      // cosine attenuation
+      Beta *= eval_brdf(brdf, si, bs.wo, ss.wvls) // brdf throughput
+            * abs(cos_theta(bs.wo))               // cosine attenuation
             / bs.pdf;
 
       // Retain last brdf density for direct emitter MIS weight
