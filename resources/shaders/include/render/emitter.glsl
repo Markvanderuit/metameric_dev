@@ -61,7 +61,7 @@ float pdf_emitter(in Interaction si) {
 
 EmitterSample sample_emitter(in Interaction si, in vec4 wvls, in vec3 sample_3d) {
   // Sample specific emitter from distribution
-  DistributionSampleDiscrete ds = sample_emitters_discrete(sample_3d.z);
+  DiscreteSample ds = sample_emitters_discrete(sample_3d.z);
   Emitter em = scene_emitter_info(ds.i);
   if (!em.is_active)
     return emitter_sample_zero();

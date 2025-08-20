@@ -3,6 +3,7 @@
 #include <render/load/blas.glsl>
 #include <render/load/cmfs.glsl>
 #include <render/load/emitter.glsl>
+#include <render/load/envmap.glsl>
 #include <render/load/illuminant.glsl>
 #include <render/load/object.glsl>
 #include <render/load/texture.glsl>
@@ -62,6 +63,8 @@ layout(binding = 6) uniform b_buff_emitters_distr {
 layout(binding = 7) uniform b_buff_envmap_info {
   bool envm_is_present;
   uint envm_i;
+  uint alias_table_size;
+  AliasTableBin alias_table[];
 } buff_envmap_info;
 layout(binding = 8) uniform b_buff_object_coef_info {
   uint n;
@@ -100,8 +103,9 @@ declare_distr_sampler(wavelength, buff_wvls_distr.data, wavelength_samples);
 declare_distr_sampler(emitters, buff_emitters_distr.data, met_max_emitters);
 declare_scene_cmfs_data(b_cmfs_3f);
 declare_scene_illuminant_data(b_illm_1f);
-declare_scene_emitter_data(buff_emitter_info.data, buff_emitter_info.n, buff_envmap_info);
-declare_scene_object_data(buff_objects.data, buff_objects.n);
+declare_scene_emitter_data(buff_emitter_info);
+declare_scene_envmap_data(buff_envmap_info);
+declare_scene_object_data(buff_objects);
 declare_scene_texture_data(buff_object_coef_info.data, buff_object_brdf_info.data, buff_emitter_coef_info.data, b_object_coef_4f, b_object_brdf_4f, b_emitter_coef_4f, b_emitter_scle_1f, b_bsis_1f);
 declare_scene_blas_data(buff_blas_prim.data, buff_blas_node.data, buff_blas_info.data);
 declare_path_data(buff_output.head, buff_output.data);

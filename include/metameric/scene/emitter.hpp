@@ -102,6 +102,8 @@ namespace met {
       // This ignores spatially varying emitters r.n.
       gl::Buffer emitter_distr_buffer;
 
+      // Alias data goes here
+
     public:
       // Class constructor and update function handle GL-side data
       SceneGLHandler();

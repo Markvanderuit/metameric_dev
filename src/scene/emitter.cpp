@@ -16,7 +16,9 @@
 #include <metameric/scene/scene.hpp>
 #include <metameric/core/distribution.hpp>
 #include <metameric/core/ranges.hpp>
+#include <algorithm>
 #include <numbers>
+#include <execution>
 
 namespace met {
   bool Emitter::operator==(const Emitter &o) const {
@@ -144,8 +146,8 @@ namespace met {
         auto emitter_cdf = Distribution(cnt_span<float>(emitter_distr));
         emitter_distr_buffer = to_std140(emitter_cdf);
 
-        // Store information on first co  nstant emitter, if one is present and active;
-        // we don't support multiple environment emitters
+        // Store information on first constant emitter, if one is present and active;
+        // we don't support multiple environment emitters (I mean how would that even look...)
         m_envm_info_data->envm_is_present = false;
         for (uint i = 0; i < emitters.size(); ++i) {
           const auto &[emitter, state] = emitters[i];
@@ -156,8 +158,42 @@ namespace met {
           }
         }
         emitter_envm_info.flush();
-      }
 
+        // Check if an envmap is present, if it is uplifting an image,
+        // and then generate an alias table for sampling
+        if (m_envm_info_data->envm_is_present) {
+          const auto &em = emitters[m_envm_info_data->envm_i];
+          if (em->spec_type == Emitter::SpectrumType::eColr && std::holds_alternative<uint>(em->color)) {
+            uint image_i = std::get<uint>(em->color);
+            
+            // Get envmap image as triplets of floats
+            Image image  = scene.resources.images[image_i]->convert({
+              .pixel_frmt = Image::PixelFormat::eRGB,
+              .pixel_type = Image::PixelType::eFloat,
+              .color_frmt = Image::ColorFormat::eLRGB
+            });
+            
+            // Compute per-pixel luminance as weight, weighted by inclination
+            std::vector<float> weights(image.size().prod());
+            float inclination_factor  = std::numbers::pi_v<float> / static_cast<float>(image.size().y());
+            float inclination_summand = .5f * inclination_factor;
+            #pragma omp parallel for
+            for (int y = 0; y < image.size().y(); ++y) {
+              for (int x = 0; x < image.size().x(); ++x) {
+                int i = y * image.size().x() + x;
+                float inclination = inclination_factor * static_cast<float>(y) + inclination_summand;
+                weights[i] = std::sinf(inclination) * luminance(image.data<Colr>()[i]); 
+              }
+            }
+
+            // Construct alias table over weights
+            AliasTable table(weights);
+
+            // Do stuff with the table lol
+          }
+        }
+      }
+      
       // Generate sync object for gpu wait
       if (emitters)
         m_fence = gl::sync::Fence(gl::sync::time_ns(1));

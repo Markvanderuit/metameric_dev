@@ -57,9 +57,10 @@ SensorSample sample_sensor(in RaySensor sensor, in float sample_1d) {
   // Generate camera ray from sample
   ss.ray = init_ray(sensor.o, sensor.d);
 
-  // Sample wavelengths; stratified sample through invercse cdf, if available
+  // Sample wavelengths; stratified sample through inverse cdf, if available
   for (uint i = 0; i < 4; ++i) {
-    DistributionSampleContinuous ds = sample_wavelength_continuous(rotate_sample_1d(sample_1d, i, 4));
+    ContinuousSample ds 
+      = sample_wavelength_continuous(rotate_sample_1d(sample_1d, i, 4));
     ss.wvls[i] = ds.f;
     ss.pdfs[i] = ds.pdf;
   }
@@ -86,9 +87,10 @@ SensorSample sample_sensor(in PixelSensor sensor, in vec3 sample_3d) {
     normalize((view_inv * vec4(xy.x * tan_y * aspect, xy.y * tan_y, -1, 0)).xyz)
   );
 
-  // Sample wavelengths; stratified sample through invercse cdf, if available
+  // Sample wavelengths; stratified sample through inverse cdf, if available
   for (uint i = 0; i < 4; ++i) {
-    DistributionSampleContinuous ds = sample_wavelength_continuous(rotate_sample_1d(sample_3d.z, i, 4));
+    ContinuousSample ds 
+      = sample_wavelength_continuous(rotate_sample_1d(sample_3d.z, i, 4));
     ss.wvls[i] = ds.f;
     ss.pdfs[i] = ds.pdf;
   }
@@ -121,9 +123,10 @@ SensorSample sample_sensor(in FilmSensor sensor, in ivec2 px, in uint sample_i, 
     normalize((view_inv * vec4(xy.x * tan_y * aspect, xy.y * tan_y, -1, 0)).xyz)
   );
 
-  // Sample wavelengths; stratified sample through invercse cdf, if available
+  // Sample wavelengths; stratified sample through inverse cdf, if available
   for (uint i = 0; i < 4; ++i) {
-    DistributionSampleContinuous ds = sample_wavelength_continuous(rotate_sample_1d(sample_3d.z, i, 4));
+    ContinuousSample ds 
+      = sample_wavelength_continuous(rotate_sample_1d(sample_3d.z, i, 4));
     ss.wvls[i] = ds.f;
     ss.pdfs[i] = ds.pdf;
   }

@@ -9,7 +9,7 @@
 // Is generally the output of ray_intersect(...).
 struct Interaction {
   // Surface information
-  vec3 p;  // Surface position in world space
+  vec3 p;  // Surface position in world spacep
   vec2 tx; // Surface texture coordinates
   vec3 n;  // Surface shading normal, defines local frame
   
@@ -41,9 +41,9 @@ Interaction get_interaction(in Ray ray) {
     } else if (is_emitter(si)) {
       detail_fill_interaction_emitter(si, ray);
     }
-  } else if (scene_has_envm_emitter()) {
-    // Otherwise, fill info for fallback interaction type: envmap
-    record_set_emitter(si.data, scene_envm_emitter_idx());
+  } else if (scene_has_envmap()) {
+    // Otherwise, fill info for fallback interaction type: envmap emitter
+    record_set_emitter(si.data, scene_envmap_emitter_i());
     detail_fill_interaction_emitter(si, ray);
   }
 

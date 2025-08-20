@@ -2,6 +2,7 @@
 #include <render/ray.glsl>
 #include <render/load/blas.glsl>
 #include <render/load/emitter.glsl>
+#include <render/load/envmap.glsl>
 #include <render/load/object.glsl>
 #include <render/load/defaults.glsl>
 
@@ -17,7 +18,7 @@ layout(binding = 0) uniform b_buff_sensor_info {
 layout(binding = 1) uniform b_buff_object_info {
   uint n;
   Object data[met_max_objects];
-} buff_objects;
+} buff_objects_info;
 layout(binding = 2) uniform b_buff_blas_info {
   uint n;
   BLASInfo data[met_max_meshes];
@@ -29,6 +30,8 @@ layout(binding = 3) uniform b_buff_emitter_info {
 layout(binding = 4) uniform b_buff_envmap_info {
   bool envm_is_present;
   uint envm_i;
+  uint alias_table_size;
+  AliasTableBin alias_table[];
 } buff_envmap_info;
 
 // Storage buffer declarations
@@ -41,8 +44,9 @@ layout(binding = 4) restrict readonly buffer b_buff_tlas_prim {
   uint data[]; 
 } buff_tlas_prim;
 
-declare_scene_emitter_data(buff_emitter_info.data, buff_emitter_info.n, buff_envmap_info);
-declare_scene_object_data(buff_objects.data, buff_objects.n);
+declare_scene_emitter_data(buff_emitter_info);
+declare_scene_envmap_data(buff_envmap_info);
+declare_scene_object_data(buff_objects_info);
 declare_scene_blas_data(buff_blas_prim.data, buff_blas_node.data, buff_blas_info.data);
 declare_distr_sampler_default(emitters);
 declare_distr_sampler_default(wavelength);

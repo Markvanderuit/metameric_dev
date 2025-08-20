@@ -3,9 +3,8 @@
 
 #define SCENE_DATA_OBJECT
 
-#define declare_scene_object_data(scene_buff_objc_info,                    \
-                                  scene_buff_objc_count)                   \
-  Object scene_object_info(uint i) { return scene_buff_objc_info[i]; } \
-  uint scene_object_count()            { return scene_buff_objc_count;   }
+#define declare_scene_object_data(info)                     \
+  Object scene_object_info(uint i) { return info.data[i]; } \
+  uint   scene_object_count()      { return info.n;       }
   
 #endif // LOAD_OBJECT_GLSL_GUARD

@@ -37,7 +37,7 @@ namespace met {
   /* Define program's underlying spectrum/cmfs/color types as renamed Eigen types */
   using CMFS = eig::Matrix<float, wavelength_samples, 3>; // Color matching function matrix
   using Spec = eig::Array<float, wavelength_samples, 1>;  // Discrete spectrum matrix
-  using Colr = eig::Array<float,  3, 1>;                  // Color signal matrix
+  using Colr = eig::Array<float, 3, 1>;                   // Color signal matrix
 
   /* Basis function object, using a offset around its mean */
   struct Basis {

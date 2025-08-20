@@ -103,24 +103,7 @@ namespace met {
 
   public:
     Distribution() = default;
-
-    Distribution(std::span<const float> values) {
-      m_func = { values.begin(), values.end() };
-      m_cdf.resize(values.size() + 1);
-      
-      // Scan values to build cdf
-      // Cumulative sum to build cdf
-      m_cdf.front() = 0.f;
-      for (uint i = 1; i < m_cdf.size(); ++i)
-        m_cdf[i] = m_cdf[i - 1] + m_func[i - 1];
-
-      // Keep sum around for normalization
-      m_func_sum = m_cdf.back();
-      for (uint i = 0; i < m_func.size(); ++i)
-        m_func[i] /= m_func_sum;
-      for (uint i = 1; i < m_cdf.size(); ++i)
-        m_cdf[i]  /= m_func_sum;
-    }
+    Distribution(std::span<const float> values);
 
     float cdf(uint i) const {
       return m_cdf[i];
@@ -174,5 +157,44 @@ namespace met {
     // Data accessors
     std::span<const float> data_func() const { return m_func; }
     std::span<const float> data_cdf()  const { return m_cdf;  }
+  };
+
+  // Simple 1d alias table for O(1) sampling
+  struct AliasTable {
+    struct Bin {
+      float p;
+      float q;
+      int   alias;
+    };
+
+  private:
+    std::vector<Bin> m_bins;
+
+  public: // Construction
+    AliasTable() = default;
+    AliasTable(std::span<const float> values);
+  
+  public: // Distribution methods
+    // Returns a specific index 
+    uint sample(float u) const {
+      int    i = std::min<int>(u * m_bins.size(), m_bins.size() - 1);
+      float up = std::min<float>(u * m_bins.size() - i, 0x1.fffffep-1);
+      if (up < m_bins[i].q) {
+        return i;
+      } else {
+        return m_bins[i].alias;
+      }
+    }
+
+    // Return probability density for a specific sample
+    float pdf(uint i) const {
+      return m_bins[i].p;
+    }
+
+  public: // Accessors and boilerplate
+    size_t size() const { return m_bins.size(); }
+    
+    const Bin &operator[](uint i) const { return m_bins[i]; }
+          Bin &operator[](uint i)       { return m_bins[i]; }
   };
 } // namespace met
