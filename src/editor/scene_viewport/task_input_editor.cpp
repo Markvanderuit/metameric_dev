@@ -144,7 +144,7 @@ namespace met {
     for (const auto &path : power_series_samples)
       accumulate_spectrum(cstr.powr_j[path.power], path.wvls, path.values);
     for (auto &power : cstr.powr_j) {
-      power *= .25f * static_cast<float>(wavelength_samples) / static_cast<float>(indirect_query_spp);
+      power *= .25f / static_cast<float>(indirect_query_spp);
       if (power = power.cwiseMax(0.f); (power <= 1e-3).all())
         power = 0.f;
     }
