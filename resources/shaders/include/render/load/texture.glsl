@@ -1,7 +1,5 @@
 #ifndef LOAD_TEXTURE_GLSL_GUARD
 #define LOAD_TEXTURE_GLSL_GUARD
-
-#define SCENE_DATA_TEXTURE
  
 #define declare_scene_texture_data(scene_buff_object_coef_info,              \
                                    scene_buff_object_brdf_info,              \

@@ -10,18 +10,50 @@
 
 vec4 Li_debug(in SensorSample ss, in SamplerState state) {
   // Ray-trace first. If no surface is intersected by the ray, return early
-  if (!scene_intersect(ss.ray))
-    return vec4(0);
+  scene_intersect(ss.ray);
+
+  // Path throughput over density
+  vec4 Beta = vec4(1 / ss.pdfs);
 
   // Get info about the intersected surface; if an emitter was intersected, return early
   Interaction si = get_interaction(ss.ray);
-  if (!is_object(si))
-    return vec4(1);
+  if (!is_object(si)) {
+    vec4  e = eval_emitter(si, ss.wvls, next_2d(state));
+    float p = pdf_emitter(si);
+    float l = p; // hsum(e) * .25f / p;
+    return vec4(vec3(l) * 1, 1);
+  }
 
   // Construct the underlying BRDF at the intersected surface
   BRDF brdf = get_brdf(si, ss.wvls, next_2d(state));
-  
-  return vec4(si.n, 1);
+
+  /* vec2 tx = mod(vec2(atan(si.n.x, -si.n.z) * .5f, acos(si.n.y)) * M_PI_INV + 1.f, 1.f);
+  vec3 d = square_to_unif_sphere(tx).yzx * vec3(1, 1, -1);
+  ss.ray = ray_towards_direction(si, d);
+  si = get_interaction(ss.ray);
+  vec4  L = eval_emitter(si, ss.wvls, next_2d(state));
+  float p = pdf_emitter(si);
+  return vec4(vec3(hsum(L) * 0.25f / p), 1) ; */
+
+  EmitterSample es = sample_emitter(si, ss.wvls, next_3d(state));
+  if (es.pdf == 0.f) {
+    return vec4(0);
+  } else {
+    vec4  e = eval_emitter(es, ss.wvls, next_2d(state));
+    float p = es.pdf;
+    float l = p; // hsum(e) * .25f / p;
+    return vec4(vec3(l) * 1, 1);
+  }
+
+
+  // return ds.i == 0 ? vec4(1, 0, 0, 1) : vec4(0, 0, 1, 1);
+  // return vec4(vec3(cos_theta(d)), 1);
+  // bool is_positive = cos_theta(to_local(si, es.ray.d)) > 0.f;
+
+  // return is_positive ? vec4(0, 1, 0, 1) : vec4(1, 0, 0, 1);
+  // return vec4(vec3(cos_theta(to_local(si, es.ray.d))), 1);
+
+  // return vec4(si.n, 1);
 }
 
 vec4 Li(in SensorSample ss, in SamplerState state, out float alpha) {

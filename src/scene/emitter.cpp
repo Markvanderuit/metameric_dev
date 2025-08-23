@@ -57,11 +57,24 @@ namespace met {
     inline
     gl::Buffer to_std140(const Distribution &d) {
       met_trace_full();
-      std::vector<eig::Array4f> data;
-      data.push_back(eig::Array4f(d.sum()));
-      rng::copy(d.data_func(), std::back_inserter(data));
-      rng::copy(d.data_cdf(), std::back_inserter(data));
-      return gl::Buffer {{ .data = cnt_span<const std::byte>(data) }};    
+
+      std::vector<eig::Array4f> buffer;
+      buffer.push_back(eig::Array4f(d.sum()));
+      rng::copy(d.data_func(), std::back_inserter(buffer));
+      rng::copy(d.data_cdf(), std::back_inserter(buffer));
+
+      return gl::Buffer {{ .data = cnt_span<const std::byte>(buffer) }};    
+    }
+
+    inline
+    gl::Buffer to_std430(const AliasTable &a) {
+      met_trace_full();
+      // auto size = eig::Array4u { static_cast<uint>(a.size()), 0, 0, 0 };
+      // std::vector<std::byte> buffer();
+      // buffer.append_range(cnt_span<const std::byte>(data));
+      // return gl::Buffer {{ .data = std::span<const std::byte> { buffer } }};
+      auto data = a.data_bins();
+      return gl::Buffer {{ .data = cnt_span<const std::byte>(data) }};
     }
     
     SceneGLHandler<met::Emitter>::SceneGLHandler() {
@@ -80,6 +93,7 @@ namespace met {
       m_fence = { };
 
       // Get relevant resources
+      const auto &settings = scene.components.settings.value;
       const auto &emitters = scene.components.emitters;
 
       // Skip entirely; no emitters
@@ -162,34 +176,38 @@ namespace met {
         // Check if an envmap is present, if it is uplifting an image,
         // and then generate an alias table for sampling
         if (m_envm_info_data->envm_is_present) {
-          const auto &em = emitters[m_envm_info_data->envm_i];
+          const auto &em = emitters[m_envm_info_data->envm_i];          
           if (em->spec_type == Emitter::SpectrumType::eColr && std::holds_alternative<uint>(em->color)) {
             uint image_i = std::get<uint>(em->color);
+            bool should_update = em || scene.resources.images[image_i];
             
-            // Get envmap image as triplets of floats
-            Image image  = scene.resources.images[image_i]->convert({
-              .pixel_frmt = Image::PixelFormat::eRGB,
-              .pixel_type = Image::PixelType::eFloat,
-              .color_frmt = Image::ColorFormat::eLRGB
-            });
-            
-            // Compute per-pixel luminance as weight, weighted by inclination
-            std::vector<float> weights(image.size().prod());
-            float inclination_factor  = std::numbers::pi_v<float> / static_cast<float>(image.size().y());
-            float inclination_summand = .5f * inclination_factor;
-            #pragma omp parallel for
-            for (int y = 0; y < image.size().y(); ++y) {
-              for (int x = 0; x < image.size().x(); ++x) {
-                int i = y * image.size().x() + x;
-                float inclination = inclination_factor * static_cast<float>(y) + inclination_summand;
-                weights[i] = std::sinf(inclination) * luminance(image.data<Colr>()[i]); 
+            if (should_update) {
+              // Get envmap image as triplets of floats
+              Image image  = scene.resources.images[image_i]->convert({
+                .resize_to  = settings.apply_texture_size(scene.resources.images[image_i]->size()),
+                .pixel_frmt = Image::PixelFormat::eRGB,
+                .pixel_type = Image::PixelType::eFloat,
+                .color_frmt = Image::ColorFormat::eLRGB
+              });
+              
+              // Compute per-pixel luminance as weight, weighted by inclination
+              std::vector<float> weights(image.size().prod());
+              float inclination_factor  = std::numbers::pi_v<float> / static_cast<float>(image.size().y());
+              float inclination_summand = .5f * inclination_factor;
+              #pragma omp parallel for
+              for (int y = 0; y < image.size().y(); ++y) {
+                for (int x = 0; x < image.size().x(); ++x) {
+                  int i = y * image.size().x() + x;
+                  float inclination = inclination_factor * static_cast<float>(y) + inclination_summand;
+                  weights[i] = std::sinf(inclination) * luminance(image.data<Colr>()[i]); 
+                }
               }
+
+              // Construct alias table over weights
+              AliasTable table(weights);
+              envmap_distr_buffer = detail::to_std430(table);
+              fmt::print("Built alias table for envmap (image {}, size {})\n", image_i, table.size());
             }
-
-            // Construct alias table over weights
-            AliasTable table(weights);
-
-            // Do stuff with the table lol
           }
         }
       }

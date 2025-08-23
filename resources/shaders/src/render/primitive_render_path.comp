@@ -57,18 +57,20 @@ layout(binding = 4) uniform b_buff_emitter_info {
   uint n;
   Emitter data[met_max_emitters];
 } buff_emitter_info;
-layout(binding = 5) uniform b_buff_wvls_distr {
-  WavelengthDistribution data;
-} buff_wvls_distr;
-layout(binding = 6) uniform b_buff_emitters_distr {
-  EmitterDistribution data;
-} buff_emitters_distr;
-layout(binding = 7) uniform b_buff_envmap_info {
+layout(binding = 5) uniform b_buff_envmap_info {
   bool envm_is_present;
   uint envm_i;
-  uint alias_table_size;
-  AliasTableBin alias_table[];
 } buff_envmap_info;
+layout(binding = 6) uniform b_buff_wvls_distr {
+  float sum;
+  float func[wavelength_samples];
+  float cdf[wavelength_samples + 1];
+} buff_wvls_distr;
+layout(binding = 7) uniform b_buff_emitters_distr {
+  float sum;
+  float func[met_max_emitters];
+  float cdf[met_max_emitters + 1];
+} buff_emitters_distr;
 layout(binding = 8) uniform b_buff_object_coef_info {
   uint n;
   AtlasInfo data[met_max_textures];
@@ -83,8 +85,9 @@ layout(binding = 10) uniform b_buff_object_brdf_info {
 } buff_object_brdf_info;
 
 // Storage buffer declarations
-layout(binding = 0) restrict readonly buffer b_buff_blas_node { BVHNodePack   data[]; } buff_blas_node;
-layout(binding = 1) restrict readonly buffer b_buff_blas_prim { PrimitivePack data[]; } buff_blas_prim;
+layout(binding = 0) restrict readonly buffer b_buff_blas_node    { BVHNodePack   data[]; } buff_blas_node;
+layout(binding = 1) restrict readonly buffer b_buff_blas_prim    { PrimitivePack data[]; } buff_blas_prim;
+layout(binding = 2) restrict readonly buffer b_buff_envmap_distr { AliasTableBin data[]; } buff_envmap_distr;
 
 // Texture/image units, ergo samplers and output images
 layout(binding = 0) uniform sampler1DArray b_illm_1f;         // Illuminant function data, 1 component
@@ -104,12 +107,13 @@ shared uint     _blas_stack[gl_WorkGroupSize.x * gl_WorkGroupSize.y * gl_WorkGro
 
 // Declare scene data; creates functions to access and interact with
 // scene data without knowing the exact names of buffers, textures, etc
-declare_distr_sampler(wavelength, buff_wvls_distr.data, wavelength_samples);
-declare_distr_sampler(emitters, buff_emitters_distr.data, met_max_emitters);
+declare_distr_sampler(wavelength, buff_wvls_distr, wavelength_samples);
+declare_distr_sampler(emitters, buff_emitters_distr, met_max_emitters);
 declare_scene_cmfs_data(b_cmfs_3f);
 declare_scene_illuminant_data(b_illm_1f);
 declare_scene_emitter_data(buff_emitter_info);
 declare_scene_envmap_data(buff_envmap_info);
+declare_alias_sampler(envm_alias_table, buff_envmap_distr);
 declare_scene_texture_data(buff_object_coef_info.data, buff_object_brdf_info.data, buff_emitter_coef_info.data, b_object_coef_4f, b_object_brdf_4f, b_emitter_coef_4f, b_emitter_scle_1f, b_bsis_1f);
 declare_scene_object_data(buff_object_info);
 declare_scene_blas_data(buff_blas_prim.data, buff_blas_node.data, _blas_info);
@@ -171,7 +175,7 @@ void main() {
       // Instead output debug value
       L = Li_debug(sensor_sample, state);
     }
-    
+
     // Ignore invocations above requested film size; we keep invocations
     // alive and path-tracing - even outside the exact film size - for subgroup shenanigans
     guard_continue(all(lessThan(xy(), buff_sensor_info.film_size)));

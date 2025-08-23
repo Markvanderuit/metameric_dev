@@ -165,6 +165,7 @@ namespace met {
       float p;
       float q;
       int   alias;
+      int   _padding;
     };
 
   private:
@@ -179,11 +180,7 @@ namespace met {
     uint sample(float u) const {
       int    i = std::min<int>(u * m_bins.size(), m_bins.size() - 1);
       float up = std::min<float>(u * m_bins.size() - i, 0x1.fffffep-1);
-      if (up < m_bins[i].q) {
-        return i;
-      } else {
-        return m_bins[i].alias;
-      }
+      return (up < m_bins[i].q) ? i : m_bins[i].alias;
     }
 
     // Return probability density for a specific sample
@@ -196,5 +193,7 @@ namespace met {
     
     const Bin &operator[](uint i) const { return m_bins[i]; }
           Bin &operator[](uint i)       { return m_bins[i]; }
+
+    std::span<const Bin> data_bins() const { return m_bins; }
   };
 } // namespace met

@@ -90,7 +90,7 @@ namespace met {
         alignas(4) uint envm_i;
       } *m_envm_info_data;
       static_assert(sizeof(EnvBufferLayout) == 8);
-
+      
     public:
       // This buffer stores one instance of BlockLayout per emitter component
       gl::Buffer emitter_info;
@@ -103,7 +103,7 @@ namespace met {
       gl::Buffer emitter_distr_buffer;
 
       // Alias data goes here
-
+      gl::Buffer envmap_distr_buffer;
     public:
       // Class constructor and update function handle GL-side data
       SceneGLHandler();

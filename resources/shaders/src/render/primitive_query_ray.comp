@@ -36,7 +36,8 @@ layout(binding = 4) uniform b_buff_envmap_info {
 
 // Storage buffer declarations
 layout(binding = 0) restrict readonly buffer b_buff_blas_node { BVHNodePack data[]; } buff_blas_node;
-layout(binding = 2) restrict readonly buffer b_buff_blas_prim { PrimitivePack data[]; } buff_blas_prim;
+layout(binding = 1) restrict readonly buffer b_buff_blas_prim { PrimitivePack data[]; } buff_blas_prim;
+layout(binding = 2) restrict readonly buffer b_buff_envmap_distr { AliasTableBin data[]; } buff_envmap_distr;
 layout(binding = 3) restrict coherent buffer b_buff_output { 
   Ray data;
 } buff_output;
@@ -47,6 +48,7 @@ layout(binding = 4) restrict readonly buffer b_buff_tlas_prim {
 declare_scene_emitter_data(buff_emitter_info);
 declare_scene_envmap_data(buff_envmap_info);
 declare_scene_object_data(buff_objects_info);
+declare_alias_sampler(envm_alias_table, buff_envmap_distr);
 declare_scene_blas_data(buff_blas_prim.data, buff_blas_node.data, buff_blas_info.data);
 declare_distr_sampler_default(emitters);
 declare_distr_sampler_default(wavelength);

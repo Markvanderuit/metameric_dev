@@ -1,8 +1,6 @@
 #ifndef LOAD_TLAS_GLSL_GUARD
 #define LOAD_TLAS_GLSL_GUARD
 
-#define SCENE_DATA_TLAS
-
 #define declare_scene_tlas_data(scene_buff_tlas_prim,                     \
                                 scene_buff_tlas_node,                     \
                                 scene_buff_tlas_info)                     \

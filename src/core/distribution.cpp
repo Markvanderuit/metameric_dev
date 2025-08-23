@@ -51,7 +51,7 @@ namespace met {
     m_bins.resize(values.size());
     std::transform(std::execution::par_unseq, range_iter(values), m_bins.begin(), 
       [rcp_sum](const float &w) { return Bin { .p = w * rcp_sum }; });
-    
+
     struct Outcome {
       float p_hat;
       uint  i;
@@ -76,7 +76,7 @@ namespace met {
 
       m_bins[l.i].q     = l.p_hat;
       m_bins[l.i].alias = h.i;
-
+      
       float p_excesss = l.p_hat + h.p_hat - 1.f;
       if (p_excesss < 1.f) {
         light.push_back({ p_excesss, h.i }); 

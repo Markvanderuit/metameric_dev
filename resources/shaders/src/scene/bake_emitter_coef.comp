@@ -49,8 +49,8 @@ layout(binding = 1, rgba32f) uniform restrict writeonly image2DArray b_atlas_scl
 
 void main() {
   // Load relevant object/patch data
-  Emitter emitter = buff_emitters.data[buff_unif.emitter_i];
-  AtlasInfo   atlas   = buff_atlas.data[buff_unif.emitter_i];
+  Emitter   emitter = buff_emitters.data[buff_unif.emitter_i];
+  AtlasInfo atlas   = buff_atlas.data[buff_unif.emitter_i];
   
   // Determine pixel location in padded patch, then clamp invocations to
   // relevant region; the atlas patch plus a 2px padding border for oversampling

@@ -1,8 +1,6 @@
 #ifndef LOAD_BLAS_GLSL_GUARD
 #define LOAD_BLAS_GLSL_GUARD
 
-#define SCENE_DATA_BLAS
-
 #define declare_scene_blas_data(scene_buff_blas_prim,                       \
                                 scene_buff_blas_node,                       \
                                 scene_buff_blas_info)                       \

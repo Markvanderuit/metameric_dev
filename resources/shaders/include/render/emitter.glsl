@@ -59,6 +59,11 @@ float pdf_emitter(in Interaction si) {
   return pdf;
 }
 
+float pdf_emitter(in EmitterSample es) {
+  Interaction si = get_interaction(es.ray);
+  return pdf_emitter(si);
+}
+
 EmitterSample sample_emitter(in Interaction si, in vec4 wvls, in vec3 sample_3d) {
   // Sample specific emitter from distribution
   DiscreteSample ds = sample_emitters_discrete(sample_3d.z);
@@ -75,7 +80,7 @@ EmitterSample sample_emitter(in Interaction si, in vec4 wvls, in vec3 sample_3d)
   } else if (em.type == EmitterTypePoint) {
     es = sample_emitter_point(em, si, wvls, sample_3d.xy);
   } else if (em.type == EmitterTypeConstant) {
-    es = sample_emitter_constant(em, si, wvls, sample_3d.xy);
+    es = sample_emitter_constant(em, ds.i, si, wvls, sample_3d.xy);
   }
 
   // Multiply sample pdfs

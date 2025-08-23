@@ -47,8 +47,8 @@ layout(binding = 0, rgba32f) uniform restrict writeonly image2DArray b_atlas;   
 
 void main() {
   // Load relevant object/patch data
-  Object object = buff_objects.data[buff_unif.object_i];
-  AtlasInfo  atlas  = buff_atlas.data[buff_unif.object_i];
+  Object    object = buff_objects.data[buff_unif.object_i];
+  AtlasInfo atlas  = buff_atlas.data[buff_unif.object_i];
   
   // Determine pixel location in padded patch, then clamp invocations to
   // relevant region; the atlas patch plus a 2px padding border for oversampling

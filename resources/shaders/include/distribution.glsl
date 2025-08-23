@@ -14,6 +14,7 @@ struct AliasTableBin {
   float p;
   float q;
   int   alias;
+  int   _padding;
 };
 
 #define declare_distr_sampler(name, distr, distr_len)                   \
@@ -58,7 +59,6 @@ struct AliasTableBin {
     return ds;                                                          \
   }
 
-
 #define declare_distr_sampler_default(name)                             \
   float pdf_##name##_discrete(in uint i) {                              \
     return 1.f;                                                         \
@@ -82,30 +82,30 @@ struct AliasTableBin {
     return ds;                                                          \
   }
 
-#define declare_alias_sampler(name, bins, bins_len)                     \
-  DiscreteSample sample_##name##(in float u) {                          \
-    int i = min(u * bins_len, bins_len - 1);                            \
-    float up = min(float(u * bins_len - i), 0x1.fffffep-1);             \
-    i = (up < bins[i].q) ? i : bins[i].alias;                           \
-    DiscreteSample ds;                                                  \
-    ds.i   = i;                                                         \
-    ds.pdf = bins[i].p;                                                 \
-    return ds;                                                          \
-  }                                                                     \
-                                                                        \
-  float pdf_##name##(in uint i){                                        \
-    return bins[i].p;                                                   \
+#define declare_alias_sampler(name, table)                                     \
+  DiscreteSample sample_##name##_discrete(in float u) {                        \
+    DiscreteSample ds;                                                         \
+    ds.i = min(uint(u * table.data.length()), table.data.length() - 1);        \
+    float up = min(float(u * table.data.length() - ds.i), 0.9999999403953552); \
+    if (up < table.data[ds.i].q)                                               \
+      ds.i = table.data[ds.i].alias;                                           \
+    ds.pdf = table.data[ds.i].p;                                               \
+    return ds;                                                                 \
+  }                                                                            \
+                                                                               \
+  float pdf_##name##_discrete(in uint i) {                                     \
+    return table.data[i].p;                                                    \
   }
 
-  #define declare_alias_sampler_default(name)                           \
-  DiscreteSample sample_##name##(in float u) {                          \
+#define declare_alias_sampler_default(name)                             \
+  DiscreteSample sample_##name##_discrete(in float u) {                 \
     DiscreteSample ds;                                                  \
     ds.i   = 0;                                                         \
     ds.pdf = 1.f;                                                       \
     return ds;                                                          \
   }                                                                     \
                                                                         \
-  float pdf_##name##(in uint i){                                        \
+  float pdf_##name##_discrete(in uint i) {                              \
     return 1.f;                                                         \
   }
 

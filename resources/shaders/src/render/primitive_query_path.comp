@@ -81,7 +81,8 @@ layout(binding = 10) uniform b_buff_object_brdf_info {
 
 // Storage buffer declarations
 layout(binding = 0) restrict readonly buffer b_buff_blas_node { BVHNodePack data[];   } buff_blas_node;
-layout(binding = 2) restrict readonly buffer b_buff_blas_prim { PrimitivePack data[]; } buff_blas_prim;
+layout(binding = 1) restrict readonly buffer b_buff_blas_prim { PrimitivePack data[]; } buff_blas_prim;
+layout(binding = 2) restrict readonly buffer b_buff_envmap_distr { AliasTableBin data[]; } buff_envmap_distr;
 layout(binding = 3) restrict coherent buffer b_buff_output { 
   uint head;
   uint padd[3]; /* align head to 16 bytes */ 
@@ -105,6 +106,7 @@ declare_scene_cmfs_data(b_cmfs_3f);
 declare_scene_illuminant_data(b_illm_1f);
 declare_scene_emitter_data(buff_emitter_info);
 declare_scene_envmap_data(buff_envmap_info);
+declare_alias_sampler(envm_alias_table, buff_envmap_distr);
 declare_scene_object_data(buff_objects);
 declare_scene_texture_data(buff_object_coef_info.data, buff_object_brdf_info.data, buff_emitter_coef_info.data, b_object_coef_4f, b_object_brdf_4f, b_emitter_coef_4f, b_emitter_scle_1f, b_bsis_1f);
 declare_scene_blas_data(buff_blas_prim.data, buff_blas_node.data, buff_blas_info.data);

@@ -81,7 +81,7 @@ namespace met::io {
                  | std::views::split(' ') 
                  | std::views::transform([](auto &&r) { return std::string(r.begin(), r.end()); });
       std::vector<std::string> split_vect;
-      rng::copy(split, std::back_inserter(split_vect));
+      split_vect.append_range(split);
 
       // Skip empty and commented lines
       guard_continue(!split_vect.empty() && split_vect[0][0] != '#');
@@ -127,7 +127,7 @@ namespace met::io {
                  | std::views::split(' ') 
                  | std::views::transform([](auto &&r) { return std::string(r.begin(), r.end()); });
       std::vector<std::string> split_vect;
-      rng::copy(split, std::back_inserter(split_vect));
+      split_vect.append_range(split);
 
       // Skip empty and commented lines
       guard_continue(!split_vect.empty() && split_vect[0][0] != '#');
@@ -204,7 +204,7 @@ namespace met::io {
                  | vws::take(1 + wavelength_bases)
                  | vws::transform([](auto &&r) { return std::string(range_iter(r)); });
       std::vector<std::string> data_;
-      rng::copy(split, std::back_inserter(data_));
+      data_.append_range(split);
       auto data = std::span(data_); // representation for slicing
 
       // Skip empty or commented lines

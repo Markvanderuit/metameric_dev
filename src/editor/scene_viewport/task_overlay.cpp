@@ -88,7 +88,7 @@ namespace met {
       | view_to<std::vector<std::span<const SurfaceInfo>>>();
     std::vector<SurfaceInfo> all_surfaces;
     for (auto vert_surfaces : all_vert_surfaces)
-      rng::copy(vert_surfaces, std::back_inserter(all_surfaces));
+      all_surfaces.append_range(vert_surfaces);
 
     // Generate view over surface points that are "free variables" in all active scene constraints
     auto active_surfaces

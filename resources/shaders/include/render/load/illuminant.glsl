@@ -1,8 +1,6 @@
 #ifndef LOAD_ILLUMINANT_GLSL_GUARD
 #define LOAD_ILLUMINANT_GLSL_GUARD
 
-#define SCENE_DATA_ILLUMINANT
-
 #define declare_scene_illuminant_data(scene_txtr_illm_data)           \
   vec4 scene_illuminant(uint illm_i, vec4 wvls) {                     \
     vec4 v;                                                           \
