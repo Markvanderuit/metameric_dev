@@ -13,7 +13,7 @@
 // for some brdf types 
 void detail_fill_brdf_data(inout BRDF brdf, in Object object, in vec2 data) {
   if (brdf.type == BRDFTypeMicrofacet) {
-    get_microfacet_alpha(brdf)    = max(1e-3, data.x);
+    get_microfacet_alpha(brdf)    = max(1e-3, data.x * data.x);
     get_microfacet_metallic(brdf) = data.y;
     get_microfacet_eta(brdf)      = object.eta_minmax.x;
   } else if (brdf.type == BRDFTypeDielectric) {
