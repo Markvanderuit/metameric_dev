@@ -118,6 +118,16 @@ namespace met {
     const Uplifting::Vertex &uplifting_vertex(ConstraintRecord cs) const;
     Uplifting::Vertex &uplifting_vertex(ConstraintRecord cs);
 
+  public: // Scene resource cleaning 
+    struct CleanInfo {
+      bool delete_unused_meshes       = true;
+      bool delete_unused_images       = true;
+      bool delete_unused_observers    = false;
+      bool delete_unused_illuminantes = false;
+      bool delete_unused_bases        = false;
+    };
+    void clean(CleanInfo &&info);
+
   private: 
     // Handle to program shader cache, accessible to gl-side data builders;
     mutable ResourceHandle m_cache_handle;

@@ -366,7 +366,8 @@ namespace met {
     fs::path data_path = io::path_with_ext(path, ".data");
       
     // Attempt opening zlib compressed stream, and serialize scene resources
-    auto str = zstr::ofstream(data_path.string(), scene_o_flags, Z_BEST_SPEED);
+    // auto str = zstr::ofstream(data_path.string(), scene_o_flags, Z_BEST_SPEED);
+    auto str = std::ofstream(data_path.string(), scene_o_flags);
     debug::check_expr(str.good());
     io::to_stream(*this, str);
 
@@ -395,10 +396,17 @@ namespace met {
     json js = io::load_json(json_path);
     js.get_to(*this);
 
-    // Next, attempt opening zlib compressed stream, and deserialize to scene object
-    auto str = zstr::ifstream(data_path.string(), scene_i_flags);
-    debug::check_expr(str.good());
-    io::from_stream(*this, str);
+    // Next, attempt opening zlib compressed stream, and deserialize to scene object;
+    // alternatively, open uncompressed stream and deserialize
+    try {
+      auto str = zstr::ifstream(data_path.string(), scene_i_flags);
+      debug::check_expr(str.good());
+      io::from_stream(*this, str);
+    } catch (const std::exception &e) {
+      fmt::print(stderr, "{}\n", e.what());
+      auto str = std::ifstream(data_path.string(), scene_i_flags);
+      io::from_stream(*this, str);
+    }
       
     // Set state to fresh load
     save_path  = io::path_with_ext(path, ".json");
@@ -628,6 +636,14 @@ namespace met {
     resources.bases.data().insert(resources.bases.end(),             
       std::make_move_iterator(other.resources.bases.begin()),
       std::make_move_iterator(other.resources.bases.end()));
+  }
+
+  void Scene::clean(Scene::CleanInfo &&info) {
+    met_trace();
+
+    // TODO ...
+
+    fmt::print("Scene: cleaned scene\n");
   }
 
   void Scene::touch(Scene::SceneMod &&mod) {
