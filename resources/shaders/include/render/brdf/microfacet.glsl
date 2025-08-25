@@ -41,15 +41,14 @@ vec4 eval_brdf_microfacet(in BRDF brdf, in Interaction si, in vec3 wo, in vec4 w
   vec4 F0 = mix(vec4(sdot(get_microfacet_eta(brdf) - 1) / sdot(get_microfacet_eta(brdf) + 1) / 0.08f),
                 get_microfacet_r(brdf),
                 get_microfacet_metallic(brdf));
-  vec4 F = schlick_fresnel(vec4(F0), vec4(1), cos_theta(si.wi)); 
+  vec4 F = schlick_fresnel(vec4(F0), vec4(1), dot(si.wi, wh)); 
 
   // Output value
   vec4 f = vec4(0);
   
   // Diffuse component
-  // Lambert, scaled by metallic and fresnel
+  // Lambert scaled by metallic
   vec4 diffuse = (1.f - get_microfacet_metallic(brdf))
-               * (1.f - F) 
                * get_microfacet_r(brdf);
   f += diffuse;
 
