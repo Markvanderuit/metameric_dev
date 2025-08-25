@@ -6,20 +6,16 @@ struct Frame {
   vec3 n, s, t;
 };
 
+// Src: https://people.compute.dtu.dk/jerf/code/hairy/HairAndDirections.pdf
 Frame get_frame(in vec3 n) {
   Frame fr;
 
-  float s = n.z >= 0.f ? 1.f : -1.f;
-  float a = -1.f / (s + n.z);
-  float b = n.x * n.y * a; 
-
+  const float a = -1.f / (1.f + n.z);
+  const float b = n.x * n.y * a;
+  
   fr.n = n;
-  fr.s = vec3(n.x * n.x * a *  s + 1,
-              b             *  s,
-              n.x           * -s);
-  fr.t = vec3(b,
-              n.y * n.y * a + s,
-             -n.y);
+  fr.s = vec3(fma(n.x * n.x, a, 1.f), b, -n.x);
+  fr.t = vec3(b, fma(n.y * n.y, a, 1.f), -n.y);
 
   return fr;
 }
