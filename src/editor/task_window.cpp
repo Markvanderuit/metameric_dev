@@ -30,8 +30,9 @@
 
 namespace met {
   /* Titles and ImGui IDs used to spawn modals */
-  const static std::string close_modal_title  = "Close project";
-  const static std::string exit_modal_title   = "Exit Metameric";
+  const static std::string close_modal_title     = "Close project";
+  const static std::string exit_modal_title      = "Exit Metameric";
+  const static std::string exception_modal_title = "Exception caught";
   
   namespace detail {
     // TODO handle new safe 
@@ -130,8 +131,7 @@ namespace met {
     const auto &e_scene = info.global("scene").getr<Scene>();
 
     // Continue to close function if scene state is ok; otherwise, present modal on next frame
-    if (e_scene.save_state == Scene::SaveState::eUnsaved 
-     || e_scene.save_state == Scene::SaveState::eNew) {
+    if (e_scene.save_state == Scene::SaveState::eUnsaved || e_scene.save_state == Scene::SaveState::eNew) {
       m_open_close_modal = true;
     } else {
       handle_close(info);
@@ -166,8 +166,9 @@ namespace met {
     
     // Modals/popups have to be on the same level of stack as OpenPopup(), so track this state
     // and call OpenPopup() at the end if true
-    m_open_close_modal  = false;
-    m_open_exit_modal   = false;
+    m_open_close_modal = false;
+    m_open_exit_modal  = false;
+    m_exception_modal  = false;
 
     // Set up the menu bar at the top of the window's viewport
     if (ImGui::BeginMainMenuBar()) {
@@ -190,15 +191,28 @@ namespace met {
         if (ImGui::BeginMenu("Import", is_loaded)) {
           if (ImGui::MenuItem("Wavefront (.obj)")) {
             if (fs::path path; detail::load_dialog(path, { "*.obj" })) {
-              auto &e_scene = info.global("scene").getw<Scene>();
-              e_scene.import_obj(path);
+              try {
+                auto &e_scene = info.global("scene").getw<Scene>();
+                e_scene.import_obj(path);
+              } catch(const detail::Exception& e) {
+                fmt::print("{}\n", e.what());
+                m_exception_modal = true;
+                m_exception_msg = e.what();
+              }
             }
           }
 
           if (ImGui::MenuItem("Image (.exr, .png, .jpg, ...)")) {
             if (fs::path path; detail::load_dialog(path, { "*.exr", "*.png", "*.jpg", "*.jpeg", "*.bmp" })) {
-              auto &e_scene = info.global("scene").getw<Scene>();
-              e_scene.resources.images.emplace(path.filename().string(), {{ .path = path  }});
+              try {
+                auto &e_scene = info.global("scene").getw<Scene>();
+                Image image = {{ .path = path }};
+                e_scene.resources.images.emplace(path.filename().string(), std::move(image));
+              } catch(const detail::Exception& e) {
+                fmt::print("{}\n", e.what());
+                m_exception_modal = true;
+                m_exception_msg = e.what();
+              }
             }
           }
           
@@ -317,6 +331,10 @@ namespace met {
         if (ImGui::MenuItem("Reload shaders", nullptr, nullptr)) {
           info.global("cache").getw<gl::ProgramCache>().reload();
         }
+
+        if (ImGui::MenuItem("Clean scene data", nullptr, nullptr)) {
+          info.global("scene").getw<Scene>().clean({});
+        }
         
         ImGui::Separator();
 
@@ -336,7 +354,7 @@ namespace met {
     ImGui::DockSpaceOverViewport(0, ImGui::GetMainViewport(), ImGuiDockNodeFlags_PassthruCentralNode);
 
     // Spawn close modal
-    if (m_open_close_modal)  { 
+    if (m_open_close_modal) { 
       info.child_task("close_modal").init<detail::LambdaTask>([&](auto &info) {
         if (ImGui::BeginPopupModal(close_modal_title.c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
           ImGui::Text("Do you wish to close the project? You may lose unsaved progress.");
@@ -356,7 +374,7 @@ namespace met {
     }
 
     // Spawm exit modal
-    if (m_open_exit_modal)   { 
+    if (m_open_exit_modal) {
       info.child_task("exit_modal").init<detail::LambdaTask>([&](auto &info) {
         if (ImGui::BeginPopupModal(exit_modal_title.c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
           ImGui::Text("Do you wish to exit the program? You may lose unsaved progress.");
@@ -373,6 +391,22 @@ namespace met {
         }
       });
       ImGui::OpenPopup(exit_modal_title.c_str()); 
+    }
+
+    // Spawn exception modal
+    if (m_exception_modal) {
+      info.child_task("exception_modal").init<detail::LambdaTask>([&](auto &info) {
+        if (ImGui::BeginPopupModal(exception_modal_title.c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+          ImGui::Text(m_exception_msg.c_str());
+          ImGui::SpacedSeparator();
+          if (ImGui::Button("Ok")) { 
+            info.task().dstr();
+            ImGui::CloseCurrentPopup(); 
+          }
+          ImGui::EndPopup();
+        }
+      });
+      ImGui::OpenPopup(exception_modal_title.c_str()); 
     }
   }
 } // namespace met

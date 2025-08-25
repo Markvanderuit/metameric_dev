@@ -264,7 +264,7 @@ namespace met {
         || scene.resources.images       // User loaded/deleted an image;
         || settings.state.texture_size; // Texture size setting changed
       guard(is_active);
-      fmt::print("Object {}: baking object brdf data ({}x{})\n", 
+      fmt::print("Object: baking object {} brdf data ({}x{})\n", 
         m_object_i, patch.size.x(), patch.size.y());
 
       // Get relevant program handle, bind, then bind resources to corresponding targets

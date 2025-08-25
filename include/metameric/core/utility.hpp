@@ -203,6 +203,14 @@ namespace met {
   constexpr void operator| (std::variant<Ts...> & v, visit_single<F> const& f) {
     v | visit { f, [](auto &) {} };
   }
+  template <typename T, typename F>
+  constexpr void operator| (std::optional<T> & v, visit_single<F> const& f) {
+    v | visit { f, []() {} };
+  }
+  template <typename T, typename F>
+  constexpr void operator| (std::optional<T> const& v, visit_single<F> const& f) {
+    v | visit { f, []() {} };
+  }
 
   // Syntactic sugar to do c++20 style projection on std::tuple as tuple_project<I>
   // Src: https://stackoverflow.com/questions/64963075/how-to-project-stdtuple-in-c20-constrained-algorithms

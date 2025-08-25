@@ -755,7 +755,7 @@ namespace met {
         || scene.resources.images       // User loaded/deleted a image;
         || settings.state.texture_size; // Texture size setting changed
       guard(is_active);
-      fmt::print("Uplifting {}: baking object spectra {} ({}x{})\n", 
+      fmt::print("Uplifting {}: baking object {} spectra ({}x{})\n", 
         object->uplifting_i, m_object_i, patch.size.x(), patch.size.y());
 
       // Get relevant program handle, bind, then bind resources to corresponding targets
@@ -846,7 +846,7 @@ namespace met {
         || scene.resources.images       // User loaded/deleted a image;
         || settings.state.texture_size; // Texture size setting changed
       guard(is_active);
-      fmt::print("Uplifting {}: baking object refl {} ({}x{})\n", 
+      fmt::print("Uplifting {}: baking emitter {} spectra ({}x{})\n", 
         0, m_emitter_i, patch.size.x(), patch.size.y());
 
       // Determine color boundaries for scaling hdr data

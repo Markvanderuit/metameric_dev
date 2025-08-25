@@ -44,10 +44,10 @@ namespace met {
       ImGui::SameLine();
       ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
       std::array<std::string, 2> select_titles = { "Value", "Texture" };
-      if (ImGui::BeginCombo(fmt::format("##_{}_data", title).c_str(), select_titles[variant.index()].c_str())) {
-        if (ImGui::Selectable(select_titles[0].c_str(), std::holds_alternative<Colr>(variant)))
+      if (ImGui::BeginCombo(fmt::format("##_{}_data", title).c_str(), title.c_str())) {
+        if (ImGui::Selectable("Value", std::holds_alternative<Colr>(variant)))
           variant = Colr(1);
-        if (ImGui::Selectable(select_titles[1].c_str(), std::holds_alternative<uint>(variant)))
+        if (ImGui::Selectable("Texture", std::holds_alternative<uint>(variant)))
           variant = uint(0u);
         ImGui::EndCombo();
       } // If (BeginCombo)

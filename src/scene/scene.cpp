@@ -500,6 +500,7 @@ namespace met {
       std::variant<Colr, uint>  diffuse   = Colr(.5f);
       std::variant<float, uint> metallic  = 0.f;
       std::variant<float, uint> roughness = 1.f;
+      std::optional<uint>       normalmap = { };
       Object::BRDFType brdf_type = Object::BRDFType::eDiffuse;
       if (load_materials && has_matrs) {
         // Access first material only; we ignore per-face materials; 
@@ -541,6 +542,13 @@ namespace met {
           }).first->second;
           brdf_type = Object::BRDFType::eMicrofacet;
         }
+
+        if (!obj_mat.normal_texname.empty()) {
+          normalmap = texture_load_list.insert({
+            obj_mat.normal_texname,                   // filename of texture as key
+            static_cast<uint>(texture_load_list.size()) // New texture id at end of list
+          }).first->second;
+        }
       }
 
       // 3 - create an object component referring to mesh/texture
@@ -551,7 +559,8 @@ namespace met {
         .diffuse     = diffuse,
         .metallic    = metallic,
         .roughness   = roughness,
-        .eta_minmax  = { 1.25f, 1.25f }
+        .eta_minmax  = { 1.25f, 1.25f },
+        .normalmap   = normalmap
       };
 
       // 4 - store mesh and object in scene
@@ -641,8 +650,80 @@ namespace met {
   void Scene::clean(Scene::CleanInfo &&info) {
     met_trace();
 
-    // TODO ...
+    if (info.delete_unused_meshes) {
+      // Flag meshes that remain in use
+      std::vector<uint> mask(resources.meshes.size(), 0);
+      for (const auto &[object, _] : components.objects)
+        mask[object.mesh_i] = 1;
+      
+      // Correct indices of remaining meshes using exclusive scan
+      std::vector<uint> indices(mask.size());
+      std::exclusive_scan(range_iter(mask), indices.begin(), 0u);
+      for (auto &[object, _] : components.objects)
+        object.mesh_i = indices[object.mesh_i];
 
+      // Delete unused meshes
+      uint n_deletes = 0;
+      for (auto [i, flag] : enumerate_view(mask)) {
+        guard_continue(flag == 0);
+        resources.meshes.erase(i - n_deletes);
+        n_deletes++;
+      }
+    }
+
+    if (info.delete_unused_images) {
+      // Flag images that remain in use by objects or emitters
+      std::vector<uint> mask(resources.images.size(), 0);
+      for (const auto &[object, _] : components.objects) {
+        auto visitor = visit_single([&](uint i) { mask[i] = 1; });
+        object.diffuse   | visitor;
+        object.metallic  | visitor;
+        object.roughness | visitor;
+        object.normalmap | visitor;
+      }
+      for (const auto &[emitter, _] : components.emitters) {
+        guard_continue(emitter.spec_type == Emitter::SpectrumType::eColr);
+        auto visitor = visit_single([&](uint i) { mask[i] = 1; });
+        emitter.color | visitor;
+      }
+      
+      // Correct indices of remaining images using exclusive scan
+      std::vector<uint> indices(mask.size());
+      std::exclusive_scan(range_iter(mask), indices.begin(), 0u);
+      for (auto &[object, _] : components.objects) {
+        auto visitor = visit_single([&](uint &i) { i = indices[i]; });
+        object.diffuse   | visitor;
+        object.metallic  | visitor;
+        object.roughness | visitor;
+        object.normalmap | visitor;
+      }
+      for (auto &[emitter, _] : components.emitters) {
+        guard_continue(emitter.spec_type == Emitter::SpectrumType::eColr);
+        auto visitor = visit_single([&](uint &i) { i = indices[i]; });
+        emitter.color | visitor;
+      }
+
+      // Delete unused images
+      uint n_deletes = 0;
+      for (auto [i, flag] : enumerate_view(mask)) {
+        guard_continue(flag == 0);
+        resources.images.erase(i - n_deletes);
+        n_deletes++;
+      }
+    }
+
+    if (info.delete_unused_observers) {
+      /* ... */
+    }
+
+    if (info.delete_unused_illuminants) {
+      /* ... */
+    }
+
+    if (info.delete_unused_bases) {
+      /* ... */
+    }
+    
     fmt::print("Scene: cleaned scene\n");
   }
 

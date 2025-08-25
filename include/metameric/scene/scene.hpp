@@ -120,11 +120,11 @@ namespace met {
 
   public: // Scene resource cleaning 
     struct CleanInfo {
-      bool delete_unused_meshes       = true;
-      bool delete_unused_images       = true;
-      bool delete_unused_observers    = false;
-      bool delete_unused_illuminantes = false;
-      bool delete_unused_bases        = false;
+      bool delete_unused_meshes      = true;
+      bool delete_unused_images      = true;
+      bool delete_unused_observers   = false;
+      bool delete_unused_illuminants = false;
+      bool delete_unused_bases       = false;
     };
     void clean(CleanInfo &&info);
 

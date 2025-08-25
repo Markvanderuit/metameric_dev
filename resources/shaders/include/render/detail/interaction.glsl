@@ -29,12 +29,6 @@ void detail_fill_interaction_object(inout Interaction si, in Ray ray) {
   si.n  = b.x * prim.v0.n  + b.y * prim.v1.n  + b.z * prim.v2.n;
   si.tx = b.x * prim.v0.tx + b.y * prim.v1.tx + b.z * prim.v2.tx;
   
-  // Read normalmap data
-  // vec3 nm = texture_normal(si, )
-
-   // Compute geometric normal
-  // si.ng = cross(prim.v1.p - prim.v0.p, prim.v2.p - prim.v1.p);
-
   // Offset surface position as shading point, as per
   // "Hacking the Shadow Terminator, Hanika, 2021"
   /* {

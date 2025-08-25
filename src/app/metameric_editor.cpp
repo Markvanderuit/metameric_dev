@@ -50,6 +50,10 @@ namespace met {
       wavelength_min, wavelength_max, wavelength_samples, wavelength_bases, 
       info.scene_path.string());
 
+#ifdef MET_ENABLE_TRACY
+    fmt::print("Tracy is running!\n");
+#endif // MET_ENABLE_TRACY
+
     // Scheduler is responsible for handling application tasks, 
     // task resources, and the program runtime loop
     LinearScheduler scheduler;
