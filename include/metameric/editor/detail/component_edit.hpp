@@ -197,9 +197,9 @@ namespace met {
         if (section_open && edit_info.inside_tree) ImGui::TreePop();
         info.global("scene").getw<Scene>().touch({
           .name = "Duplicate component",
-          .redo = [data] (auto &scene)                             { 
+          .redo = [data] (auto &scene)                     { 
             scene_data_by_type<Ty>(scene).push_back(data); },
-          .undo = [](auto &scene)                                  { 
+          .undo = [](auto &scene)                          { 
             scene_data_by_type<Ty>(scene).pop_back();      }
         });
         return; // Exit early as iterators are invalidated
@@ -215,9 +215,9 @@ namespace met {
         if (section_open && edit_info.inside_tree) ImGui::TreePop();
         info.global("scene").getw<Scene>().touch({
           .name = "Delete component",
-          .redo = [data_i] (auto &scene)                                { 
+          .redo = [data_i] (auto &scene)                        { 
             scene_data_by_type<Ty>(scene).erase(data_i);        },
-          .undo = [data_i, data](auto &scene)                           { 
+          .undo = [data_i, data](auto &scene)                   { 
             scene_data_by_type<Ty>(scene).insert(data_i, data); }
         });
         return; // Exit early as iterators are invalidated

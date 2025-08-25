@@ -116,10 +116,12 @@ namespace met {
       // Object transforms
       ImGui::DragFloat3("Position", value.transform.position.data(), 0.01f, -100.f, 100.f);
       ImGui::DragFloat3("Rotation", value.transform.rotation.data(), 0.01f, -10.f, 10.f);
-      ImGui::DragFloat3("Scaling",  value.transform.scaling.data(),  0.01f, 0.001f, 100.f);
 
+      // We handle scaling on one slider;
       // Important catch; prevent scale from falling to 0, something somewhere breaks :D
-      value.transform.scaling = value.transform.scaling.cwiseMax(0.001f);
+      float _scaling = value.transform.scaling.x();
+      ImGui::DragFloat("Scaling", &_scaling, 0.01f, 0.001f, 100.f);
+      value.transform.scaling = std::max(_scaling, 0.001f);
 
       ImGui::Separator();
 
@@ -399,9 +401,13 @@ namespace met {
       // Get external resources and shorthands
       const auto &scene = info.global("scene").getr<Scene>();
       const auto &value = resource.value();
+
+      size_t size_bytes = cnt_span<const std::byte>(value.verts).size()
+                        + cnt_span<const std::byte>(value.elems).size();
       
       ImGui::LabelText("Vertices", "%zu", value.verts.size());
       ImGui::LabelText("Elements", "%zu", value.elems.size());
+      ImGui::LabelText("Bytes",  "%d", size_bytes);
     };
 
     // Default implementation of editing visitor for Mesh resources
@@ -413,6 +419,7 @@ namespace met {
 
       ImGui::LabelText("Width",  "%d", value.size().x());
       ImGui::LabelText("Height", "%d", value.size().y());
+      ImGui::LabelText("Bytes",  "%d", value.data().size());
     };
   } // namespace detail
 } // namespace met
