@@ -78,11 +78,11 @@ float pdf_brdf_microfacet(in BRDF brdf, in Interaction si, in vec3 wo) {
 BRDFSample sample_brdf_microfacet(in BRDF brdf, in vec3 sample_3d, in Interaction si, in vec4 wvls) {
   if (cos_theta(si.wi) <= 0.f)
     return brdf_sample_zero();
-
+  
   // Return object
   BRDFSample bs;
   bs.is_spectral = false;
-  bs.is_delta   = false;
+  bs.is_delta    = false;
   
   // Select a lobe based on sample probabilities [spec, diffuse]
   vec2 lobe_probs = _microfacet_lobe_probs(brdf, si);

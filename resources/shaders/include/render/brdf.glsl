@@ -91,7 +91,7 @@ vec4 eval_brdf(in BRDF brdf, in Interaction si, in vec3 wo, in vec4 wvls) {
   } */
 }
 
-float pdf_brdf(in BRDF brdf, in Interaction si, in vec3 wo) {
+float pdf_brdf(in BRDF brdf, in Interaction si, in vec3 wo, in vec4 wvls) {
   if (brdf.type == BRDFTypeDiffuse) {
     return pdf_brdf_diffuse(brdf, si, wo);
   } else if (brdf.type == BRDFTypeNull) {
@@ -99,7 +99,7 @@ float pdf_brdf(in BRDF brdf, in Interaction si, in vec3 wo) {
   } else if (brdf.type == BRDFTypeMicrofacet) {
     return pdf_brdf_microfacet(brdf, si, wo);
   } else if (brdf.type == BRDFTypeDielectric) {
-    return pdf_brdf_dielectric(brdf, si, wo);
+    return pdf_brdf_dielectric(brdf, si, wo, wvls);
   } /* else if (...) {
     // ...
   } */

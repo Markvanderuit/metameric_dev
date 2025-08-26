@@ -5,6 +5,18 @@
 #include <render/warp.glsl>
 #include <render/sample.glsl>
 
+float eval_microfacet_G1(in vec3 wi, in vec3 wh, in vec3 wo, in float alpha) {
+  float alpha_2 = alpha * alpha;
+  return cos_theta(wo) 
+    * sqrt((cos_theta(wi) - alpha_2 * cos_theta(wi)) * cos_theta(wi) + alpha_2);
+}
+
+float eval_microfacet_D(in vec3 wi, in vec3 wh, in vec3 wo, in float alpha) {
+  float alpha_2 = alpha * alpha;
+  return alpha_2 
+    / sdot((alpha_2 * cos_theta(wh) - cos_theta(wh)) * cos_theta(wh) + 1.f);
+}
+
 float eval_microfacet_partial(in vec3 wi, in vec3 wh, in vec3 wo, in float alpha) {
   float alpha_2 = alpha * alpha;
 

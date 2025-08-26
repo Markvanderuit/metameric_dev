@@ -21,7 +21,7 @@ vec4 Li_debug(in SensorSample ss, in SamplerState state) {
   // Construct the underlying BRDF at the intersected surface
   BRDF brdf = get_brdf(si, ss.wvls, next_2d(state));
   
-  return vec4(si.n, 1);
+  return vec4(mulsign(si.wi, cos_theta(si.wi)), 1);
 }
 
 vec4 Li(in SensorSample ss, in SamplerState state, out float alpha) {
@@ -83,7 +83,7 @@ vec4 Li(in SensorSample ss, in SamplerState state, out float alpha) {
       
       // BRDF sample density for exitant direction in local frame
       vec3  wo     = to_local(si, es.ray.d);
-      float bs_pdf = pdf_brdf(brdf, si, wo);
+      float bs_pdf = pdf_brdf(brdf, si, wo, ss.wvls);
 
       // If the sample has throughput, test for occluder closer 
       // than sample position and add contribution

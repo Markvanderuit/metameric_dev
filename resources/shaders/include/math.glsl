@@ -124,6 +124,18 @@ vec2  safe_sqrt(in vec2  v) { return SAFE_SQRT(v); }
 vec3  safe_sqrt(in vec3  v) { return SAFE_SQRT(v); }
 vec4  safe_sqrt(in vec4  v) { return SAFE_SQRT(v); }
 
+// mulsign(a, b), multiply a by the (non-zero) sign of b
+#define MULSIGN_F(a, b, type) a * mix(-1.f, 1.f, b >= 0)
+#define MULSIGN_V(a, b, type) a * mix(type(-1), type(1), greaterThanEqual(b, type(0)))
+
+float mulsign(in float a, in float b) { return MULSIGN_F(a, b, float); }
+vec2  mulsign(in  vec2 a, in float b) { return MULSIGN_F(a, b, float); }
+vec3  mulsign(in  vec3 a, in float b) { return MULSIGN_F(a, b, float); }
+vec4  mulsign(in  vec4 a, in float b) { return MULSIGN_F(a, b, float); }
+vec2  mulsign(in  vec2 a, in  vec2 b) { return MULSIGN_V(a, b,  vec2); }
+vec3  mulsign(in  vec3 a, in  vec3 b) { return MULSIGN_V(a, b,  vec3); }
+vec4  mulsign(in  vec4 a, in  vec4 b) { return MULSIGN_V(a, b,  vec4); }
+
 // Swapping of vector objects
 
 #define SWAP_T(Ty)                        \
