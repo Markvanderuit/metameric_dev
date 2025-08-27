@@ -3,6 +3,7 @@
 
 #include <render/record.glsl>
 #include <render/ggx.glsl>
+#include <render/fresnel.glsl>
 
 // Accessors to BRDF data
 #define get_dielectric_r(brdf)             brdf.r
@@ -18,30 +19,6 @@ vec3 to_upper_hemisphere(in vec3 v) {
   return mulsign(v, cos_theta(v));
 }
 
-// Source, Mitsuba 0.5, util.cpp, line 651
-float _brdf_dielectric_fresnel(in float cos_theta_i, inout float cos_theta_t, in float eta) {
-  float scale = (cos_theta_i > 0) ? 1.f / eta : eta;
-  float cos_theta_t_2 = 1.f - (1.f - sdot(cos_theta_i)) * sdot(scale);
-  
-  // Total internal reflection check:
-  if (cos_theta_t_2 <= 0.f) {
-    cos_theta_t = 0.f;
-    return 1.f;
-  }
-
-  float cos_theta_a = abs(cos_theta_i);
-        cos_theta_t = sqrt(cos_theta_t_2);
-  float rs = (cos_theta_a - eta * cos_theta_t)
-           / (cos_theta_a + eta * cos_theta_t);
-  float rp = (eta * cos_theta_a - cos_theta_t)
-           / (eta * cos_theta_a + cos_theta_t);
-
-  cos_theta_t = (cos_theta_i > 0) ? -cos_theta_t : cos_theta_t;
-  
-  // Unpolarized
-  return 0.5f * (rs * rs + rp * rp);
-}
-
 vec4 eval_brdf_dielectric(in BRDF brdf, in Interaction si, in vec3 wo, in vec4 wvls) {
   bool  is_reflected = cos_theta(si.wi) * cos_theta(wo) >= 0.f;
   float _eta         = get_dielectric_eta(brdf);
@@ -55,7 +32,7 @@ vec4 eval_brdf_dielectric(in BRDF brdf, in Interaction si, in vec3 wo, in vec4 w
 
   // Compute fresnel, angle of transmission
   float cos_theta_t;
-  float F = _brdf_dielectric_fresnel(dot(si.wi, m), cos_theta_t, _eta);
+  float F = dielectric_fresnel(dot(si.wi, m), cos_theta_t, _eta);
 
   // Evaluate the partial microfacet distribution
   float D_G = eval_ggx(
@@ -88,7 +65,7 @@ float pdf_brdf_dielectric(in BRDF brdf, in Interaction si, in vec3 wo, in vec4 w
 
   // Compute fresnel
   float cos_theta_t;
-  float F = _brdf_dielectric_fresnel(dot(si.wi, m), cos_theta_t, _eta);
+  float F = dielectric_fresnel(dot(si.wi, m), cos_theta_t, _eta);
 
   float pdf = pdf_ggx(
     to_upper_hemisphere(si.wi), 
@@ -117,7 +94,7 @@ BRDFSample sample_brdf_dielectric(in BRDF brdf, in vec3 sample_3d, in Interactio
   // Compute fresnel and angle of transmission
   float _eta = get_dielectric_eta(brdf);
   float cos_theta_t;
-  float F = _brdf_dielectric_fresnel(dot(si.wi, ms.n), cos_theta_t, _eta);
+  float F = dielectric_fresnel(dot(si.wi, ms.n), cos_theta_t, _eta);
 
   // Get relative index of refraction
   float     eta = cos_theta(si.wi) > 0 ? _eta : 1.f / _eta;

@@ -172,17 +172,6 @@ vec4 mis_power(in vec4 pdf_a, in vec4 pdf_b) {
   return pdf_a / (pdf_a + pdf_b);
 }
 
-vec4 schlick_fresnel(in vec4 f0, in vec4 f90, in float cos_theta) {
-  float c1 = 1.f - cos_theta;
-  float c2 = c1 * c1;
-  float c5 = c2 * c2 * c1;
-  return clamp(f0 + (f90 - f0) * c5, vec4(0), vec4(1));
-}
-
-vec4 schlick_fresnel(in vec4 f0, in float cos_theta) {
-  return schlick_fresnel(f0, vec4(1), cos_theta);
-}
-
 // Convert between eta and principled specular
 float eta_to_specular(in float eta) {
   float div = (eta - 1.f) / (eta + 1.f);

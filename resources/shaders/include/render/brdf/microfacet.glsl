@@ -3,6 +3,7 @@
 
 #include <render/record.glsl>
 #include <render/ggx.glsl>
+#include <render/fresnel.glsl>
 
 // Accessors to BRDF data
 #define get_microfacet_r(brdf)        brdf.r
@@ -107,8 +108,6 @@ BRDFSample sample_brdf_microfacet(in BRDF brdf, in vec3 sample_3d, in Interactio
   }
   
   bs.pdf = pdf_brdf_microfacet(brdf, si, bs.wo);
-  // bs.pdf = lobe_probs[0] * pdf_ggx(si.wi, normalize(si.wi + bs.wo), get_microfacet_alpha(brdf))
-  //        + lobe_probs[1] * square_to_cos_hemisphere_pdf(bs.wo);
 
   return bs;
 }
