@@ -2,7 +2,7 @@
 #define BRDF_MICROFACET_GLSL_GUARD
 
 #include <render/record.glsl>
-#include <render/microfacet.glsl>
+#include <render/ggx.glsl>
 
 // Accessors to BRDF data
 #define get_microfacet_r(brdf)        brdf.r
@@ -48,27 +48,33 @@ vec4 eval_brdf_microfacet(in BRDF brdf, in Interaction si, in vec3 wo, in vec4 w
   
   // Diffuse component
   // Lambert scaled by metallic
-  vec4 diffuse = (1.f - get_microfacet_metallic(brdf))
-               * get_microfacet_r(brdf);
-  f += diffuse;
+  {
+    f += (1.f - get_microfacet_metallic(brdf))
+       * get_microfacet_r(brdf)
+       * M_PI_INV;
+  }
 
   // Specular componennt
-  // Evaluate partial ggx and multiply by fresnel
-  float D_G = eval_microfacet_partial(si.wi, wh, wo, get_microfacet_alpha(brdf));
-  vec4 specular = F * D_G;
-  f += specular;
+  // Evaluate ggx and multiply by fresnel
+  {
+    float D_G    = eval_ggx(si.wi, wh, wo, get_microfacet_alpha(brdf));
+    float weight = 1.f / (4.f * cos_theta(si.wi) * cos_theta(wo));
+    f += F * D_G * weight;
+  }
 
-  return f * M_PI_INV;
+  return f;
 }
 
 float pdf_brdf_microfacet(in BRDF brdf, in Interaction si, in vec3 wo) {
   if (cos_theta(si.wi) <= 0.f || cos_theta(wo) <= 0.f)
     return 0.f;
   
+  vec3 wh  = normalize(si.wi + wo);
   vec2 lobe_probs = _microfacet_lobe_probs(brdf, si);
 
   // Output values
-  float specular_pdf = lobe_probs[0] * pdf_microfacet(si.wi, normalize(si.wi + wo), get_microfacet_alpha(brdf));
+  float specular_pdf = lobe_probs[0] * pdf_ggx(si.wi, wh, get_microfacet_alpha(brdf))
+                     / (4.f * dot(si.wi, wh));
   float diffuse_pdf  = lobe_probs[1] * square_to_cos_hemisphere_pdf(wo);
 
   // Mix probabilities [spec, diffuse] for the two lobes
@@ -88,7 +94,7 @@ BRDFSample sample_brdf_microfacet(in BRDF brdf, in vec3 sample_3d, in Interactio
   vec2 lobe_probs = _microfacet_lobe_probs(brdf, si);
   if (sample_3d.x < lobe_probs[0]) { // Specular lobe  microfacet sampling
     // Sample a microfacet normal to reflect with
-    MicrofacetSample ms = sample_microfacet(si.wi, get_microfacet_alpha(brdf), sample_3d.yz);
+    MicrofacetSample ms = sample_ggx(si.wi, get_microfacet_alpha(brdf), sample_3d.yz);
     bs.wo = reflect(-si.wi, ms.n);
 
     if (ms.pdf == 0.f || cos_theta(bs.wo) <= 0.f)
@@ -100,8 +106,9 @@ BRDFSample sample_brdf_microfacet(in BRDF brdf, in vec3 sample_3d, in Interactio
       return brdf_sample_zero();
   }
   
-  bs.pdf = lobe_probs[0] * pdf_microfacet(si.wi, normalize(si.wi + bs.wo), get_microfacet_alpha(brdf))
-         + lobe_probs[1] * square_to_cos_hemisphere_pdf(bs.wo);
+  bs.pdf = pdf_brdf_microfacet(brdf, si, bs.wo);
+  // bs.pdf = lobe_probs[0] * pdf_ggx(si.wi, normalize(si.wi + bs.wo), get_microfacet_alpha(brdf))
+  //        + lobe_probs[1] * square_to_cos_hemisphere_pdf(bs.wo);
 
   return bs;
 }

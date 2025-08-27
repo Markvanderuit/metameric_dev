@@ -6,14 +6,13 @@
 
 // Accessors to BRDF data
 #define get_dielectric_r(brdf)             brdf.r
-#define get_dielectric_cauchy_b(brdf)      brdf.data.x
-#define get_dielectric_cauchy_c(brdf)      brdf.data.y
 #define get_dielectric_eta(brdf)           brdf.data.x
-#define get_dielectric_absorption(brdf)    brdf.data.z
+#define get_dielectric_dispersive(brdf)    brdf.data.y
 #define get_dielectric_is_dispersive(brdf) (brdf.data.y != 0)
+#define get_dielectric_absorption(brdf)    brdf.data.z
 
 // TODO hardcoded for now
-#define get_dielectric_alpha(brdf) max(1e-3, sdot(0.3))
+#define get_dielectric_alpha(brdf) max(1e-3, sdot(0.1))
 
 vec3 to_upper_hemisphere(in vec3 v) {
   return mulsign(v, cos_theta(v));
@@ -43,18 +42,9 @@ float _brdf_dielectric_fresnel(in float cos_theta_i, inout float cos_theta_t, in
   return 0.5f * (rs * rs + rp * rp);
 }
 
-float _brdf_eta_dispersive(in BRDF brdf, in float x) {
-  if (get_dielectric_is_dispersive(brdf)) {
-    // Cauchy's equation
-    return get_dielectric_cauchy_b(brdf) + get_dielectric_cauchy_c(brdf) / sdot(sample_to_wavelength(x));
-  } else {
-    return get_dielectric_eta(brdf);
-  }
-}
-
 vec4 eval_brdf_dielectric(in BRDF brdf, in Interaction si, in vec3 wo, in vec4 wvls) {
   bool  is_reflected = cos_theta(si.wi) * cos_theta(wo) >= 0.f;
-  float _eta         = _brdf_eta_dispersive(brdf, wvls.x);
+  float _eta         = get_dielectric_eta(brdf);
 
   // Get relative index of refraction along ray
   float     eta = cos_theta(si.wi) > 0 ? _eta : 1.f / _eta;
@@ -87,7 +77,7 @@ vec4 eval_brdf_dielectric(in BRDF brdf, in Interaction si, in vec3 wo, in vec4 w
 
 float pdf_brdf_dielectric(in BRDF brdf, in Interaction si, in vec3 wo, in vec4 wvls) {
   bool  is_reflected = cos_theta(si.wi) * cos_theta(wo) >= 0.f;
-  float _eta         = _brdf_eta_dispersive(brdf, wvls.x);
+  float _eta         = get_dielectric_eta(brdf);
 
   // Get relative index of refraction
   float     eta = cos_theta(si.wi) > 0 ? _eta : 1.f / _eta;
@@ -125,7 +115,7 @@ BRDFSample sample_brdf_dielectric(in BRDF brdf, in vec3 sample_3d, in Interactio
   );
 
   // Compute fresnel and angle of transmission
-  float    _eta = _brdf_eta_dispersive(brdf, wvls.x);
+  float _eta = get_dielectric_eta(brdf);
   float cos_theta_t;
   float F = _brdf_dielectric_fresnel(dot(si.wi, ms.n), cos_theta_t, _eta);
 

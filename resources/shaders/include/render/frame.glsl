@@ -32,6 +32,10 @@ float cos_theta(in vec3 v) {
   return v.z;
 }
 
+float abs_cos_theta(in vec3 v) {
+  return abs(v.z);
+}
+
 vec3 local_reflect(in vec3 wi) {
   return vec3(-wi.xy, wi.z);
 }

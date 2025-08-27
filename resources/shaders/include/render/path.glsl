@@ -118,16 +118,20 @@ vec4 Li(in SensorSample ss, in SamplerState state, out float alpha) {
       
       // Update throughput, sample density
       Beta *= eval_brdf(brdf, si, bs.wo, ss.wvls) // brdf throughput
-            * abs(cos_theta(bs.wo))               // cosine attenuation
+            * abs_cos_theta(bs.wo)                // cosine attenuation
             / bs.pdf;
 
       // Retain last brdf density for direct emitter MIS weight
       prev_bs_pdf      = bs.pdf;
       prev_bs_is_delta = bs.is_delta;
 
-      // Handle wavelength-dependence in the BRDF by terminating secondary wavelengths
+      // Handle delta wavelength-dependence in the BRDF by terminating secondary wavelengths;
+      // as "hero" wavelength we select the highest probability wavelength
       if (!bs_is_spectral && bs.is_spectral) {
         bs_is_spectral = true;
+
+        // bvec4 mask = greaterThanEqual(ss.pdfs, vec4(hmax(ss.pdfs)));
+        // Beta *= mix(vec4(0), vec4(4), mask);
         Beta *= vec4(4, 0, 0, 0);
       }
 
