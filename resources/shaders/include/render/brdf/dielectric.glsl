@@ -12,7 +12,11 @@
 #define get_dielectric_is_dispersive(brdf) (brdf.data.y != 0)
 
 // TODO hardcoded for now
-#define get_dielectric_alpha(brdf) 0.01
+#define get_dielectric_alpha(brdf) max(1e-3, 0.1 * 0.3)
+
+vec3 to_upper_hemisphere(in vec3 v) {
+  return mulsign(v, cos_theta(v));
+}
 
 // Source, Mitsuba 0.5, util.cpp, line 651
 float _brdf_dielectric_fresnel(in float cos_theta_i, inout float cos_theta_t, in float eta) {
@@ -51,38 +55,32 @@ vec4 eval_brdf_dielectric(in BRDF brdf, in Interaction si, in vec3 wo, in vec4 w
   bool  is_reflected = cos_theta(si.wi) * cos_theta(wo) >= 0.f;
   float _eta         = _brdf_eta_dispersive(brdf, wvls.x);
 
-  // Get relative index of refraction
+  // Get relative index of refraction along ray
   float     eta = cos_theta(si.wi) > 0 ? _eta : 1.f / _eta;
   float inv_eta = cos_theta(si.wi) > 0 ? 1.f / _eta : _eta;
 
   // Get the half-vector in the positive hemisphere direction
-  vec3 m = normalize(si.wi + mix(eta, 1.f, is_reflected) * wo);
-  m = mulsign(m, cos_theta(m));
+  vec3 m = to_upper_hemisphere(normalize(si.wi + wo * (is_reflected ? 1.f : eta)));
 
-  // Compute eta for hero wavelength only, the rest gets killed later on
   // Compute fresnel, angle of transmission
   float cos_theta_t;
   float F = _brdf_dielectric_fresnel(dot(si.wi, m), cos_theta_t, _eta);
 
   // Evaluate the partial microfacet distribution
   float D_G = eval_microfacet_partial(
-    mulsign(si.wi, cos_theta(si.wi)), 
+    to_upper_hemisphere(si.wi),
     m, 
-    mulsign(wo, cos_theta(wo)), 
+    to_upper_hemisphere(wo),
     get_dielectric_alpha(brdf)
   );
 
   if (is_reflected) {
-    return vec4(F * D_G) 
-      / (4.f * cos_theta(si.wi) * cos_theta(wo));
+    float weight = 1.f / (4.f * cos_theta(si.wi) * cos_theta(wo));
+    return vec4(F * D_G * abs(weight));
   } else {
-    float scaling  = sdot(inv_eta);
-    float jacobian = sdot(eta) * dot(wo, m) / sdot(dot(si.wi, m) + eta * dot(wo, m));
-
-    return vec4(abs(
-      /* scaling * */ jacobian * (1.f - F) * D_G * dot(si.wi, m) 
-      / (cos_theta(si.wi) * cos_theta(wo)) 
-    ));
+    float denom = sdot(dot(wo, m) + dot(si.wi, m) * eta) * cos_theta(si.wi) * cos_theta(wo);
+    float weight = sdot(inv_eta) * dot(si.wi, m) * dot(wo, m) / abs(denom);
+    return vec4((1.f - F) * D_G * abs(weight));
   }
 }
 
@@ -95,29 +93,35 @@ float pdf_brdf_dielectric(in BRDF brdf, in Interaction si, in vec3 wo, in vec4 w
   float inv_eta = cos_theta(si.wi) > 0 ? 1.f / _eta : _eta;
 
   // Get the half-vector in the positive hemisphere direction
-  vec3 m = normalize(si.wi + mix(eta, 1.f, is_reflected) * wo);
-  m = mulsign(m, cos_theta(m));
+  vec3 m = to_upper_hemisphere(normalize(si.wi + mix(eta, 1.f, is_reflected) * wo));
 
   // Compute fresnel
   float cos_theta_t;
   float F = _brdf_dielectric_fresnel(dot(si.wi, m), cos_theta_t, _eta);
 
-  // Compute jacobian factor
-  float jacobian = is_reflected
-                 ? (1.f / (4.f * dot(wo, m)))
-                 : (sdot(eta) * dot(wo, m) / sdot(dot(si.wi, m) + eta * dot(wo, m)));
-  
-  float pdf = pdf_microfacet(mulsign(si.wi, cos_theta(si.wi)), m, get_microfacet_alpha(brdf))
-            * (is_reflected ? F : 1.f - F)
-            * abs(jacobian);
-  return pdf;
+  float pdf = pdf_microfacet(
+    to_upper_hemisphere(si.wi), 
+    m, 
+    get_dielectric_alpha(brdf)
+  );
+
+  if (is_reflected) {
+    float weight = 1.f / (4.f * dot(wo, m));
+    return pdf * F * abs(weight);
+  } else {
+    float weight = sdot(inv_eta) * dot(wo, m) 
+                 / sdot(dot(wo, m) + dot(si.wi, m) * eta);
+    return pdf * (1.f - F) * abs(weight);
+  }
 }
 
 BRDFSample sample_brdf_dielectric(in BRDF brdf, in vec3 sample_3d, in Interaction si, in vec4 wvls) {
   // Sample a microfacet normal to reflect/refract on
-  MicrofacetSample ms = sample_microfacet(mulsign(si.wi, cos_theta(si.wi)),
-                                          get_microfacet_alpha(brdf), 
-                                          sample_3d.yz);
+  MicrofacetSample ms = sample_microfacet(
+    to_upper_hemisphere(si.wi),
+    get_dielectric_alpha(brdf), 
+    sample_3d.yz
+  );
 
   // Compute fresnel and angle of transmission
   float    _eta = _brdf_eta_dispersive(brdf, wvls.x);
@@ -142,21 +146,19 @@ BRDFSample sample_brdf_dielectric(in BRDF brdf, in vec3 sample_3d, in Interactio
 
     bs.is_spectral = false;
     bs.wo          = to_world(local_fr, wo);
-    bs.pdf         = ms.pdf * F;
 
-    float jacobian = 1.f / (4.f * dot(bs.wo, ms.n));
-    bs.pdf *= abs(jacobian);
+    float weight = 1.f / (4.f * dot(bs.wo, ms.n));
+    bs.pdf = F * ms.pdf * abs(weight);
   } else {
     // Refract on microfacet normal
     vec3 wo = local_refract(local_wi, cos_theta_t, inv_eta);
 
     bs.is_spectral = get_dielectric_is_dispersive(brdf);
     bs.wo          = to_world(local_fr, wo);
-    bs.pdf         = ms.pdf * (1.f - F);
 
-    float jacobian = sdot(eta) * dot(bs.wo, ms.n)
-                   / sdot(dot(si.wi, ms.n) + eta * dot(bs.wo, ms.n));
-    bs.pdf *= abs(jacobian);
+    float weight = sdot(inv_eta) * dot(bs.wo, ms.n)
+                 / sdot(dot(bs.wo, ms.n) + dot(si.wi, ms.n) * eta);
+    bs.pdf = (1.f - F) * ms.pdf * abs(weight);
   }
 
   return bs;
