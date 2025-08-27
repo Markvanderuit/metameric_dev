@@ -2,6 +2,7 @@
 #define BRDF_DIELECTRIC_GLSL_GUARD
 
 #include <render/record.glsl>
+#include <render/ggx.glsl>
 
 // Accessors to BRDF data
 #define get_dielectric_r(brdf)             brdf.r
@@ -12,7 +13,7 @@
 #define get_dielectric_is_dispersive(brdf) (brdf.data.y != 0)
 
 // TODO hardcoded for now
-#define get_dielectric_alpha(brdf) max(1e-3, 0.1 * 0.3)
+#define get_dielectric_alpha(brdf) max(1e-3, sdot(0.3))
 
 vec3 to_upper_hemisphere(in vec3 v) {
   return mulsign(v, cos_theta(v));
@@ -67,9 +68,9 @@ vec4 eval_brdf_dielectric(in BRDF brdf, in Interaction si, in vec3 wo, in vec4 w
   float F = _brdf_dielectric_fresnel(dot(si.wi, m), cos_theta_t, _eta);
 
   // Evaluate the partial microfacet distribution
-  float D_G = eval_microfacet_partial(
+  float D_G = eval_ggx(
     to_upper_hemisphere(si.wi),
-    m, 
+    m,
     to_upper_hemisphere(wo),
     get_dielectric_alpha(brdf)
   );
@@ -78,7 +79,7 @@ vec4 eval_brdf_dielectric(in BRDF brdf, in Interaction si, in vec3 wo, in vec4 w
     float weight = 1.f / (4.f * cos_theta(si.wi) * cos_theta(wo));
     return vec4(F * D_G * abs(weight));
   } else {
-    float denom = sdot(dot(wo, m) + dot(si.wi, m) * eta) * cos_theta(si.wi) * cos_theta(wo);
+    float denom = sdot(dot(wo, m) + dot(si.wi, m) * inv_eta) * cos_theta(si.wi) * cos_theta(wo);
     float weight = sdot(inv_eta) * dot(si.wi, m) * dot(wo, m) / abs(denom);
     return vec4((1.f - F) * D_G * abs(weight));
   }
@@ -99,25 +100,25 @@ float pdf_brdf_dielectric(in BRDF brdf, in Interaction si, in vec3 wo, in vec4 w
   float cos_theta_t;
   float F = _brdf_dielectric_fresnel(dot(si.wi, m), cos_theta_t, _eta);
 
-  float pdf = pdf_microfacet(
+  float pdf = pdf_ggx(
     to_upper_hemisphere(si.wi), 
     m, 
     get_dielectric_alpha(brdf)
   );
 
   if (is_reflected) {
-    float weight = 1.f / (4.f * dot(wo, m));
+    float weight = 1.f / (4.f * dot(si.wi, m));
     return pdf * F * abs(weight);
   } else {
     float weight = sdot(inv_eta) * dot(wo, m) 
-                 / sdot(dot(wo, m) + dot(si.wi, m) * eta);
+                 / sdot(dot(wo, m) + dot(si.wi, m) * inv_eta);
     return pdf * (1.f - F) * abs(weight);
   }
 }
 
 BRDFSample sample_brdf_dielectric(in BRDF brdf, in vec3 sample_3d, in Interaction si, in vec4 wvls) {
   // Sample a microfacet normal to reflect/refract on
-  MicrofacetSample ms = sample_microfacet(
+  MicrofacetSample ms = sample_ggx(
     to_upper_hemisphere(si.wi),
     get_dielectric_alpha(brdf), 
     sample_3d.yz
@@ -147,7 +148,7 @@ BRDFSample sample_brdf_dielectric(in BRDF brdf, in vec3 sample_3d, in Interactio
     bs.is_spectral = false;
     bs.wo          = to_world(local_fr, wo);
 
-    float weight = 1.f / (4.f * dot(bs.wo, ms.n));
+    float weight = 1.f / (4.f * dot(si.wi, ms.n));
     bs.pdf = F * ms.pdf * abs(weight);
   } else {
     // Refract on microfacet normal
@@ -157,7 +158,7 @@ BRDFSample sample_brdf_dielectric(in BRDF brdf, in vec3 sample_3d, in Interactio
     bs.wo          = to_world(local_fr, wo);
 
     float weight = sdot(inv_eta) * dot(bs.wo, ms.n)
-                 / sdot(dot(bs.wo, ms.n) + dot(si.wi, ms.n) * eta);
+                 / sdot(dot(bs.wo, ms.n) + dot(si.wi, ms.n) * inv_eta);
     bs.pdf = (1.f - F) * ms.pdf * abs(weight);
   }
 

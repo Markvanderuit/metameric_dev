@@ -33,9 +33,9 @@ vec4 Li(in SensorSample ss, in SamplerState state, out float alpha) {
   vec4 Beta = vec4(1 / ss.pdfs); // Path throughput over density
 
   // Prior brdf sample data, default-initialized, kept for NEE and MIS
-  float prev_bs_pdf         = 1.f;
-  bool  prev_bs_is_delta    = true;
-  bool  bs_is_spectral = false;
+  float prev_bs_pdf      = 1.f;
+  bool  prev_bs_is_delta = true;
+  bool  bs_is_spectral   = false;
 
   // Iterate up to maximum depth
   for (uint depth = 0; /* ... */ ; ++depth) {
