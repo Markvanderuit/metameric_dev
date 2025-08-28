@@ -167,6 +167,10 @@ void main() {
       L = Li(sensor_sample, state, alpha);
       if (!use_alpha)
         alpha = 1.f;
+
+      // Brightness clamp, cheap hack for fireflies
+      // TODO make sensor/renderer option
+      L = clamp(L, vec4(0), vec4(3200));
     } else {
       // Instead output debug value
       L = Li_debug(sensor_sample, state);
@@ -179,7 +183,7 @@ void main() {
     // The accumulated rgba measure is the current value in the film. We integrate
     // over the color system and add to this measure in a running average.
     vec4 measure = imageLoad(b_film, xy());
-    if (!use_debug) {    
+    if (!use_debug) {
       measure += (vec4(sensor_apply(sensor_sample, L), alpha) - measure) / float(i + 1);
     } else {
       measure += (L - measure) / float(i + 1);

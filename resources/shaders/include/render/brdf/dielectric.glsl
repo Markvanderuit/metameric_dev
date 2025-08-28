@@ -13,7 +13,7 @@
 #define get_dielectric_absorption(brdf)    brdf.data.z
 
 // TODO hardcoded for now
-#define get_dielectric_alpha(brdf) max(1e-3, sdot(0.1))
+#define get_dielectric_alpha(brdf) max(1e-3, sdot(0.2))
 
 vec3 to_upper_hemisphere(in vec3 v) {
   return mulsign(v, cos_theta(v));

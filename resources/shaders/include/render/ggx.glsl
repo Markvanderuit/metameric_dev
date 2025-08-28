@@ -3,9 +3,8 @@
 
 float ggx_D(in vec3 n, in float alpha) {
   // Compute D per eq. 1 in https://jcgt.org/published/0007/04/01/paper.pdf
-  float alpha_2 = sdot(alpha);
-  float xyz     = sdot(n.x / alpha) + sdot(n.y / alpha) + sdot(n.z);
-  float D       = 1.f / (M_PI * alpha_2 * sdot(xyz));
+  float xyz = sdot(n.x / alpha) + sdot(n.y / alpha) + sdot(n.z);
+  float D   = 1.f / (M_PI * sdot(alpha) * sdot(xyz));
 
   // Clamp to avoid numeric issues later on
   return cos_theta(n) > 1e-20f ? D : 0.f;
@@ -16,9 +15,6 @@ float ggx_smith_g1(in vec3 wi, in vec3 n, in float alpha) {
   float xyz = (sdot(alpha * wi.x) + sdot(alpha * wi.y)) / sdot(wi.z);
   float g1  = 2.f / (1.f + sqrt(1.f + xyz));
 
-  // Catch edges, see mitsuba 3, microfacet.h line 357 and 362
-  if (alpha == 0.f)
-    g1 = 1.f;
   if (dot(wi, n) * cos_theta(wi) <= 0.f)
     g1 = 0.f;
   

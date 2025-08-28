@@ -11,7 +11,7 @@ vec4 eval_emitter_point(in Emitter em, in Interaction si, in vec4 wvls, in vec2 
 }
 
 float pdf_emitter_point(in Emitter em, in Interaction si) {
-  return 1.f;
+  return 0.f;
 }
 
 EmitterSample sample_emitter_point(in Emitter em, in Interaction si, in vec4 wvls, in vec2 sample_2d) {
