@@ -26,7 +26,7 @@ struct Object {
   uvec2 albedo_data;
   uint  metallic_data;
   uint  roughness_data;
-  vec2  eta_minmax;
+  uint  eta_data;
   float absorption;
   uint  normalmap_data;
 };

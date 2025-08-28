@@ -39,7 +39,7 @@ float pdf_ggx(in vec3 wi, in vec3 wh, in float alpha) {
   return ggx_D(wh, alpha) 
        * ggx_smith_g1(wi, wh, alpha) 
        * abs(dot(wi, wh))
-       / cos_theta(wi);
+       / abs_cos_theta(wi);
 }
 
 float eval_ggx(in vec3 wi, in vec3 wh, in vec3 wo, in float alpha) {

@@ -44,13 +44,14 @@ namespace met {
 
     // Material data is packed with object; 
     // Most values are a variant; either a specified value, or a texture index
-    BRDFType                  brdf_type  = BRDFType::eDiffuse;
-    std::variant<Colr,  uint> diffuse    = Colr(.5f);        // for diffuse/microfacet/dielectric with absorption
-    std::variant<float, uint> metallic   = 0.0f;             // for microfacet brdf
-    std::variant<float, uint> roughness  = 0.1f;             // for microfacet brdf
-    eig::Array2f              eta_minmax = { 1.25f, 1.25f }; // for dielectric brdf
-    float                     absorption = 0.f;              // for dielectric brdf
-    std::optional<uint>       normalmap;                     // optional normalmap texture inndex
+    BRDFType                  brdf_type    = BRDFType::eDiffuse;
+    std::variant<Colr,  uint> diffuse      = Colr(.5f);        // for diffuse/microfacet/dielectric with absorption
+    std::variant<float, uint> metallic     = 0.0f;             // for microfacet brdf
+    std::variant<float, uint> roughness    = 0.1f;             // for microfacet brdf
+    std::variant<float, uint> transmission = 0.0f;             // for microfacet brdf
+    eig::Array2f              eta_minmax   = { 1.25f, 1.25f }; // for dielectric brdf
+    float                     absorption = 0.f;                // for dielectric brdf
+    std::optional<uint>       normalmap;                       // optional normalmap texture inndex
 
   public: // Boilerplate
     bool operator==(const Object &o) const;
@@ -101,7 +102,7 @@ namespace met {
         alignas(4)  uint          metallic_data;
         alignas(4)  uint          roughness_data;
         // ---
-        alignas(8)  eig::Array2f  eta_minmax;
+        alignas(4)  uint          eta_data;
         alignas(4)  float         absorption;
         alignas(4)  uint          normalmap_data;
       };

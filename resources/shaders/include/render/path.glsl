@@ -93,10 +93,10 @@ vec4 Li(in SensorSample ss, in SamplerState state, out float alpha) {
 
         // Assemble path throughput
         vec4 s = Beta                                      // path throughput
-               * eval_brdf(brdf, si, wo, ss.wvls)          // brdf response
-               * cos_theta(wo)                             // cosine attenuation
+               * eval_brdf(brdf, si, wo, ss.wvls)          // brdf throughput
                * eval_emitter(es, ss.wvls, next_2d(state)) // emitter contribution
                * mis_weight                                // mis weight
+               * abs_cos_theta(wo)                         // cosine attenuation
                / es.pdf;                                   // sample density
 
         // Store current path query if requested
@@ -116,10 +116,10 @@ vec4 Li(in SensorSample ss, in SamplerState state, out float alpha) {
       if (bs.pdf == 0.f)
         break;
       
-      // Update throughput, sample density
+      // Update path throughput
       Beta *= eval_brdf(brdf, si, bs.wo, ss.wvls) // brdf throughput
             * abs_cos_theta(bs.wo)                // cosine attenuation
-            / bs.pdf;
+            / bs.pdf;                             // sample density
 
       // Retain last brdf density for direct emitter MIS weight
       prev_bs_pdf      = bs.pdf;

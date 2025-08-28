@@ -124,6 +124,8 @@ namespace met {
           auto mesh_trf   = scene.resources.meshes.gl.mesh_cache[object.mesh_i].unit_trf;
           auto trf        = (object_trf * mesh_trf).eval();
 
+          /* eig::Array2u brdf_data; */
+
           // Fill in object struct data
           m_object_info_map->data[i] = {  
             .trf            = trf,
@@ -134,7 +136,7 @@ namespace met {
             .albedo_data    = pack_material_3f(object.diffuse),
             .metallic_data  = pack_material_1f(object.metallic),
             .roughness_data = pack_material_1f(object.roughness),
-            .eta_minmax     = object.eta_minmax,
+            .eta_data       = detail::pack_half_2x16(object.eta_minmax),
             .absorption     = object.absorption,
             .normalmap_data = pack_optional_1u(object.normalmap)
           };

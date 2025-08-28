@@ -69,12 +69,12 @@ float pdf_brdf_microfacet(in BRDF brdf, in Interaction si, in vec3 wo) {
   if (cos_theta(si.wi) <= 0.f || cos_theta(wo) <= 0.f)
     return 0.f;
   
-  vec3 wh  = normalize(si.wi + wo);
+  vec3 wh         = normalize(si.wi + wo);
   vec2 lobe_probs = _microfacet_lobe_probs(brdf, si);
 
   // Output values
   float specular_pdf = lobe_probs[0] * pdf_ggx(si.wi, wh, get_microfacet_alpha(brdf))
-                     / (4.f * cos_theta(si.wi) /* * dot(si.wi, wh) */);
+                     / (4.f * abs(dot(si.wi, wh)));
   float diffuse_pdf  = lobe_probs[1] * square_to_cos_hemisphere_pdf(wo);
 
   // Mix probabilities [spec, diffuse] for the two lobes

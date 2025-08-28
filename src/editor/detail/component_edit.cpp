@@ -144,10 +144,10 @@ namespace met {
       if (value.brdf_type == Object::BRDFType::eMicrofacet) {
         push_texture_variant_selector_1f("Roughness", scene.resources.images, value.roughness);
         push_texture_variant_selector_1f("Metallic",  scene.resources.images, value.metallic);
-        ImGui::SliderFloat("Eta", &value.eta_minmax[0], 1.001f, 2.0f);
+        ImGui::SliderFloat("Eta", &value.eta_minmax[0], 1.f, 4.f);
       }
       if (value.brdf_type == Object::BRDFType::eDielectric) {
-        ImGui::SliderFloat2("Eta (min, max)", value.eta_minmax.data(), 1.001f, 2.0f);
+        ImGui::SliderFloat2("Eta (min, max)", value.eta_minmax.data(), 1.f, 4.f);
         ImGui::SliderFloat("Absorption", &value.absorption, 1.f, 100.0f);
       }
 
