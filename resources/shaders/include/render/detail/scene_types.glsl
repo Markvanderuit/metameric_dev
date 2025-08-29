@@ -19,16 +19,12 @@ struct Object {
   
   // Indices referring to auxiliary scene resources
   uint mesh_i;              
-  uint uplifting_i;
 
   // Material data
   uint  brdf_type;   // Type of brdf; 0 = null, 1 = diffuse, 2 = mirror, 3 = ggx, 4 = glass
-  uvec2 albedo_data;
-  uint  metallic_data;
-  uint  roughness_data;
-  uint  eta_data;
-  float absorption;
   uint  normalmap_data;
+  uvec2 albedo_data;
+  uvec2 brdf_data;
 };
 
 // Info object to gather Scene::Emitter data
@@ -63,9 +59,14 @@ struct BRDF {
   #define BRDFTypeMicrofacet 2
   #define BRDFTypeDielectric 3
 
-  uint type; // One of the above values
-  vec4 r;    // Underlying reflectance or transmittances on 4 wvls
-  vec4 data; // Supplemental values for principled/dielectric brdfs
+  uint  type;         // One of the above values
+  vec4  r;            // Albedo for 4 wavelengthss
+  bool  is_spectral;
+  float metallic;
+  float alpha;        // Squared surface roughness
+  float eta;          // Potentially wavelength-dependent index of refraction
+  float transmission;
+  float absorption;
 };
 
 // Info object for referred patch from texture atlas

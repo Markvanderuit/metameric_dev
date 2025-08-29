@@ -44,4 +44,8 @@ vec3 local_refract(in vec3 wi, float cos_theta, float eta) {
   return vec3(-wi.xy * eta, cos_theta);
 }
 
+vec3 to_upper_hemisphere(in vec3 v) {
+  return mulsign(v, cos_theta(v));
+}
+
 #endif // FRAME_GLSL_GUARD

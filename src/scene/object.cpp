@@ -67,6 +67,20 @@ namespace met {
       return { u[0], u[1] };
     }
 
+    uint to_10b(const std::variant<float, uint> &v) {
+      uint u;
+      if (std::holds_alternative<float>(v)) {
+        u = (0x1FFu & static_cast<uint>(std::round(std::clamp(std::get<float>(v), 0.f, 1.f) * 511.f)));
+      } else {
+        u = (0x1FFu & static_cast<uint>(std::get<uint>(v))) | 0x200u;
+      }
+      return u;
+    }
+
+    uint to_8b(float v) {
+      return static_cast<uint>(v * 255.f);
+    }
+
     // Helper to pack float/uint variant to a uint
     inline
     uint pack_material_1f(const std::variant<float, uint> &v) {
@@ -124,21 +138,24 @@ namespace met {
           auto mesh_trf   = scene.resources.meshes.gl.mesh_cache[object.mesh_i].unit_trf;
           auto trf        = (object_trf * mesh_trf).eval();
 
-          /* eig::Array2u brdf_data; */
-
+          // Pack most brdf data together
+          eig::Array2u brdf_data;
+          brdf_data[0] = ((to_10b(object.metallic)                    & 0x03FFu)      )  // 10b for metallic
+                       | ((to_10b(object.roughness)                   & 0x03FFu) << 10)  // 10b for roughness
+                       | ((to_10b(object.transmission)                & 0x03FFu) << 20); // 10b for transmission
+          brdf_data[1] = ((to_8b((object.eta_minmax.x() - 1.f) / 3.f) & 0x00FFu)      )  // 8b for eta (minimum)
+                       | ((to_8b((object.eta_minmax.y() - 1.f) / 3.f) & 0x00FFu) <<  8)  // 8b for eta (maximum)
+                       | ((detail::to_float16(object.absorption)      & 0xFFFFu) << 16); // 16b for fp16 absorption
+                                 
           // Fill in object struct data
           m_object_info_map->data[i] = {  
             .trf            = trf,
             .is_active      = object.is_active,
             .mesh_i         = object.mesh_i,
-            .uplifting_i    = object.uplifting_i,
             .brdf_type      = static_cast<uint>(object.brdf_type),
+            .normalmap_data = pack_optional_1u(object.normalmap),
             .albedo_data    = pack_material_3f(object.diffuse),
-            .metallic_data  = pack_material_1f(object.metallic),
-            .roughness_data = pack_material_1f(object.roughness),
-            .eta_data       = detail::pack_half_2x16(object.eta_minmax),
-            .absorption     = object.absorption,
-            .normalmap_data = pack_optional_1u(object.normalmap)
+            .brdf_data      = brdf_data
           };
         } // for (uint i)
         

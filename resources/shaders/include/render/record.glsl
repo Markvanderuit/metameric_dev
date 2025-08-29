@@ -47,6 +47,13 @@ uint record_get_emitter(in uint rc)          { return (rc >> 24) & 0x0000007F;  
 uint record_get_object_primitive(in uint rc) { return rc & 0x00FFFFFF;                 }
 bool record_get_anyhit(in uint rc)           { return rc == 0x1;                       }
 
+// Getters to read packed material data from the first 10 bits of a uint;
+// storing either a 9b unorm or an index
+bool  record_10b_is_value(in uint rc)  { return (rc & 0x200) == 0;         }
+bool  record_10b_is_index(in uint rc)  { return (rc & 0x200) != 0;         }
+float record_10b_get_value(in uint rc) { return float(rc & 0x1FF) / 511.f; }
+uint  record_10b_get_index(in uint rc) { return (rc & 0x1FF);              }
+
 // Getters to read packed Object material data;
 // uvec2/uint records are used by objects to store material values/texture indices
 bool  record_is_sampled(in uvec2 rc) { return (rc.y & 0xFFFF0000) != 0; }

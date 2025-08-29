@@ -27,6 +27,14 @@ struct BVHNodePack {
   uint child_aabb_1[4]; // 8 child aabbs: lo.z | hi.z
 };
 
+uint pack_unorm_10(in float f) {
+  return uint(round(clamp(f, 0.f, 1.f) * 1023));
+}
+
+float unpack_unorm_10(in uint b) {
+  return float(b) / 1023.f;
+}
+
 float[8] unpack_snorm_8(in uvec4 p) {
   float[8] m;
   vec2 f2;

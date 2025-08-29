@@ -36,6 +36,9 @@ vec3 ggx_sample_hemisphere(in vec3 wi, in vec2 sample_2d) {
 }
 
 float pdf_ggx(in vec3 wi, in vec3 wh, in float alpha) {
+  // Ensure inputs are in upper hemisphere
+  wi = to_upper_hemisphere(wi);
+
   return ggx_D(wh, alpha) 
        * ggx_smith_g1(wi, wh, alpha) 
        * abs(dot(wi, wh))
@@ -43,10 +46,18 @@ float pdf_ggx(in vec3 wi, in vec3 wh, in float alpha) {
 }
 
 float eval_ggx(in vec3 wi, in vec3 wh, in vec3 wo, in float alpha) {
-  return ggx_D(wh, alpha) * ggx_G(wi, wh, wo, alpha);
+  // Ensure inputs are in upper hemisphere
+  wi = to_upper_hemisphere(wi);
+  wo = to_upper_hemisphere(wo);
+
+  return ggx_D(wh, alpha) 
+       * ggx_G(wi, wh, wo, alpha);
 }
 
 MicrofacetSample sample_ggx(in vec3 wi, in float alpha, in vec2 sample_2d) {
+  // Ensure inputs are in upper hemisphere
+  wi = to_upper_hemisphere(wi);
+
   // Step 1; warp wi to hemisphere as wi_p
   vec3 wi_p = normalize(vec3(wi.xy * alpha, wi.z));
 

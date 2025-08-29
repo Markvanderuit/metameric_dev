@@ -95,18 +95,18 @@ namespace met {
         // ---
         alignas(4)  uint          is_active;
         alignas(4)  uint          mesh_i;
-        alignas(4)  uint          uplifting_i;
         alignas(4)  uint          brdf_type;
+        alignas(4)  uint          normalmap_data;
         // ---
         alignas(8)  eig::Array2u  albedo_data;
-        alignas(4)  uint          metallic_data;
-        alignas(4)  uint          roughness_data;
+        alignas(8)  eig::Array2u  brdf_data;
+        // alignas(4)  uint          metallic_data;
+        // alignas(4)  uint          roughness_data;
         // ---
-        alignas(4)  uint          eta_data;
-        alignas(4)  float         absorption;
-        alignas(4)  uint          normalmap_data;
+        // alignas(4)  uint          eta_data;
+        // alignas(4)  float         absorption;
       };
-      static_assert(sizeof(BlockLayout) == 112);
+      static_assert(sizeof(BlockLayout) == 96);
 
       // All-object buffer layout
       struct BufferLayout {

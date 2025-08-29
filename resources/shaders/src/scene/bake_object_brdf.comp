@@ -30,81 +30,120 @@ layout(binding = 0)          uniform sampler2DArray                  b_txtr_3f; 
 layout(binding = 1)          uniform sampler2DArray                  b_txtr_1f; // Input 1-component textures
 layout(binding = 0, rgba32f) uniform restrict writeonly image2DArray b_atlas;   // Output coefficient texture atlas
 
+uint unpack_record_10b(in uint b) {
+  return ((b & 0x200) << 21) | (b & 0x1FFu);
+}
+
 void main() {
   // Load relevant object/patch data
-  Object object = buff_objects.data[buff_unif.object_i];
-  AtlasInfo  atlas  = buff_atlas.data[buff_unif.object_i];
-  
+  Object    object = buff_objects.data[buff_unif.object_i];
+  AtlasInfo atlas  = buff_atlas.data[buff_unif.object_i];
+
   // Determine pixel location in padded patch, then clamp invocations to
   // relevant region; the atlas patch plus a 2px padding border for oversampling
   const uvec2 px_out = gl_GlobalInvocationID.xy + atlas.offs;
   guard(clamp(px_out, atlas.offs, atlas.offs + atlas.size - 1) == px_out);
 
-  // Output value; [roughness, metallic], [normal]
-  vec2 p;
-  vec3 n;
+  // Unpack packed brdf data records
+  uint object_metallic_data     = (object.brdf_data[0]      ) & 0x03FF;     
+  uint object_roughness_data    = (object.brdf_data[0] >> 10) & 0x03FF;  
+  uint object_transmission_data = (object.brdf_data[0] >> 20) & 0x03FF;  
+  uint object_normalmap_data    = object.normalmap_data;
+  /* float object_eta_min           = float(((object.brdf_data[1]      ) & 0x00FFu)) / 256.f + 1.f;
+  float object_eta_max           = float(((object.brdf_data[1] >>  8) & 0x00FFu)) / 256.f + 1.f;
+  float object_absorption        = unpackHalf2x16(((object.brdf_data[1] >> 16) & 0xFFFFu)).x;   */
 
   // First, sample roughness value from object
-  if (record_is_sampled(object.roughness_data)) {
+  float object_roughness;
+  if (record_10b_is_index(object_roughness_data)) {
     // Determine pixel location in texture atlas
-    TextureInfo txtr = buff_textures.data[record_get_sampler_index(object.roughness_data)];
+    TextureInfo txtr = buff_textures.data[record_10b_get_index(object_roughness_data)];
     const uvec2 px_in = clamp(gl_GlobalInvocationID.xy + txtr.offs, txtr.offs, txtr.offs + txtr.size - 1);
 
     // Value is supplied by scene texture; could be b_txtr_3f or b_txtr_1f
     if (txtr.is_3f) {
       const vec2 tx_in = clamp((vec2(px_in) + 0.5f)
                        / textureSize(b_txtr_3f, 0).xy, vec2(0), vec2(1));
-      p.x = texture(b_txtr_3f, vec3(tx_in, txtr.layer)).x;
+      object_roughness = texture(b_txtr_3f, vec3(tx_in, txtr.layer)).x;
     } else {
       const vec2 tx_in = clamp((vec2(px_in) + 0.5f)
                        / textureSize(b_txtr_1f, 0).xy, vec2(0), vec2(1));
-      p.x = texture(b_txtr_1f, vec3(tx_in, txtr.layer)).x;
+      object_roughness = texture(b_txtr_1f, vec3(tx_in, txtr.layer)).x;
     }
   } else {
-    p.x = record_get_direct_value(object.roughness_data);
+    object_roughness = record_10b_get_value(object_roughness_data);
   }
-  
+
   // Then, sample metallic value from object
-  if (record_is_sampled(object.metallic_data)) {
+  float object_metallic;
+  if (record_10b_is_index(object_metallic_data)) {
     // Determine pixel location in texture atlas
-    TextureInfo txtr = buff_textures.data[record_get_sampler_index(object.metallic_data)];
+    TextureInfo txtr = buff_textures.data[record_10b_get_index(object_metallic_data)];
     const uvec2 px_in = clamp(gl_GlobalInvocationID.xy + txtr.offs, txtr.offs, txtr.offs + txtr.size - 1);
 
     // Value is supplied by scene texture; could be b_txtr_3f.x or b_txtr_1f
     if (txtr.is_3f) {
       const vec2 tx_in = clamp((vec2(px_in) + 0.5f)
                        / textureSize(b_txtr_3f, 0).xy, vec2(0), vec2(1));
-      p.y = texture(b_txtr_3f, vec3(tx_in, txtr.layer)).x;
+      object_metallic = texture(b_txtr_3f, vec3(tx_in, txtr.layer)).x;
     } else {
       const vec2 tx_in = clamp((vec2(px_in) + 0.5f)
                        / textureSize(b_txtr_1f, 0).xy, vec2(0), vec2(1));
-      p.y = texture(b_txtr_1f, vec3(tx_in, txtr.layer)).x;
+      object_metallic = texture(b_txtr_1f, vec3(tx_in, txtr.layer)).x;
     }
   } else {
-    p.y =  record_get_direct_value(object.metallic_data);
+    object_metallic =  record_10b_get_value(object_metallic_data);
   }
 
+  float object_transmission;
+  /* if (record_10b_is_index(object_transmission_data)) {
+    // Determine pixel location in texture atlas
+    TextureInfo txtr = buff_textures.data[record_10b_get_index(object_metallic_data)];
+    const uvec2 px_in = clamp(gl_GlobalInvocationID.xy + txtr.offs, txtr.offs, txtr.offs + txtr.size - 1);
+
+    // Value is supplied by scene texture; could be b_txtr_3f.x or b_txtr_1f
+    if (txtr.is_3f) {
+      const vec2 tx_in = clamp((vec2(px_in) + 0.5f)
+                       / textureSize(b_txtr_3f, 0).xy, vec2(0), vec2(1));
+      object_transmission = texture(b_txtr_3f, vec3(tx_in, txtr.layer)).x;
+    } else {
+      const vec2 tx_in = clamp((vec2(px_in) + 0.5f)
+                       / textureSize(b_txtr_1f, 0).xy, vec2(0), vec2(1));
+      object_transmission = texture(b_txtr_1f, vec3(tx_in, txtr.layer)).x;
+    }
+  } else {
+    object_transmission =  record_10b_get_value(object_transmission_data);
+  } */
+  object_transmission = 0.f;
+
   // Then, query normalmap data from object
-  if (record_is_optional_set(object.normalmap_data)) {
-    TextureInfo txtr  = buff_textures.data[record_get_optional_value(object.normalmap_data)];
+  vec3 object_normalmap;
+  if (record_is_optional_set(object_normalmap_data)) {
+    TextureInfo txtr  = buff_textures.data[record_get_optional_value(object_normalmap_data)];
     const uvec2 px_in = clamp(gl_GlobalInvocationID.xy + txtr.offs, txtr.offs, txtr.offs + txtr.size - 1);
     
     // Value is supplied by scene texture; should only allow b_txtr_3f
     if (txtr.is_3f) {
       const vec2 tx_in = clamp((vec2(px_in) + 0.5f)
                        / textureSize(b_txtr_3f, 0).xy, vec2(0), vec2(1));
-      n = normalize(texture(b_txtr_3f, vec3(tx_in, txtr.layer)).xyz * 2.f - 1.f);
+      object_normalmap = normalize(texture(b_txtr_3f, vec3(tx_in, txtr.layer)).xyz * 2.f - 1.f);
     } else {
       // Fallback
-      n = vec3(0, 0, 1);
+      object_normalmap = vec3(0, 0, 1);
     }
   } else {
     // Fallback
-    n = vec3(0, 0, 1);
+    object_normalmap = vec3(0, 0, 1);
   }
 
+  // Repack sampled brdf data
+  uvec4 brdf_data;
+  brdf_data.x = ((pack_unorm_10(object_metallic)     & 0x03FF)      )
+              | ((pack_unorm_10(object_roughness)    & 0x03FF) << 10)
+              | ((pack_unorm_10(object_transmission) & 0x03FF) << 20);
+  brdf_data.y = object.brdf_data.y; // forwarded
+  brdf_data.zw = floatBitsToUint(pack_normal_octahedral(object_normalmap));
+
   // Finally, write packed result out to atlas
-  vec4 v = vec4(p, pack_normal_octahedral(n));
-  imageStore(b_atlas, ivec3(px_out, atlas.layer), v);
-  // imageStore(b_atlas, ivec3(px_out, atlas.layer), uintBitsToFloat(uvec4(packHalf2x16(p), 1, 1, 1)));
+  imageStore(b_atlas, ivec3(px_out, atlas.layer), uintBitsToFloat(brdf_data));
 }
