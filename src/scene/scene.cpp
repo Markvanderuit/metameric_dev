@@ -154,10 +154,11 @@ namespace met {
           { "brdf_type",   object.brdf_type   },
           { "eta_minmax",  object.eta_minmax  },
           { "absorption",  object.absorption  }};
-    js["diffuse"]   = {{ "index", object.diffuse.index() },   { "variant", object.diffuse   }};
-    js["roughness"] = {{ "index", object.roughness.index() }, { "variant", object.roughness }};
-    js["metallic"]  = {{ "index", object.metallic.index() },  { "variant", object.metallic  }};
-    js["normalmap"] = {{ "has_value", object.normalmap.has_value() },  { "value", object.normalmap.value_or(0u) }};
+    js["diffuse"]      = {{ "index", object.diffuse.index()      },  { "variant", object.diffuse      }};
+    js["roughness"]    = {{ "index", object.roughness.index()    },  { "variant", object.roughness    }};
+    js["metallic"]     = {{ "index", object.metallic.index()     },  { "variant", object.metallic     }};
+    js["transmission"] = {{ "index", object.transmission.index() },  { "variant", object.transmission }};
+    js["normalmap"]    = {{ "has_value", object.normalmap.has_value() },  { "value", object.normalmap.value_or(0u) }};
   }
 
   void from_json(const json &js, Object &object) {
@@ -187,6 +188,13 @@ namespace met {
       switch (js.at("roughness").at("index").get<size_t>()) {
         case 0: object.roughness = js.at("roughness").at("variant").get<float>(); break;
         case 1: object.roughness = js.at("roughness").at("variant").get<uint>(); break;
+        default: debug::check_expr(false, "Error parsing json material data");
+      }
+    }
+    if (js.contains("transmission")) {
+      switch (js.at("transmission").at("index").get<size_t>()) {
+        case 0: object.transmission = js.at("transmission").at("variant").get<float>(); break;
+        case 1: object.transmission = js.at("transmission").at("variant").get<uint>(); break;
         default: debug::check_expr(false, "Error parsing json material data");
       }
     }
@@ -497,10 +505,11 @@ namespace met {
 
       // 2 - Identify referred texture resource or specify a single value, and
       //     generally identify the brdf.
-      std::variant<Colr, uint>  diffuse   = Colr(.5f);
-      std::variant<float, uint> metallic  = 0.f;
-      std::variant<float, uint> roughness = 1.f;
-      std::optional<uint>       normalmap = { };
+      std::variant<Colr, uint>  diffuse      = Colr(.5f);
+      std::variant<float, uint> metallic     = 0.f;
+      std::variant<float, uint> roughness    = 1.f;
+      std::variant<float, uint> transmission = 0.f;
+      std::optional<uint>       normalmap    = { };
       Object::BRDFType brdf_type = Object::BRDFType::eDiffuse;
       if (load_materials && has_matrs) {
         // Access first material only; we ignore per-face materials; 
@@ -543,6 +552,16 @@ namespace met {
           brdf_type = Object::BRDFType::eMicrofacet;
         }
 
+        if (obj_mat.alpha_texname.empty()) {
+          transmission = obj_mat.transmittance[0];
+        } else {
+          // Assign an allocated texture id from texture_load_list or get a new one
+          transmission = texture_load_list.insert({ 
+            obj_mat.alpha_texname,                   // filename of texture as key
+            static_cast<uint>(texture_load_list.size()) // New texture id at end of list
+          }).first->second;
+        }
+
         if (!obj_mat.normal_texname.empty()) {
           normalmap = texture_load_list.insert({
             obj_mat.normal_texname,                   // filename of texture as key
@@ -553,14 +572,15 @@ namespace met {
 
       // 3 - create an object component referring to mesh/texture
       met::Object object = {
-        .mesh_i      = static_cast<uint>(scene.resources.meshes.size()),
-        .uplifting_i = 0,
-        .brdf_type   = brdf_type,
-        .diffuse     = diffuse,
-        .metallic    = metallic,
-        .roughness   = roughness,
-        .eta_minmax  = { 1.25f, 1.25f },
-        .normalmap   = normalmap
+        .mesh_i       = static_cast<uint>(scene.resources.meshes.size()),
+        .uplifting_i  = 0,
+        .brdf_type    = brdf_type,
+        .diffuse      = diffuse,
+        .metallic     = metallic,
+        .roughness    = roughness,
+        .transmission = transmission,
+        .eta_minmax   = { 1.25f, 1.25f },
+        .normalmap    = normalmap
       };
 
       // 4 - store mesh and object in scene

@@ -142,8 +142,9 @@ namespace met {
         push_texture_variant_selector_3f("Albedo", scene.resources.images, value.diffuse);
       }
       if (value.brdf_type == Object::BRDFType::eMicrofacet) {
-        push_texture_variant_selector_1f("Roughness", scene.resources.images, value.roughness);
-        push_texture_variant_selector_1f("Metallic",  scene.resources.images, value.metallic);
+        push_texture_variant_selector_1f("Transmission", scene.resources.images, value.transmission);
+        push_texture_variant_selector_1f("Roughness",    scene.resources.images, value.roughness);
+        push_texture_variant_selector_1f("Metallic",     scene.resources.images, value.metallic);
         if (ImGui::SliderFloat("Eta", &value.eta_minmax[0], 1.f, 4.f))
           value.eta_minmax[1] = value.eta_minmax[0];
       }

@@ -132,17 +132,18 @@ namespace met {
     // state tracking for object members in the program view
     template <>
     struct SceneStateHandler<Object> : public SceneStateHandlerBase<Object> {    
-      SceneStateHandler<decltype(Object::is_active)>   is_active;
-      SceneStateHandler<decltype(Object::transform)>   transform;
-      SceneStateHandler<decltype(Object::mesh_i)>      mesh_i;
-      SceneStateHandler<decltype(Object::uplifting_i)> uplifting_i;
-      SceneStateHandler<decltype(Object::brdf_type)>   brdf_type;
-      SceneStateHandler<decltype(Object::diffuse)>     diffuse;
-      SceneStateHandler<decltype(Object::metallic)>    metallic;
-      SceneStateHandler<decltype(Object::roughness)>   roughness;
-      SceneStateHandler<decltype(Object::eta_minmax)>  eta_minmax;
-      SceneStateHandler<decltype(Object::absorption)>  absorption;
-      SceneStateHandler<decltype(Object::normalmap)>   normalmap;
+      SceneStateHandler<decltype(Object::is_active)>    is_active;
+      SceneStateHandler<decltype(Object::transform)>    transform;
+      SceneStateHandler<decltype(Object::mesh_i)>       mesh_i;
+      SceneStateHandler<decltype(Object::uplifting_i)>  uplifting_i;
+      SceneStateHandler<decltype(Object::brdf_type)>    brdf_type;
+      SceneStateHandler<decltype(Object::diffuse)>      diffuse;
+      SceneStateHandler<decltype(Object::metallic)>     metallic;
+      SceneStateHandler<decltype(Object::roughness)>    roughness;
+      SceneStateHandler<decltype(Object::transmission)> transmission;
+      SceneStateHandler<decltype(Object::eta_minmax)>   eta_minmax;
+      SceneStateHandler<decltype(Object::absorption)>   absorption;
+      SceneStateHandler<decltype(Object::normalmap)>    normalmap;
 
     public:
       bool update(const Object &o) override {
@@ -156,6 +157,7 @@ namespace met {
         | diffuse.update(o.diffuse)
         | metallic.update(o.metallic)
         | roughness.update(o.roughness)
+        | transmission.update(o.transmission)
         | eta_minmax.update(o.eta_minmax)
         | absorption.update(o.absorption)
         | normalmap.update(o.normalmap)

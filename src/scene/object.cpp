@@ -43,6 +43,12 @@ namespace met {
       case 1: guard(std::get<uint>(roughness) == std::get<uint>(o.roughness), false); break;
     }
 
+    guard(transmission.index() == o.transmission.index(), false);
+    switch (transmission.index()) {
+      case 0: guard(std::get<float>(transmission) == std::get<float>(o.transmission), false); break;
+      case 1: guard(std::get<uint>(transmission) == std::get<uint>(o.transmission), false); break;
+    }
+
     guard(normalmap == o.normalmap, false);
     if (normalmap)
       guard(*normalmap == *o.normalmap, false);
@@ -275,6 +281,7 @@ namespace met {
         || object.state.eta_minmax      // Different value set on object
         || object.state.mesh_i          // Different mesh attached to object
         || object.state.absorption      // Different value set on object
+        || object.state.transmission    // Different value set on object
         || object.state.eta_minmax      // Different value set on object
         || scene.resources.meshes       // User loaded/deleted a mesh;
         || scene.resources.images       // User loaded/deleted an image;
