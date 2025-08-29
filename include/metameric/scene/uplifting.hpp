@@ -229,7 +229,11 @@ namespace met {
       // - writes this data to a scene texture atlas
       struct ObjectData {
         // Layout for data written to std140 buffer
-        struct BlockLayout { uint object_i; };
+        struct BlockLayout { 
+          alignas(8) eig::Array2u object_albedo_data;  
+          alignas(4) uint         object_i; 
+        };
+        static_assert(sizeof(BlockLayout) == 16);
 
         // Objects for texture bake
         std::string  m_program_key;
@@ -251,7 +255,7 @@ namespace met {
       // - writes this data to a scene texture atlas
       struct EmitterData {
         struct BlockLayout { 
-          alignas(8) eig::Array2f boundaries;
+          alignas(8) eig::Array2u emitter_color_data;
           alignas(4) uint         emitter_i; 
         };
         static_assert(sizeof(BlockLayout) == 16);

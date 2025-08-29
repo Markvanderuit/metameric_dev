@@ -95,11 +95,10 @@ namespace met {
 
           m_emitter_info_map->data[i] = {
             .trf              = emitter.transform.affine().matrix(),
-            .is_active        = emitter.is_active,
-            .type             = static_cast<uint>(emitter.type),
-            .spec_type        = static_cast<uint>(emitter.spec_type),
+            .flags            = (emitter.is_active ? 0x80000000 : 0)
+                              | ((static_cast<uint>(emitter.spec_type) & 0x00FF) <<  8)
+                              | ((static_cast<uint>(emitter.type     ) & 0x00FF)      ),
             .illuminant_scale = emitter.illuminant_scale,
-            .color_data       = pack_material_3f(emitter.color),
             .illuminant_i     = emitter.illuminant_i
           };
         } // for (uint i)

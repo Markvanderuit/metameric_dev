@@ -15,7 +15,7 @@ BRDF get_brdf(inout Interaction si, vec4 wvls, in vec2 sample_2d) {
   if (is_object(si)) {
     // Query brdf type
     Object object = scene_object_info(record_get_object(si.data));
-    brdf.type = object.brdf_type;
+    brdf.type = object_brdf_type(object);
 
     // Query reflectance texture data
     brdf.r = texture_reflectance(si, wvls, sample_2d);

@@ -64,21 +64,16 @@ namespace met {
       // Per-object block layout
       struct BlockLayout {
         alignas(16) eig::Matrix4f trf;
-        // ---
-        alignas(4)  uint          is_active;
-        alignas(4)  uint          type;
-        alignas(4)  uint          spec_type;
+        alignas(4)  uint          flags;
         alignas(4)  float         illuminant_scale;
-        // ---
-        alignas(8)  eig::Array2u  color_data;
         alignas(4)  uint          illuminant_i;
       };
-      static_assert(sizeof(BlockLayout) == 96);
+      static_assert(sizeof(BlockLayout) == 80);
 
       // All-object buffer layout
       struct BufferLayout {
         alignas(4)  uint n;
-        alignas(16) std::array<BlockLayout, met_max_objects> data;
+        alignas(16) std::array<BlockLayout, met_max_emitters> data;
       };
       
       // Write mapped persistent emitter data

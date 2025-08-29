@@ -2,15 +2,15 @@
 #define RENDER_OBJECT_GLSL_GUARD
 
 bool ray_intersect_object(inout Ray ray, uint object_i) {
-  Object object_info = scene_object_info(object_i);
-  if (!object_info.is_active)
+  Object object = scene_object_info(object_i);
+  if (!object_is_active(object))
     return false;
 
   // Generate local ray
-  Ray ray_local = ray_transform(ray, inverse(object_info.trf));
+  Ray ray_local = ray_transform(ray, inverse(object.trf));
 
   // Run intersection, return if not a closest hit
-  if (!ray_intersect_blas(ray_local, object_info.mesh_i))
+  if (!ray_intersect_blas(ray_local, object_mesh_i(object)))
     return false;
 
   // Recover world-space distance from local ray
@@ -23,15 +23,15 @@ bool ray_intersect_object(inout Ray ray, uint object_i) {
 }
 
 bool ray_intersect_object_any(in Ray ray, uint object_i) {
-  Object object_info = scene_object_info(object_i);
-  if (!object_info.is_active)
+  Object object = scene_object_info(object_i);
+  if (!object_is_active(object))
     return false;
   
   // Generate local ray
-  Ray ray_local = ray_transform(ray, inverse(object_info.trf));
+  Ray ray_local = ray_transform(ray, inverse(object.trf));
   
   // Run intersection and return result
-  return ray_intersect_blas_any(ray_local, object_info.mesh_i);
+  return ray_intersect_blas_any(ray_local, object_mesh_i(object));
 }
 
 #endif // RENDER_OBJECT_GLSL_GUARD

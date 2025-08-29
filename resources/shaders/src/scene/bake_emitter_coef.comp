@@ -16,22 +16,18 @@ layout(std140) uniform;
 
 // Uniform buffer declarations
 layout(binding = 0) uniform b_buff_unif {
-  vec2 boundaries;
-  uint emitter_i;
+  uvec2 emitter_color_data;
+  uint  emitter_i;
 } buff_unif;
 layout(binding = 1) uniform b_buff_atlas {
   uint n;
   AtlasInfo data[met_max_textures];
 } buff_atlas;
-layout(binding = 2) uniform b_buff_emitters {
-  uint n;
-  Emitter data[met_max_emitters];
-} buff_emitters;
-layout(binding = 3) uniform b_buff_textures {
+layout(binding = 2) uniform b_buff_textures {
   uint n;
   TextureInfo data[met_max_textures];
 } buff_textures;
-layout(binding = 4) uniform b_buff_uplift_bary { 
+layout(binding = 3) uniform b_buff_uplift_bary { 
   uint n;
   BarycentricData data[met_max_constraints]; 
 } buff_uplift_bary;
@@ -47,10 +43,33 @@ layout(binding = 1)          uniform sampler2DArray                  b_txtr_1f; 
 layout(binding = 0, rgba32f) uniform restrict writeonly image2DArray b_atlas_coef; // Output coefficient texture atlas
 layout(binding = 1, rgba32f) uniform restrict writeonly image2DArray b_atlas_scle; // Output scaling for clipped hdr
 
+vec3 read_record_data_vec3(in uvec2 rc) {
+  vec3 v;
+  if (record_is_index(rc)) {
+    // Determine pixel location in texture atlas
+    TextureInfo txtr  = buff_textures.data[record_get_index(rc)];
+    const uvec2 px_in = clamp(gl_GlobalInvocationID.xy + txtr.offs, txtr.offs, txtr.offs + txtr.size - 1);
+
+    // Color value is supplied by scene texture; could be b_txtr_3f or b_txtr_1f
+    if (txtr.is_3f) {
+      const vec2 tx_in = clamp((vec2(px_in) + 0.5f)
+                       / textureSize(b_txtr_3f, 0).xy, vec2(0), vec2(1));
+      v = texture(b_txtr_3f, vec3(tx_in, txtr.layer)).xyz;
+    } else {
+      const vec2 tx_in = clamp((vec2(px_in) + 0.5f)
+                       / textureSize(b_txtr_1f, 0).xy, vec2(0), vec2(1));
+      v = vec3(texture(b_txtr_1f, vec3(tx_in, txtr.layer)).x);
+    }
+  } else {
+    // Color value is specified directly
+    v = record_get_value(rc);
+  }
+  return v;
+}
+
 void main() {
   // Load relevant object/patch data
-  Emitter emitter = buff_emitters.data[buff_unif.emitter_i];
-  AtlasInfo   atlas   = buff_atlas.data[buff_unif.emitter_i];
+  AtlasInfo atlas = buff_atlas.data[buff_unif.emitter_i];
   
   // Determine pixel location in padded patch, then clamp invocations to
   // relevant region; the atlas patch plus a 2px padding border for oversampling
@@ -58,26 +77,7 @@ void main() {
   guard(clamp(px_out, atlas.offs, atlas.offs + atlas.size - 1) == px_out);
 
   // First, sample color value from object
-  vec3 p;
-  if (record_is_sampled(emitter.color_data)) {
-    // Determine pixel location in texture atlas
-    TextureInfo txtr  = buff_textures.data[record_get_sampler_index(emitter.color_data)];
-    const uvec2 px_in = clamp(gl_GlobalInvocationID.xy + txtr.offs, txtr.offs, txtr.offs + txtr.size - 1);
-
-    // Color value is supplied by scene texture; could be b_txtr_3f or b_txtr_1f
-    if (txtr.is_3f) {
-      const vec2 tx_in = clamp((vec2(px_in) + 0.5f)
-                       / textureSize(b_txtr_3f, 0).xy, vec2(0), vec2(1));
-      p = texture(b_txtr_3f, vec3(tx_in, txtr.layer)).xyz;
-    } else {
-      const vec2 tx_in = clamp((vec2(px_in) + 0.5f)
-                       / textureSize(b_txtr_1f, 0).xy, vec2(0), vec2(1));
-      p = vec3(texture(b_txtr_1f, vec3(tx_in, txtr.layer)).x);
-    }
-  } else {
-    // Color value is specified directly
-    p = record_get_direct_value(emitter.color_data);
-  }
+  vec3 p = read_record_data_vec3(buff_unif.emitter_color_data);
 
   // If color value exceeds 1, we scale it down and store this scale value.
   // So much for treating hdr image data with care :D

@@ -11,16 +11,20 @@ layout(std140) uniform;
 // Uniform buffer declarations
 layout(binding = 0) uniform b_buff_unif {
   uint object_i;
+
+  uint  object_metallic_data;
+  uint  object_roughness_data;
+  uint  object_transmission_data;
+
+  uvec2 object_albedo_data;
+  uint  object_normalmap_data;
+  uint  object_misc_data;
 } buff_unif;
 layout(binding = 1) uniform b_buff_atlas {
   uint n;
   AtlasInfo data[met_max_textures];
 } buff_atlas;
-layout(binding = 2) uniform b_buff_objects {
-  uint n;
-  Object data[met_max_objects];
-} buff_objects;
-layout(binding = 3) uniform b_buff_textures {
+layout(binding = 2) uniform b_buff_textures {
   uint n;
   TextureInfo data[met_max_textures];
 } buff_textures;
@@ -32,9 +36,9 @@ layout(binding = 0, rgba32f) uniform restrict writeonly image2DArray b_atlas;   
 
 float read_record_data_float(in uint rc) {
   float f;
-  if (record_10b_is_index(rc)) {
+  if (record_is_index(rc)) {
     // Determine pixel location in texture atlas
-    TextureInfo txtr = buff_textures.data[record_10b_get_index(rc)];
+    TextureInfo txtr = buff_textures.data[record_get_index(rc)];
     const uvec2 px_in = clamp(gl_GlobalInvocationID.xy + txtr.offs, txtr.offs, txtr.offs + txtr.size - 1);
 
     // Value is supplied by scene texture; could be b_txtr_3f or b_txtr_1f
@@ -48,7 +52,7 @@ float read_record_data_float(in uint rc) {
       f = texture(b_txtr_1f, vec3(tx_in, txtr.layer)).x;
     }
   } else {
-    f = record_10b_get_value(rc);
+    f = record_get_value(rc);
   }
   return f;
 }
@@ -77,27 +81,25 @@ vec3 read_record_data_vec3(in uint rc) {
 
 void main() {
   // Load relevant object/patch data
-  Object    object = buff_objects.data[buff_unif.object_i];
-  AtlasInfo atlas  = buff_atlas.data[buff_unif.object_i];
+  AtlasInfo atlas = buff_atlas.data[buff_unif.object_i];
 
   // Determine pixel location in padded patch, then clamp invocations to
   // relevant region; the atlas patch plus a 2px padding border for oversampling
   const uvec2 px_out = gl_GlobalInvocationID.xy + atlas.offs;
   guard(clamp(px_out, atlas.offs, atlas.offs + atlas.size - 1) == px_out);
 
-  // Unpack packed brdf data records, then sample texture or
-  // extract scalar from said records
-  float metallic     = read_record_data_float((object.brdf_data[0]      ) & 0x03FF);
-  float roughness    = read_record_data_float((object.brdf_data[0] >> 10) & 0x03FF);
-  float transmission = 0.f; /* = read_record_data_float((object.brdf_data[0] >> 20) & 0x03FF) */;
-  vec3  normalmap    = read_record_data_vec3(object.normalmap_data);
+  // Read brdf data records, then sample texture or extract scalar from said records
+  float metallic     = read_record_data_float(buff_unif.object_metallic_data);
+  float roughness    = read_record_data_float(buff_unif.object_roughness_data);
+  float transmission = read_record_data_float(buff_unif.object_transmission_data);
+  vec3  normalmap    = read_record_data_vec3(buff_unif.object_normalmap_data);
 
   // Repack sampled brdf data
   uvec4 brdf_data;
   brdf_data.x = ((pack_unorm_10(metallic)     & 0x03FF)      )
               | ((pack_unorm_10(roughness)    & 0x03FF) << 10)
               | ((pack_unorm_10(transmission) & 0x03FF) << 20);
-  brdf_data.y = object.brdf_data.y; // forwarded
+  brdf_data.y = buff_unif.object_misc_data; // forwarded
   brdf_data.zw = floatBitsToUint(pack_normal_octahedral(normalmap));
 
   // Finally, write packed result out to atlas

@@ -24,30 +24,20 @@ vec3 tx2_to_atlas_tx3(in AtlasInfo atlas_patch, in vec2 tx2, in vec2 atlas_size)
 // baked spectral texture coefficients live in an atlas in this implementation, 
 // so this step is necessary.
 vec3 si_to_object_coef_atlas_tx(in Interaction si) {
-  // Obtain uv coordinates, or set to 0.5 if the albedo value is specified
-  Object object_info = scene_object_info(record_get_object(si.data));
-  vec2 tx2 = record_is_sampled(object_info.albedo_data) ? si.tx : vec2(0.5f);
-
-  // Return coordinates in texture atlas
   AtlasInfo atlas_info = scene_texture_object_coef_info(record_get_object(si.data));
-  return tx2_to_atlas_tx3(atlas_info, tx2, scene_texture_object_coef_size());
+  return tx2_to_atlas_tx3(atlas_info, si.tx, scene_texture_object_coef_size());
 }
 
 // Same as above, different atlas
 vec3 si_to_object_brdf_atlas_tx(in Interaction si) {
-  // Obtain uv coordinates, or set to 0.5 if the albedo value is specified
-  Object object_info = scene_object_info(record_get_object(si.data));
-  vec2 tx2 = si.tx; // record_is_sampled(object_info.albedo_data) ? si.tx : vec2(0.5f);
-
-  // Return coordinates in texture atlas
   AtlasInfo atlas_info = scene_texture_object_brdf_info(record_get_object(si.data));
-  return tx2_to_atlas_tx3(atlas_info, tx2, scene_texture_object_brdf_size());
+  return tx2_to_atlas_tx3(atlas_info, si.tx, scene_texture_object_brdf_size());
 }
 
 // Same as above, but for illuminant data
-vec3 tx_to_emitter_coef_atlas_tx(in uint emitter_i, in vec2 tx2) {
-  AtlasInfo atlas_info = scene_texture_emitter_coef_info(emitter_i);
-  return tx2_to_atlas_tx3(atlas_info, tx2, scene_texture_emitter_coef_size());
+vec3 tx_to_emitter_coef_atlas_tx(in Interaction si) {
+  AtlasInfo atlas_info = scene_texture_emitter_coef_info(record_get_emitter(si.data));
+  return tx2_to_atlas_tx3(atlas_info, si.tx, scene_texture_emitter_coef_size());
 }
 
 // Sample four-wavelength surface reflectances using stochastic sampling; we avoid
@@ -83,20 +73,17 @@ vec4 texture_brdf(in Interaction si, in vec2 sample_2d) {
   // Translate surface uv data to texture atlas uv
   vec3 tx = si_to_object_brdf_atlas_tx(si);
 
-  /* return scene_texture_object_brdf_fetch(ivec3(tx) + ivec3(tx_offsets[0], 0)); */
-
   // Sample a texel offset for stochastic mixing; the interpolation weight of that texel equals
   // the sampling density, so we can elimitate both it and the density from further computation
   uint i = hsum(mix(uvec2(0), uvec2(1, 2), greaterThanEqual(sample_2d, vec2(1) - fract(tx.xy))));
   
-  // Load brdf data for a particular corner
-  vec4 data = scene_texture_object_brdf_fetch(ivec3(tx) + ivec3(tx_offsets[i], 0));
-  return data;
+  // Sample brdf data for a particular corner
+  return scene_texture_object_brdf_fetch(ivec3(tx) + ivec3(tx_offsets[i], 0));
 }
 
-vec4 texture_illuminant(in uint emitter_i, in vec2 tx2, in vec4 wvls, in vec2 sample_2d) {
+vec4 texture_illuminant(in Interaction si, in vec4 wvls, in vec2 sample_2d) {
   // Translate provided uv data to texture atlas uv
-  vec3 tx = tx_to_emitter_coef_atlas_tx(emitter_i, tx2);
+  vec3 tx = tx_to_emitter_coef_atlas_tx(si);
 
   // Sample a texel offset for stochastic mixing; the interpolation weight of that texel equals
   // the sampling density, so we can elimitate both it and the density from further computation
@@ -119,10 +106,6 @@ vec4 texture_illuminant(in uint emitter_i, in vec2 tx2, in vec4 wvls, in vec2 sa
   } // for (uint k)
 
   return e * scene_texture_emitter_scle_fetch(ivec3(tx) + ivec3(tx_offsets[i], 0));
-}
-
-vec4 texture_illuminant(in Interaction si, in vec4 wvls, in vec2 sample_2d) {
-  return texture_illuminant(record_get_emitter(si.data), si.tx, wvls, sample_2d);
 }
 
 #endif // TEXTURE_GLSL_GUARD

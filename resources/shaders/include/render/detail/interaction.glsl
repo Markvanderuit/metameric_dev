@@ -63,15 +63,20 @@ void detail_fill_interaction_emitter(inout Interaction si, in Ray ray) {
   si.p = ray_get_position(ray);
 
   // Fill data based on type of area emitters
-  if (em.type == EmitterTypeSphere) {
-    si.n  = normalize(si.p - em.trf[3].xyz);
-    si.tx = mod(vec2(atan(si.n.x, -si.n.z) * .5f, acos(si.n.y)) * M_PI_INV + 1.f, 1.f);
-  } else if (em.type == EmitterTypeRectangle) {
-    si.n  = normalize(em.trf[2].xyz);
-    si.tx = 0.5 + (inverse(em.trf) * vec4(si.p, 1)).xy;
-  } else if (em.type == EmitterTypePoint || em.type == EmitterTypeConstant) {
-    si.n  = ray.d;
-    si.tx = mod(vec2(atan(si.n.x, -si.n.z) * .5f, acos(si.n.y)) * M_PI_INV + 1.f, 1.f);
+  switch (emitter_shape_type(em)) {
+    case EmitterTypeSphere:
+      si.n  = normalize(si.p - em.trf[3].xyz);
+      si.tx = mod(vec2(atan(si.n.x, -si.n.z) * .5f, acos(si.n.y)) * M_PI_INV + 1.f, 1.f);
+      break;
+    case EmitterTypeRectangle:
+      si.n  = normalize(em.trf[2].xyz);
+      si.tx = 0.5 + (inverse(em.trf) * vec4(si.p, 1)).xy;
+      break;
+    case EmitterTypePoint:
+    case EmitterTypeConstant:
+      si.n  = ray.d;
+      si.tx = mod(vec2(atan(si.n.x, -si.n.z) * .5f, acos(si.n.y)) * M_PI_INV + 1.f, 1.f);
+      break;
   }
 
   // Generate shading frame based on geometric normal

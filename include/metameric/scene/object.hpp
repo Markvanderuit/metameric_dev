@@ -68,7 +68,17 @@ namespace met {
       // - writes this data to the `texture_brdf` atlas below
       struct ObjectData {
         // Layout for data written to std140 buffer
-        struct BlockLayout { uint object_i; };
+        struct BlockLayout { 
+          alignas(4) uint         object_i; 
+          alignas(4) uint         object_metallic_data; 
+          alignas(4) uint         object_roughness_data; 
+          alignas(4) uint         object_transmission_data; 
+          // ---
+          alignas(8) eig::Array2u object_albedo_data; 
+          alignas(4) uint         object_normalmap_data; 
+          alignas(4) uint         object_misc_data; 
+        };
+        static_assert(sizeof(BlockLayout) == 32);
 
         // Objects for texture bake
         std::string  m_program_key;
@@ -92,21 +102,9 @@ namespace met {
       // Per-object block layout
       struct BlockLayout {
         alignas(16) eig::Matrix4f trf;
-        // ---
-        alignas(4)  uint          is_active;
-        alignas(4)  uint          mesh_i;
-        alignas(4)  uint          brdf_type;
-        alignas(4)  uint          normalmap_data;
-        // ---
-        alignas(8)  eig::Array2u  albedo_data;
-        alignas(8)  eig::Array2u  brdf_data;
-        // alignas(4)  uint          metallic_data;
-        // alignas(4)  uint          roughness_data;
-        // ---
-        // alignas(4)  uint          eta_data;
-        // alignas(4)  float         absorption;
+        alignas(4)  uint          flags;
       };
-      static_assert(sizeof(BlockLayout) == 96);
+      static_assert(sizeof(BlockLayout) == 80);
 
       // All-object buffer layout
       struct BufferLayout {

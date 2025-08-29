@@ -33,6 +33,22 @@ namespace met {
         }
       return false;
     }
+    
+    // Helper to pack color/uint variant to a uvec2
+    inline
+    eig::Array2u pack_material_3f(const std::variant<Colr, uint> &v) {
+      met_trace();
+      std::array<uint, 2> u;
+      if (v.index()) {
+        u[0] = std::get<1>(v);
+        u[1] = 0x00010000;
+      } else {
+        Colr c = std::get<0>(v);
+        u[0] = detail::pack_half_2x16(c.head<2>());
+        u[1] = detail::pack_half_2x16({ c.z(), 0 });
+      }
+      return { u[0], u[1] };
+    }
   } // namespace detail
   
   bool Uplifting::operator==(const Uplifting &o) const {
@@ -758,12 +774,18 @@ namespace met {
       fmt::print("Uplifting {}: baking object {} spectra ({}x{})\n", 
         object->uplifting_i, m_object_i, patch.size.x(), patch.size.y());
 
+      // Flush relevant data to uniform buffer
+      *m_buffer_map = {
+        .object_albedo_data = detail::pack_material_3f(object->diffuse),
+        .object_i           = m_object_i
+      };
+      m_buffer.flush();
+
       // Get relevant program handle, bind, then bind resources to corresponding targets
       auto &cache = scene.m_cache_handle.getw<gl::ProgramCache>();
       auto &program = cache.at(m_program_key);
       program.bind();
       program.bind("b_buff_unif",        m_buffer);
-      program.bind("b_buff_objects",     scene.components.objects.gl.object_info);
       program.bind("b_buff_atlas",       atlas.buffer());
       program.bind("b_atlas",            atlas.texture());
       program.bind("b_buff_uplift_coef", uplifting_gl.buffer_coef);
@@ -849,11 +871,10 @@ namespace met {
       fmt::print("Uplifting {}: baking emitter {} spectra ({}x{})\n", 
         0, m_emitter_i, patch.size.x(), patch.size.y());
 
-      // Determine color boundaries for scaling hdr data
-      // TODO precompute
-      m_buffer_map->boundaries = emitter->color | visit {
-        [](const Colr &)   { return eig::Array2f(0, 1);                          },
-        [&](const uint &i) { return scene.resources.images[i]->min_max_values(); }
+      // Flush uniform buffer data
+      *m_buffer_map = {
+        .emitter_color_data = pack_material_3f(emitter->color),
+        .emitter_i          = m_emitter_i 
       };
       m_buffer.flush();
 
@@ -862,7 +883,6 @@ namespace met {
       auto &program = cache.at(m_program_key);
       program.bind();
       program.bind("b_buff_unif",        m_buffer);
-      program.bind("b_buff_emitters",    scene.components.emitters.gl.emitter_info);
       program.bind("b_buff_atlas",       atlas_coef.buffer());
       program.bind("b_atlas_coef",       atlas_coef.texture());
       program.bind("b_atlas_scle",       atlas_scle.texture());

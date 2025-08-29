@@ -16,21 +16,18 @@ layout(std140) uniform;
 
 // Uniform buffer declarations
 layout(binding = 0) uniform b_buff_unif {
-  uint object_i;
+  uvec2 object_albedo_data;
+  uint  object_i;
 } buff_unif;
 layout(binding = 1) uniform b_buff_atlas {
   uint n;
   AtlasInfo data[met_max_textures];
 } buff_atlas;
-layout(binding = 2) uniform b_buff_objects {
-  uint n;
-  Object data[met_max_objects];
-} buff_objects;
-layout(binding = 3) uniform b_buff_textures {
+layout(binding = 2) uniform b_buff_textures {
   uint n;
   TextureInfo data[met_max_textures];
 } buff_textures;
-layout(binding = 4) uniform b_buff_uplift_bary { 
+layout(binding = 3) uniform b_buff_uplift_bary { 
   uint n;
   BarycentricData data[met_max_constraints]; 
 } buff_uplift_bary;
@@ -45,37 +42,41 @@ layout(binding = 0)          uniform sampler2DArray                  b_txtr_3f; 
 layout(binding = 1)          uniform sampler2DArray                  b_txtr_1f; // Input 1-component textures
 layout(binding = 0, rgba32f) uniform restrict writeonly image2DArray b_atlas;   // Output coefficient texture atlas
 
-void main() {
-  // Load relevant object/patch data
-  Object    object = buff_objects.data[buff_unif.object_i];
-  AtlasInfo atlas  = buff_atlas.data[buff_unif.object_i];
-  
-  // Determine pixel location in padded patch, then clamp invocations to
-  // relevant region; the atlas patch plus a 2px padding border for oversampling
-  const uvec2 px_out = gl_GlobalInvocationID.xy + atlas.offs;
-  guard(clamp(px_out, atlas.offs, atlas.offs + atlas.size - 1) == px_out);
-
-  // First, sample color value from object
-  vec3 p;
-  if (record_is_sampled(object.albedo_data)) {
+vec3 read_record_data_vec3(in uvec2 rc) {
+  vec3 v;
+  if (record_is_index(rc)) {
     // Determine pixel location in texture atlas
-    TextureInfo txtr  = buff_textures.data[record_get_sampler_index(object.albedo_data)];
+    TextureInfo txtr  = buff_textures.data[record_get_index(rc)];
     const uvec2 px_in = clamp(gl_GlobalInvocationID.xy + txtr.offs, txtr.offs, txtr.offs + txtr.size - 1);
 
     // Color value is supplied by scene texture; could be b_txtr_3f or b_txtr_1f
     if (txtr.is_3f) {
       const vec2 tx_in = clamp((vec2(px_in) + 0.5f)
                        / textureSize(b_txtr_3f, 0).xy, vec2(0), vec2(1));
-      p = texture(b_txtr_3f, vec3(tx_in, txtr.layer)).xyz;
+      v = texture(b_txtr_3f, vec3(tx_in, txtr.layer)).xyz;
     } else {
       const vec2 tx_in = clamp((vec2(px_in) + 0.5f)
                        / textureSize(b_txtr_1f, 0).xy, vec2(0), vec2(1));
-      p = vec3(texture(b_txtr_1f, vec3(tx_in, txtr.layer)).x);
+      v = vec3(texture(b_txtr_1f, vec3(tx_in, txtr.layer)).x);
     }
   } else {
     // Color value is specified directly
-    p = record_get_direct_value(object.albedo_data);
+    v = record_get_value(rc);
   }
+  return v;
+}
+
+void main() {
+  // Load relevant patch data
+  AtlasInfo atlas = buff_atlas.data[buff_unif.object_i];
+  
+  // Determine pixel location in padded patch, then clamp invocations to
+  // relevant region; the atlas patch plus a 2px padding border for oversampling
+  const uvec2 px_out = gl_GlobalInvocationID.xy + atlas.offs;
+  guard(clamp(px_out, atlas.offs, atlas.offs + atlas.size - 1) == px_out);
+
+  // Read albedo data record, then sample texture or extract color from said record
+  vec3 p = read_record_data_vec3(buff_unif.object_albedo_data);
   
   // Next, brute-force search for the corresponding barycentric weights and tetrahedron's index
   float result_err = FLT_MAX;

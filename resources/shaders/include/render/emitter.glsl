@@ -21,15 +21,15 @@ vec4 eval_emitter(in Interaction si, in vec4 wvls, in vec2 sample_2d) {
     return vec4(0);
   
   Emitter em = scene_emitter_info(record_get_emitter(si.data));
-  
-  if (em.type == EmitterTypeSphere) {
-    return eval_emitter_sphere(em, si, wvls, sample_2d);
-  } else if (em.type == EmitterTypeRectangle) {
-    return eval_emitter_rectangle(em, si, wvls, sample_2d);
-  } else if (em.type == EmitterTypePoint) {
-    return eval_emitter_point(em, si, wvls, sample_2d);
-  } else if (em.type == EmitterTypeConstant) {
-    return eval_emitter_constant(em, si, wvls, sample_2d);
+  switch (emitter_shape_type(em)) {
+    case EmitterTypeSphere:
+      return eval_emitter_sphere(em, si, wvls, sample_2d);
+    case EmitterTypeRectangle:
+      return eval_emitter_rectangle(em, si, wvls, sample_2d);
+    case EmitterTypePoint:
+      return eval_emitter_point(em, si, wvls, sample_2d);
+    case EmitterTypeConstant:
+      return eval_emitter_constant(em, si, wvls, sample_2d);
   }
 }
 
@@ -46,14 +46,19 @@ float pdf_emitter(in Interaction si) {
   Emitter em = scene_emitter_info(record_get_emitter(si.data));
   float pdf = pdf_emitters_discrete(record_get_emitter(si.data));
   
-  if (em.type == EmitterTypeSphere) {
-    pdf *= pdf_emitter_sphere(em, si);
-  } else if (em.type == EmitterTypeRectangle) {
-    pdf *= pdf_emitter_rectangle(em, si);
-  } else if (em.type == EmitterTypePoint) {
-    pdf *= pdf_emitter_point(em, si);
-  } else if (em.type == EmitterTypeConstant) {
-    pdf *= pdf_emitter_constant(em, si);
+  switch (emitter_shape_type(em)) {
+    case EmitterTypeSphere:
+      pdf *= pdf_emitter_sphere(em, si);
+      break;
+    case EmitterTypeRectangle:
+      pdf *= pdf_emitter_rectangle(em, si);
+      break;
+    case EmitterTypePoint:
+      pdf *= pdf_emitter_point(em, si);
+      break;
+    case EmitterTypeConstant:
+      pdf *= pdf_emitter_constant(em, si);
+      break;
   }
 
   return pdf;
@@ -63,19 +68,25 @@ EmitterSample sample_emitter(in Interaction si, in vec4 wvls, in vec3 sample_3d)
   // Sample specific emitter from distribution
   DiscreteSample ds = sample_emitters_discrete(sample_3d.z);
   Emitter em = scene_emitter_info(ds.i);
-  if (!em.is_active)
+  if (!emitter_is_active(em))
     return emitter_sample_zero();
 
   // Sample specific position on emitter
   EmitterSample es;
-  if (em.type == EmitterTypeSphere) {
-    es = sample_emitter_sphere(em, si, wvls, sample_3d.xy);
-  } else if (em.type == EmitterTypeRectangle) {
-    es = sample_emitter_rectangle(em, si, wvls, sample_3d.xy);
-  } else if (em.type == EmitterTypePoint) {
-    es = sample_emitter_point(em, si, wvls, sample_3d.xy);
-  } else if (em.type == EmitterTypeConstant) {
-    es = sample_emitter_constant(em, si, wvls, sample_3d.xy);
+    
+  switch (emitter_shape_type(em)) {
+    case EmitterTypeSphere:
+      es = sample_emitter_sphere(em, si, wvls, sample_3d.xy);
+      break;
+    case EmitterTypeRectangle:
+      es = sample_emitter_rectangle(em, si, wvls, sample_3d.xy);
+      break;
+    case EmitterTypePoint:
+      es = sample_emitter_point(em, si, wvls, sample_3d.xy);
+      break;
+    case EmitterTypeConstant:
+      es = sample_emitter_constant(em, si, wvls, sample_3d.xy);
+      break;
   }
 
   // Multiply sample pdfs
@@ -89,19 +100,24 @@ EmitterSample sample_emitter(in Interaction si, in vec4 wvls, in vec3 sample_3d)
 
 bool ray_intersect_emitter(inout Ray ray, in uint emitter_i) {
   Emitter em = scene_emitter_info(emitter_i);
-  if (!em.is_active)
+  if (!emitter_is_active(em))
     return false;
 
   // Run intersection; flag result
   bool hit;
-  if (em.type == EmitterTypeSphere) {
-    Sphere sphere = { em.trf[3].xyz, .5f * length(em.trf[0].xyz) };
-    hit = ray_intersect(ray, sphere);
-  } else if (em.type == EmitterTypeRectangle) {
-    Rectangle rectangle = { em.trf[3].xyz, em.trf[0].xyz, em.trf[1].xyz, normalize(em.trf[2].xyz) };
-    hit = ray_intersect(ray, rectangle);
-  } else {
-    hit = false;
+  switch (emitter_shape_type(em)) {
+    case EmitterTypeSphere:
+      Sphere sphere = { em.trf[3].xyz, .5f * length(em.trf[0].xyz) };
+      hit = ray_intersect(ray, sphere);
+      break;
+    case EmitterTypeRectangle:
+      Rectangle rectangle = { em.trf[3].xyz, em.trf[0].xyz, em.trf[1].xyz, normalize(em.trf[2].xyz) };
+      hit = ray_intersect(ray, rectangle);
+      break;
+    case EmitterTypePoint: 
+    case EmitterTypeConstant:
+      hit = false;
+      break;
   }
 
   // Store emitter index in ray record on closest hit
@@ -113,18 +129,20 @@ bool ray_intersect_emitter(inout Ray ray, in uint emitter_i) {
 
 bool ray_intersect_emitter_any(in Ray ray, in uint emitter_i) {
   Emitter em = scene_emitter_info(emitter_i);
-  if (!em.is_active)
+  if (!emitter_is_active(em))
     return false;
   
   // Run intersection; on a hit, simply return
-  if (em.type == EmitterTypeSphere) {
-    Sphere sphere = { em.trf[3].xyz, .5f * length(em.trf[0].xyz) };
-    return ray_intersect_any(ray, sphere);
-  } else if (em.type == EmitterTypeRectangle) {
-    Rectangle rectangle = { em.trf[3].xyz, em.trf[0].xyz, em.trf[1].xyz, normalize(em.trf[2].xyz) };
-    return ray_intersect_any(ray, rectangle);
-  } else {
-    return false;
+  switch (emitter_shape_type(em)) {
+    case EmitterTypeSphere:
+      Sphere sphere = { em.trf[3].xyz, .5f * length(em.trf[0].xyz) };
+      return ray_intersect(ray, sphere);
+    case EmitterTypeRectangle:
+      Rectangle rectangle = { em.trf[3].xyz, em.trf[0].xyz, em.trf[1].xyz, normalize(em.trf[2].xyz) };
+      return ray_intersect(ray, rectangle);
+    case EmitterTypePoint: 
+    case EmitterTypeConstant:
+      return false;
   }
 }
 

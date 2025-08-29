@@ -149,13 +149,10 @@ namespace met {
                                  
           // Fill in object struct data
           m_object_info_map->data[i] = {  
-            .trf            = trf,
-            .is_active      = object.is_active,
-            .mesh_i         = object.mesh_i,
-            .brdf_type      = static_cast<uint>(object.brdf_type),
-            .normalmap_data = pack_optional_1u(object.normalmap),
-            .albedo_data    = pack_material_3f(object.diffuse),
-            .brdf_data      = brdf_data
+            .trf   = trf,
+            .flags = (object.is_active ? 0x80000000 : 0)
+                   | ((static_cast<uint>(object.brdf_type) & 0x7) << 28)
+                   | ((static_cast<uint>(object.mesh_i) & 0x0FFFFFFF))
           };
         } // for (uint i)
         
@@ -286,12 +283,25 @@ namespace met {
       fmt::print("Object: baking object {} brdf data ({}x{})\n", 
         m_object_i, patch.size.x(), patch.size.y());
 
+      // Fill in block data
+      *m_buffer_map = {
+        .object_i                 = m_object_i,
+        .object_metallic_data     = detail::pack_material_1f(object->metallic),
+        .object_roughness_data    = detail::pack_material_1f(object->roughness),
+        .object_transmission_data = detail::pack_material_1f(object->transmission),
+        .object_albedo_data       = detail::pack_material_3f(object->diffuse),
+        .object_normalmap_data    = detail::pack_optional_1u(object->normalmap),
+        .object_misc_data         = ((to_8b((object->eta_minmax.x() - 1.f) / 3.f) & 0x00FFu)      ) // 8b for eta (minimum)
+                                  | ((to_8b((object->eta_minmax.y() - 1.f) / 3.f) & 0x00FFu) <<  8) // 8b for eta (maximum)
+                                  | ((detail::to_float16(object->absorption)      & 0xFFFFu) << 16) // 16b for fp16 
+      };
+      m_buffer.flush();
+
       // Get relevant program handle, bind, then bind resources to corresponding targets
       auto &cache = scene.m_cache_handle.getw<gl::ProgramCache>();
       auto &program = cache.at(m_program_key);
       program.bind();
       program.bind("b_buff_unif",       m_buffer);
-      program.bind("b_buff_objects",    scene.components.objects.gl.object_info);
       program.bind("b_buff_atlas",      atlas.buffer());
       program.bind("b_atlas",           atlas.texture());
       if (!scene.resources.images.empty()) {

@@ -7,8 +7,8 @@ vec4 eval_emitter_sphere(in Emitter em, in Interaction si, in vec4 wvls, in vec2
     return vec4(0);
     
   // Sample either uplifted texture data, or a specified illuminant
-  vec4 L = em.spec_type == EmitterSpectrumTypeColor
-         ? texture_illuminant(record_get_emitter(si.data), si.tx, wvls, sample_2d)
+  vec4 L = emitter_spec_type(em) == EmitterSpectrumTypeColor
+         ? texture_illuminant(si, wvls, sample_2d)
          : scene_illuminant(em.illuminant_i, wvls);
   
   return L * em.illuminant_scale;
