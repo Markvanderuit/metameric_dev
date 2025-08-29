@@ -27,8 +27,6 @@ vec4 eval_brdf_dielectric(in BRDF brdf, in Interaction si, in vec3 wo, in vec4 w
     float weight = sdot(inv_eta) * dot(si.wi, m) * dot(wo, m) / abs(denom);
     return vec4((1.f - F) * GD * abs(weight));
   }
-
-
 }
 
 float pdf_brdf_dielectric(in BRDF brdf, in Interaction si, in vec3 wo, in vec4 wvls) {
@@ -62,19 +60,19 @@ BRDFSample sample_brdf_dielectric(in BRDF brdf, in vec3 sample_3d, in Interactio
   // Get relative index of refraction
   float     eta = cos_theta(si.wi) > 0 ? brdf.eta : 1.f / brdf.eta;
   float inv_eta = cos_theta(si.wi) > 0 ? 1.f / brdf.eta : brdf.eta;
-
-  // Return object
-  BRDFSample bs;
-  bs.is_delta = false;
-  bs.pdf      = ms.pdf;
   
   // Move into microfacet normal's frame
   Frame local_fr = get_frame(ms.n);
   vec3  local_wi = to_local(local_fr, si.wi);
 
+  // Return object
+  BRDFSample bs;
+  bs.is_delta = false;
+  bs.pdf      = ms.pdf;
+
   // Compute fresnel and angle of transmission
   float F = schlick_fresnel(schlick_F0(brdf.eta), abs_cos_theta(local_wi));
-
+  
   // Pick reflection/refraction lobe
   if (sample_3d.x < F) {
     // Reflect on microfacet normal
@@ -86,7 +84,7 @@ BRDFSample sample_brdf_dielectric(in BRDF brdf, in vec3 sample_3d, in Interactio
     bs.pdf         = F * ms.pdf * abs(weight);
   } else {
     // Refract on microfacet normal
-    vec3 local_wo = local_refract(local_wi, cos_theta(local_wi), inv_eta);
+    vec3 local_wo = local_refract(local_wi, inv_eta);
     float weight  = sdot(inv_eta) * cos_theta(local_wo)
                   / sdot(cos_theta(local_wo) + cos_theta(local_wi) * inv_eta);
     

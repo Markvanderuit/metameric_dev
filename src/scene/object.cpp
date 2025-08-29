@@ -144,15 +144,6 @@ namespace met {
           auto mesh_trf   = scene.resources.meshes.gl.mesh_cache[object.mesh_i].unit_trf;
           auto trf        = (object_trf * mesh_trf).eval();
 
-          // Pack most brdf data together
-          eig::Array2u brdf_data;
-          brdf_data[0] = ((to_10b(object.metallic)                    & 0x03FFu)      )  // 10b for metallic
-                       | ((to_10b(object.roughness)                   & 0x03FFu) << 10)  // 10b for roughness
-                       | ((to_10b(object.transmission)                & 0x03FFu) << 20); // 10b for transmission
-          brdf_data[1] = ((to_8b((object.eta_minmax.x() - 1.f) / 3.f) & 0x00FFu)      )  // 8b for eta (minimum)
-                       | ((to_8b((object.eta_minmax.y() - 1.f) / 3.f) & 0x00FFu) <<  8)  // 8b for eta (maximum)
-                       | ((detail::to_float16(object.absorption)      & 0xFFFFu) << 16); // 16b for fp16 absorption
-                                 
           // Fill in object struct data
           m_object_info_map->data[i] = {  
             .trf   = trf,
