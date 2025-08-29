@@ -9,33 +9,6 @@
 #include <render/brdf/microfacet.glsl>
 #include <render/brdf/dielectric.glsl>
 
-// Helper to fill or precompute specific brdf data
-// for some brdf types 
-void detail_fill_brdf_data(inout BRDF brdf, in Object object, in vec4 wvls, in uvec2 data) {
-  // Unpack and assign brdf data
-  brdf.metallic     = unpack_unorm_10((data[0]      ) & 0x03FF);
-  brdf.alpha        = unpack_unorm_10((data[0] >> 10) & 0x03FF);
-  brdf.transmission = unpack_unorm_10((data[0] >> 20) & 0x03FF);
-  brdf.absorption   = unpackHalf2x16(((data[1] >> 16) & 0xFFFFu)).x; 
-
-  // Alpha is clamped to avoid specularities, and squared for perceptual niceness
-  brdf.alpha = max(1e-3, brdf.alpha * brdf.alpha);
-
-  // Compute cauchy coefficients b and c, then compute actual wavelength-dependent eta
-  float eta_min = float(((data[1]     ) & 0x00FFu)) / 255.f * 3.f + 1.f;
-  float eta_max = float(((data[1] >> 8) & 0x00FFu)) / 255.f * 3.f + 1.f;
-  if (eta_max > eta_min) {
-    float lambda_min_2 = sdot(wavelength_min), lambda_max_2 = sdot(wavelength_max);
-    float cauchy_b = (lambda_min_2 * eta_max - lambda_max_2 * eta_min) / (lambda_min_2 - lambda_max_2);
-    float cauchy_c = lambda_min_2 * (eta_max - cauchy_b);
-    brdf.eta         = cauchy_b + cauchy_c / sdot(sample_to_wavelength(wvls.x));
-    brdf.is_spectral = true;
-  } else {
-    brdf.eta         = eta_min;
-    brdf.is_spectral = false;
-  }
-}
-
 BRDF get_brdf(inout Interaction si, vec4 wvls, in vec2 sample_2d) {
   BRDF brdf;
   
@@ -47,9 +20,31 @@ BRDF get_brdf(inout Interaction si, vec4 wvls, in vec2 sample_2d) {
     // Query reflectance texture data
     brdf.r = texture_reflectance(si, wvls, sample_2d);
 
-    // Unpack other brdf data
+    // Read data pack from brdf parameter bake
     uvec4 data = floatBitsToUint(texture_brdf(si, sample_2d));
-    detail_fill_brdf_data(brdf, object, wvls, data.xy);
+
+    // Unpack and assign brdf data
+    brdf.metallic     = unpack_unorm_10((data[0]      ) & 0x03FF);             // 10b unorm
+    brdf.alpha        = unpack_unorm_10((data[0] >> 10) & 0x03FF);             // 10b unorm
+    brdf.transmission = unpack_unorm_10((data[0] >> 20) & 0x03FF);             // 10b unorm
+    float eta_min     = float(((data[1]     ) & 0x00FFu)) / 255.f * 3.f + 1.f; // 8b unorm
+    float eta_max     = float(((data[1] >> 8) & 0x00FFu)) / 255.f * 3.f + 1.f; // 8b unorm
+    brdf.absorption   = unpackHalf2x16(((data[1] >> 16) & 0xFFFFu)).x;         // 16b half
+
+    // Alpha is clamped to avoid specularities, and squared for perceptual niceness
+    brdf.alpha = max(1e-3, brdf.alpha * brdf.alpha);
+
+    // Compute cauchy coefficients b and c, then compute actual wavelength-dependent eta
+    if (eta_max > eta_min) {
+      float lambda_min_2 = sdot(wavelength_min), lambda_max_2 = sdot(wavelength_max);
+      float cauchy_b = (lambda_min_2 * eta_max - lambda_max_2 * eta_min) / (lambda_min_2 - lambda_max_2);
+      float cauchy_c = lambda_min_2 * (eta_max - cauchy_b);
+      brdf.eta         = cauchy_b + cauchy_c / sdot(sample_to_wavelength(wvls.x));
+      brdf.is_spectral = true;
+    } else {
+      brdf.eta         = eta_min;
+      brdf.is_spectral = false;
+    }
 
     // Unpack normalmap data;
     // Now that we've queried the underlying textures, we can adjust the 
