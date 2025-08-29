@@ -7,9 +7,7 @@
 
 vec2 _microfacet_lobe_probs(in BRDF brdf, in Interaction si) {  
   // Estimate fresnel for incident vector to establish probabilities
-  vec4 F0 = mix(vec4(sdot(brdf.eta - 1) / sdot(brdf.eta + 1) / 0.08f),
-                brdf.r,
-                brdf.metallic);
+  vec4 F0 = mix(vec4(schlick_F0(brdf.eta)), brdf.r, brdf.metallic);
   vec4 F = schlick_fresnel(F0, cos_theta(si.wi));
   
   // Diffuse lobe probability mixed by metallic and the average of fresnel 
@@ -32,10 +30,8 @@ vec4 eval_brdf_microfacet(in BRDF brdf, in Interaction si, in vec3 wo, in vec4 w
     return vec4(0);
 
   vec3 wh = normalize(si.wi + wo);
-  vec4 F0 = mix(vec4(sdot(brdf.eta - 1) / sdot(brdf.eta + 1) / 0.08f),
-                brdf.r,
-                brdf.metallic);
-  vec4 F = schlick_fresnel(vec4(F0), vec4(1), dot(si.wi, wh)); 
+  vec4 F0 = mix(vec4(schlick_F0(brdf.eta)), brdf.r, brdf.metallic);
+  vec4 F  = schlick_fresnel(vec4(F0), vec4(1), dot(si.wi, wh)); 
 
   // Output value
   vec4 f = vec4(0);

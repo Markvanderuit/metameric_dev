@@ -50,8 +50,7 @@ float eval_ggx(in vec3 wi, in vec3 wh, in vec3 wo, in float alpha) {
   wi = to_upper_hemisphere(wi);
   wo = to_upper_hemisphere(wo);
 
-  return ggx_D(wh, alpha) 
-       * ggx_G(wi, wh, wo, alpha);
+  return ggx_D(wh, alpha) * ggx_G(wi, wh, wo, alpha);
 }
 
 MicrofacetSample sample_ggx(in vec3 wi, in float alpha, in vec2 sample_2d) {
