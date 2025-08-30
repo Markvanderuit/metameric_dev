@@ -146,11 +146,12 @@ namespace met {
         push_texture_variant_selector_1f("Metallic",     scene.resources.images, value.metallic);
         push_texture_variant_selector_1f("Transmission", scene.resources.images, value.transmission);
         ImGui::SliderFloat2("Eta (min, max)", value.eta_minmax.data(), 1.001f, 4.f);
+        ImGui::SliderFloat("Absorption", &value.absorption, 0.f, 1.f);
       }
       if (value.brdf_type == Object::BRDFType::eDielectric) {
         push_texture_variant_selector_1f("Roughness", scene.resources.images, value.roughness);
         ImGui::SliderFloat2("Eta (min, max)", value.eta_minmax.data(), 1.001f, 4.f);
-        ImGui::SliderFloat("Absorption", &value.absorption, 1.f, 100.0f);
+        ImGui::SliderFloat("Absorption", &value.absorption, 0.f, 1.f);
       }
 
       ImGui::Separator();

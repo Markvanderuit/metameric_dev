@@ -21,22 +21,7 @@ vec4 Li_debug(in SensorSample ss, in SamplerState state) {
   // Construct the underlying BRDF at the intersected surface
   BRDF brdf = get_brdf(si, ss.wvls, next_2d(state));
   
-  // Importance sample brdf direction
-  BRDFSample bs = sample_brdf(brdf, next_3d(state), si, ss.wvls);
-  
-  // Get lobe densities
-  vec3 m = vec3(0, 0, 1);
-  LobeDensity lobes = detail_get_lobes(brdf, si, m);
-
-  // Early exit on zero brdf density
-  // TODO evaluate
-  if (bs.pdf == 0.f)
-    return vec4(0);
-    
-  bool is_reflected = cos_theta(si.wi) * cos_theta(bs.wo) >= 0.f;
-  return is_reflected ? vec4(1, 0, 0, 1)
-                      : vec4(0, 0, 1, 1);
-  return vec4(vec3(lobes.specular_refract), 1);
+  return vec4(si.n, 1);
 }
 
 vec4 Li(in SensorSample ss, in SamplerState state, out float alpha) {

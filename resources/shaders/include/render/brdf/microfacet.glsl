@@ -5,26 +5,6 @@
 #include <render/ggx.glsl>
 #include <render/fresnel.glsl>
 
-/* vec2 _microfacet_lobe_probs(in BRDF brdf, in Interaction si) {  
-  // Estimate fresnel for incident vector to establish probabilities
-  vec4 F0 = mix(vec4(schlick_F0(brdf.eta)), brdf.r, brdf.metallic);
-  vec4 F  = schlick_fresnel(F0, cos_theta(si.wi));
-  
-  // Diffuse lobe probability mixed by metallic and the average of fresnel 
-  // over the four wavelengths. We *do not* deal with differing probabilities, 
-  // I don't want to implement hero sampling.
-  float prob_diff = (1.f - (hsum(F) * 0.25f)) * (1.f - brdf.metallic);
-  float prob_spec = 1.f - prob_diff;
-  
-  // Normalize
-  float prob_rcp = 1.f / (prob_diff + prob_spec);
-  prob_diff *= prob_rcp;
-  prob_spec *= prob_rcp;
-
-  // We consistently return [spec, diffuse]
-  return vec2(prob_spec, prob_diff);
-} */
-
 // Weighting of different BxDF lobes, potentially shared between BxDF models;
 // also caching F because we'll reuse it a lot
 struct LobeDensity {
@@ -34,16 +14,12 @@ struct LobeDensity {
   float specular_refract;
 };
 
-LobeDensity detail_get_lobes(in BRDF brdf, in Interaction si, in vec3 wh) {
+LobeDensity detail_get_lobes(in BRDF brdf, in Interaction si, in vec4 F) {
   // Return value
   LobeDensity lobe;
 
-  // Compute fresnel, assuming a microfacet normal is already available
-  vec4 F0 = mix(vec4(schlick_F0(brdf.eta)), brdf.r, brdf.metallic);
-  lobe.F  = schlick_fresnel(vec4(F0), vec4(1), dot(to_upper_hemisphere(si.wi), wh)); 
-  
   // Average used for metals, and same as F for dielectrics.
-  float F_avg = hsum(lobe.F) * .25f;
+  float F_avg = hsum(F) * .25f;
 
   if (is_upper_hemisphere(si.wi)) {
     // From upper
@@ -77,9 +53,11 @@ vec4 eval_brdf_microfacet(in BRDF brdf, in Interaction si, in vec3 wo, in vec4 w
   // Get the half-vector in the positive hemisphere direction
   vec3 m = to_upper_hemisphere(normalize(si.wi + wo * (is_reflected ? 1.f : eta)));
 
-  // Evaluate fresnel and the microfacet distribution
-  vec4 F0  = mix(vec4(schlick_F0(brdf.eta)), brdf.r, brdf.metallic);
-  vec4 F   = schlick_fresnel(vec4(F0), vec4(1), dot(to_upper_hemisphere(si.wi), m)); 
+  // Compute fresnel
+  vec4 F0 = mix(vec4(schlick_F0(brdf.eta)), brdf.r, brdf.metallic);
+  vec4 F  = schlick_fresnel(F0, dot(to_upper_hemisphere(si.wi), m)); 
+  
+  // Evaluate microfacet distribution
   float GD = eval_ggx(si.wi, m, wo, brdf.alpha);
 
   // Output value
@@ -98,10 +76,16 @@ vec4 eval_brdf_microfacet(in BRDF brdf, in Interaction si, in vec3 wo, in vec4 w
   
   // Specular refract; evaluate ggx and multiply by fresnel, jacobian
   if (!is_reflected) {
-    float denom = sdot(dot(wo, m) + dot(si.wi, m) * inv_eta) * cos_theta(si.wi) * cos_theta(wo);
-    float weight = sdot(inv_eta) * dot(si.wi, m) * dot(wo, m) / abs(denom);
-    vec4 r = is_upper ? vec4(1) : brdf.r;
-    f += brdf.transmission * r * (1.f - F) * GD * abs(weight);
+    // Apply Beer's law on exit
+    vec4 r = is_upper 
+           ? vec4(1) 
+           : exp(-si.t * brdf.absorption * (1.f - brdf.r));
+
+
+    float weight = sdot(inv_eta) * dot(si.wi, m) * dot(wo, m) 
+                 / abs(sdot(dot(wo, m) + dot(si.wi, m) * inv_eta) * cos_theta(si.wi) * cos_theta(wo));
+
+    f += (1.f - F) * (1.f - brdf.metallic) * brdf.transmission * r * GD * abs(weight);
   }
 
   return f;
@@ -115,9 +99,15 @@ float pdf_brdf_microfacet(in BRDF brdf, in Interaction si, in vec3 wo) {
   float     eta = is_upper_hemisphere(si.wi) ? brdf.eta : 1.f / brdf.eta;
   float inv_eta = is_upper_hemisphere(si.wi) ? 1.f / brdf.eta : brdf.eta;
 
-  // Get the half-vector in the positive hemisphere direction
-  vec3        m     = to_upper_hemisphere(normalize(si.wi + mix(eta, 1.f, is_reflected) * wo));
-  LobeDensity lobes = detail_get_lobes(brdf, si, m);
+  // Get the half-vector in the positive hemisphere direction as acting normal
+  vec3 m = to_upper_hemisphere(normalize(si.wi + mix(eta, 1.f, is_reflected) * wo));
+
+  // Compute fresnel
+  vec4 F0 = mix(vec4(schlick_F0(brdf.eta)), brdf.r, brdf.metallic);
+  vec4 F  = schlick_fresnel(F0, dot(to_upper_hemisphere(si.wi), m)); 
+
+  // Compute lobe densities
+  LobeDensity lobes = detail_get_lobes(brdf, si, F);
 
   // Output value
   float pdf = 0.f;
@@ -163,8 +153,13 @@ BRDFSample sample_brdf_microfacet(in BRDF brdf, in vec3 sample_3d, in Interactio
   bs.is_delta    = false;
   bs.is_spectral = false;
 
-  // Compute fresnel, lobe selection density
-  LobeDensity lobes = detail_get_lobes(brdf, si, ms.n);
+  // Compute fresnel and angle of transmission; F is set to 1 on total internal reflection
+  float cos_theta_t;
+  vec4 F0 = mix(vec4(schlick_F0(brdf.eta)), brdf.r, brdf.metallic);
+  vec4 F  = schlick_fresnel(F0, cos_theta(local_wi), cos_theta_t, brdf.eta); 
+
+  // Compute lobe densities
+  LobeDensity lobes = detail_get_lobes(brdf, si, F);
 
   // Sample one of the lobes 
   if (sample_3d.x < lobes.specular_reflect) {
@@ -176,7 +171,7 @@ BRDFSample sample_brdf_microfacet(in BRDF brdf, in vec3 sample_3d, in Interactio
       return brdf_sample_zero();
   } else if (sample_3d.x < (lobes.specular_reflect + lobes.specular_refract)) {
     // Refract on microfacet normal
-    bs.wo          = to_world(local_fr, local_refract(local_wi, inv_eta));
+    bs.wo          = to_world(local_fr, local_refract(local_wi, cos_theta_t, inv_eta));
     bs.is_spectral = brdf.is_spectral;
     
     if (cos_theta(bs.wo) * cos_theta(si.wi) >= 0)

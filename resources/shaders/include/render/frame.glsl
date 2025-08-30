@@ -46,6 +46,10 @@ vec3 local_refract(in vec3 wi, float inv_eta) {
   return vec3(-wi.xy * inv_eta, cos_theta_t);
 }
 
+vec3 local_refract(in vec3 wi, float cos_theta_t, float inv_eta) {
+  return vec3(-wi.xy * inv_eta, cos_theta_t);
+}
+
 vec3 to_upper_hemisphere(in vec3 v) {
   return mulsign(v, cos_theta(v));
 }

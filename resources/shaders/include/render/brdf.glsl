@@ -31,6 +31,9 @@ BRDF get_brdf(inout Interaction si, vec4 wvls, in vec2 sample_2d) {
     float eta_max     = float(((data[1] >> 8) & 0x00FFu)) / 255.f * 3.f + 1.f; // 8b unorm
     brdf.absorption   = unpackHalf2x16(((data[1] >> 16) & 0xFFFFu)).x;         // 16b half
 
+    // Absorption is scaled by 100x to account for scale
+    brdf.absorption *= 100.f;
+
     // Alpha is clamped to avoid specularities, and squared for perceptual niceness
     brdf.alpha = max(1e-3, brdf.alpha * brdf.alpha);
 
