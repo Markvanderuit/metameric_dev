@@ -71,10 +71,9 @@ BRDF get_brdf(inout Interaction si, vec4 wvls, in vec2 sample_2d) {
   // Unpack normalmap data;
   // Now that we've queried the underlying textures, we can adjust the 
   // local shading frame. This wasn't in use before this point.
-  // vec3 nm = unpack_normal_octahedral(unpackUnorm2x16(data.w));
-  // brdf.n = to_world(si, nm);
-  // si.n  = to_world(si, nm);
-  // si.wi = to_local(si, to_world(si, si.wi));
+  vec3 n = brdf_normalmap(brdf);
+  si.n   = to_world(si, n);
+  si.wi  = to_local(si, to_world(si, si.wi));
 
   return brdf;
 }
