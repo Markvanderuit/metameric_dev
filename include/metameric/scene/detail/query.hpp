@@ -24,7 +24,7 @@ namespace met::detail {
   SurfaceInfo query_surface_info(const Scene &scene, const eig::Array3f p, const SurfaceRecord &rc);
 
   // Given surface information, build uplifting tessellation data that the renderer would use
-  // to uplift the surface diffuse color to a spectrum
+  // to uplift the surface albedo color to a spectrum
   UpliftingInfo query_uplifting_info(const Scene &scene, const SurfaceInfo &si);
 
   // Repeat of query_uplifting_info applied to an entire queried path

@@ -151,13 +151,12 @@ namespace met {
           { "transform",       object.transform       },
           { "mesh_i",          object.mesh_i          },
           { "uplifting_i",     object.uplifting_i     },
-          { "brdf_type",       object.brdf_type       },
           { "eta_minmax",      object.eta_minmax      },
           { "absorption",      object.absorption      },
           { "clearcoat",       object.clearcoat       },
           { "clearcoat_alpha", object.clearcoat_alpha }};
-    js["diffuse"]      = {{ "index", object.diffuse.index()      },  { "variant", object.diffuse      }};
-    js["roughness"]    = {{ "index", object.roughness.index()    },  { "variant", object.roughness    }};
+    js["diffuse"]      = {{ "index", object.albedo.index()      },  { "variant", object.albedo      }};
+    js["roughness"]    = {{ "index", object.alpha.index()    },  { "variant", object.alpha    }};
     js["metallic"]     = {{ "index", object.metallic.index()     },  { "variant", object.metallic     }};
     js["transmission"] = {{ "index", object.transmission.index() },  { "variant", object.transmission }};
     js["normalmap"]    = {{ "has_value", object.normalmap.has_value() },  { "value", object.normalmap.value_or(0u) }};
@@ -169,14 +168,9 @@ namespace met {
     js.at("transform").get_to(object.transform);
     js.at("mesh_i").get_to(object.mesh_i);
     js.at("uplifting_i").get_to(object.uplifting_i);
-    if (!js.contains("brdf_type")) {
-      object.brdf_type = Object::BRDFType::eDiffuse;
-    } else {
-      js.at("brdf_type").get_to(object.brdf_type);
-    }
     switch (js.at("diffuse").at("index").get<size_t>()) {
-      case 0: object.diffuse = js.at("diffuse").at("variant").get<Colr>(); break;
-      case 1: object.diffuse = js.at("diffuse").at("variant").get<uint>(); break;
+      case 0: object.albedo = js.at("diffuse").at("variant").get<Colr>(); break;
+      case 1: object.albedo = js.at("diffuse").at("variant").get<uint>(); break;
       default: debug::check_expr(false, "Error parsing json material data");
     }
     if (js.contains("metallic")) {
@@ -188,8 +182,8 @@ namespace met {
     }
     if (js.contains("roughness")) {
       switch (js.at("roughness").at("index").get<size_t>()) {
-        case 0: object.roughness = js.at("roughness").at("variant").get<float>(); break;
-        case 1: object.roughness = js.at("roughness").at("variant").get<uint>(); break;
+        case 0: object.alpha = js.at("roughness").at("variant").get<float>(); break;
+        case 1: object.alpha = js.at("roughness").at("variant").get<uint>(); break;
         default: debug::check_expr(false, "Error parsing json material data");
       }
     }
@@ -332,7 +326,7 @@ namespace met {
                        .scaling  = 1.f },
       .mesh_i      = 0, 
       .uplifting_i = 0,
-      .diffuse     = Colr(0.5) 
+      .albedo     = Colr(0.5) 
     });
 
     // Default uplifting
@@ -513,22 +507,21 @@ namespace met {
 
       // 2 - Identify referred texture resource or specify a single value, and
       //     generally identify the brdf.
-      std::variant<Colr, uint>  diffuse      = Colr(.5f);
+      std::variant<Colr, uint>  albedo       = Colr(.5f);
       std::variant<float, uint> metallic     = 0.f;
-      std::variant<float, uint> roughness    = 1.f;
+      std::variant<float, uint> alpha    = 1.f;
       std::variant<float, uint> transmission = 0.f;
       std::optional<uint>       normalmap    = { };
-      Object::BRDFType brdf_type = Object::BRDFType::eDiffuse;
       if (load_materials && has_matrs) {
         // Access first material only; we ignore per-face materials; 
         const auto &obj_mat = result.materials[shape.mesh.material_ids.front()];
         
         if (obj_mat.diffuse_texname.empty()) {
           // Assign color value if there is no file path
-          diffuse = Colr { obj_mat.diffuse[0], obj_mat.diffuse[1], obj_mat.diffuse[2] };
+          albedo = Colr { obj_mat.diffuse[0], obj_mat.diffuse[1], obj_mat.diffuse[2] };
         } else {
           // Assign an allocated texture id from texture_load_list or get a new one
-          diffuse = texture_load_list.insert({ 
+          albedo = texture_load_list.insert({ 
             obj_mat.diffuse_texname,                    // filename of texture as key
             static_cast<uint>(texture_load_list.size()) // New texture id at end of list
           }).first->second;
@@ -536,28 +529,22 @@ namespace met {
 
         if (obj_mat.metallic_texname.empty()) {
           metallic = obj_mat.metallic;
-          if (obj_mat.roughness != 1.f || obj_mat.metallic != 0.f)
-            brdf_type = Object::BRDFType::eMicrofacet;
         } else {
           // Assign an allocated texture id from texture_load_list or get a new one
           metallic = texture_load_list.insert({ 
             obj_mat.metallic_texname,                   // filename of texture as key
             static_cast<uint>(texture_load_list.size()) // New texture id at end of list
           }).first->second;
-          brdf_type = Object::BRDFType::eMicrofacet;
         }
         
         if (obj_mat.roughness_texname.empty()) {
-          roughness = obj_mat.roughness;
-          if (obj_mat.roughness != 1.f || obj_mat.metallic != 0.f)
-            brdf_type = Object::BRDFType::eMicrofacet;
+          alpha = obj_mat.roughness;
         } else {
           // Assign an allocated texture id from texture_load_list or get a new one
-          roughness = texture_load_list.insert({ 
+          alpha = texture_load_list.insert({ 
             obj_mat.roughness_texname,                   // filename of texture as key
             static_cast<uint>(texture_load_list.size()) // New texture id at end of list
           }).first->second;
-          brdf_type = Object::BRDFType::eMicrofacet;
         }
 
         if (obj_mat.alpha_texname.empty()) {
@@ -580,17 +567,16 @@ namespace met {
 
       // 3 - create an object component referring to mesh/texture
       met::Object object = {
-        .mesh_i         = static_cast<uint>(scene.resources.meshes.size()),
-        .uplifting_i    = 0,
-        .brdf_type      = brdf_type,
-        .diffuse        = diffuse,
-        .metallic       = metallic,
-        .roughness      = roughness,
-        .transmission   = transmission,
-        .eta_minmax     = { 1.25f, 1.25f },
-        .absorption     = 0.f,
-        .normalmap      = normalmap,
-        .clearcoat      = 0.f,
+        .mesh_i          = static_cast<uint>(scene.resources.meshes.size()),
+        .uplifting_i     = 0,
+        .albedo          = albedo,
+        .metallic        = metallic,
+        .alpha           = alpha,
+        .transmission    = transmission,
+        .eta_minmax      = { 1.25f, 1.25f },
+        .absorption      = 0.f,
+        .normalmap       = normalmap,
+        .clearcoat       = 0.f,
         .clearcoat_alpha = 0.f
       };
 
@@ -639,8 +625,8 @@ namespace met {
         component->mesh_i += resources.meshes.size();
       if (!other.components.upliftings.empty())
         component->uplifting_i += components.upliftings.size();
-      if (component->diffuse.index() == 1)
-        component->diffuse = static_cast<uint>(std::get<1>(component->diffuse) + resources.images.size());
+      if (component->albedo.index() == 1)
+        component->albedo = static_cast<uint>(std::get<1>(component->albedo) + resources.images.size());
       return component;
     });
 
@@ -707,9 +693,9 @@ namespace met {
       std::vector<uint> mask(resources.images.size(), 0);
       for (const auto &[object, _] : components.objects) {
         auto visitor = visit_single([&](uint i) { mask[i] = 1; });
-        object.diffuse   | visitor;
+        object.albedo   | visitor;
         object.metallic  | visitor;
-        object.roughness | visitor;
+        object.alpha | visitor;
         object.normalmap | visitor;
       }
       for (const auto &[emitter, _] : components.emitters) {
@@ -723,9 +709,9 @@ namespace met {
       std::exclusive_scan(range_iter(mask), indices.begin(), 0u);
       for (auto &[object, _] : components.objects) {
         auto visitor = visit_single([&](uint &i) { i = indices[i]; });
-        object.diffuse   | visitor;
+        object.albedo   | visitor;
         object.metallic  | visitor;
-        object.roughness | visitor;
+        object.alpha | visitor;
         object.normalmap | visitor;
       }
       for (auto &[emitter, _] : components.emitters) {
@@ -873,13 +859,13 @@ namespace met {
       if (obj.uplifting_i >= components.upliftings.size())
         obj.uplifting_i = 0u;
 
-      obj.diffuse | visit_single([&](uint i) {
+      obj.albedo | visit_single([&](uint i) {
         if (i >= resources.images.size())
-          obj.diffuse = Colr(0.5f);
+          obj.albedo = Colr(0.5f);
       });
-      obj.roughness | visit_single([&](uint i) {
+      obj.alpha | visit_single([&](uint i) {
         if (i >= resources.images.size())
-          obj.roughness = 0.1f;
+          obj.alpha = 0.1f;
       });
       obj.metallic | visit_single([&](uint i) {
         if (i >= resources.images.size())

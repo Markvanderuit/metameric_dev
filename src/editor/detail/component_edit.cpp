@@ -126,8 +126,8 @@ namespace met {
       // BRDF parameters
       ImGui::Separator();
 
-      push_texture_variant_selector_3f("Albedo",   scene.resources.images, value.diffuse);
-      push_texture_variant_selector_1f("Alpha",    scene.resources.images, value.roughness);
+      push_texture_variant_selector_3f("Albedo",   scene.resources.images, value.albedo);
+      push_texture_variant_selector_1f("Alpha",    scene.resources.images, value.alpha);
       push_texture_variant_selector_1f("Metallic", scene.resources.images, value.metallic);
       ImGui::SliderFloat2("Eta (min, max)", value.eta_minmax.data(), 1.001f, 4.f);
 

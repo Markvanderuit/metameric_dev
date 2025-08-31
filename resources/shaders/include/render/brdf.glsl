@@ -50,39 +50,31 @@ vec4 detail_get_lobe_cdf(in BRDF brdf, in Interaction si, in vec4 F) {
 BRDF get_brdf(inout Interaction si, vec4 wvls, in vec2 sample_2d) {
   BRDF brdf;
   
-  if (is_object(si)) {
-    // Query brdf type
-    Object object = scene_object_info(record_get_object(si.data));
-    brdf.type = object_brdf_type(object);
-
-    // Query reflectance and brdf texture data
-    brdf.r    = texture_reflectance(si, wvls, sample_2d);
-    brdf.data = texture_brdf(si, sample_2d);
-    
-    // Compute cauchy coefficients b and c, then compute actual wavelength-dependent eta
-    float eta_min = float(((brdf.data[1]     ) & 0x00FFu)) / 255.f * 3.f + 1.f; // 8b unorm
-    float eta_max = float(((brdf.data[1] >> 8) & 0x00FFu)) / 255.f * 3.f + 1.f; // 8b unorm
-    if (eta_max > eta_min) {
-      float lambda_min_2 = sdot(wavelength_min), lambda_max_2 = sdot(wavelength_max);
-      float cauchy_b = (lambda_min_2 * eta_max - lambda_max_2 * eta_min) / (lambda_min_2 - lambda_max_2);
-      float cauchy_c = lambda_min_2 * (eta_max - cauchy_b);
-      brdf.eta         = cauchy_b + cauchy_c / sdot(sample_to_wavelength(wvls.x));
-      brdf.is_spectral = true;
-    } else {
-      brdf.eta         = eta_min;
-      brdf.is_spectral = false;
-    }
-
-    // Unpack normalmap data;
-    // Now that we've queried the underlying textures, we can adjust the 
-    // local shading frame. This wasn't in use before this point.
-    // vec3 nm = unpack_normal_octahedral(unpackUnorm2x16(data.w));
-    // brdf.n = to_world(si, nm);
-    // si.n  = to_world(si, nm);
-    // si.wi = to_local(si, to_world(si, si.wi));
+  // Query packed reflectance and brdf texture data
+  brdf.r    = texture_reflectance(si, wvls, sample_2d);
+  brdf.data = texture_brdf(si, sample_2d);
+  
+  // Compute cauchy coefficients b and c, then compute actual wavelength-dependent eta
+  float eta_min = float(((brdf.data[1]     ) & 0x00FFu)) / 255.f * 3.f + 1.f; // 8b unorm
+  float eta_max = float(((brdf.data[1] >> 8) & 0x00FFu)) / 255.f * 3.f + 1.f; // 8b unorm
+  if (eta_max > eta_min) {
+    float lambda_min_2 = sdot(wavelength_min), lambda_max_2 = sdot(wavelength_max);
+    float cauchy_b = (lambda_min_2 * eta_max - lambda_max_2 * eta_min) / (lambda_min_2 - lambda_max_2);
+    float cauchy_c = lambda_min_2 * (eta_max - cauchy_b);
+    brdf.eta         = cauchy_b + cauchy_c / sdot(sample_to_wavelength(wvls.x));
+    brdf.is_spectral = true;
   } else {
-    brdf.type = BRDFTypeNull;
+    brdf.eta         = eta_min;
+    brdf.is_spectral = false;
   }
+
+  // Unpack normalmap data;
+  // Now that we've queried the underlying textures, we can adjust the 
+  // local shading frame. This wasn't in use before this point.
+  // vec3 nm = unpack_normal_octahedral(unpackUnorm2x16(data.w));
+  // brdf.n = to_world(si, nm);
+  // si.n  = to_world(si, nm);
+  // si.wi = to_local(si, to_world(si, si.wi));
 
   return brdf;
 }

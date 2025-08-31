@@ -92,7 +92,7 @@ namespace met::detail {
     si.n.normalize();
 
     // Recover surface diffuse data based on underlying object material
-    si.diffuse = object.diffuse | visit {
+    si.diffuse = object.albedo | visit {
       [&](uint i) -> Colr { 
         return scene.resources.images[i]->sample(si.tx, Image::ColorFormat::eLRGB).head<3>(); 
       },

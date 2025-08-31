@@ -358,7 +358,7 @@ namespace met {
         // for the atlas. If a color was specified, we allocate a small patch
         std::vector<eig::Array2u> inputs(objects.size());
         rng::transform(objects, inputs.begin(), [&](const auto &object) -> eig::Array2u {
-          return object->diffuse | visit {
+          return object->albedo | visit {
             [&](uint i) { return images.gl.m_texture_info_map->data[i].size; },
             [&](Colr f) { return eig::Array2u { 16, 16 }; },
           };
@@ -763,7 +763,7 @@ namespace met {
       bool is_active 
          = m_is_first_update            // First run, demands render anyways
         || atlas.is_invalitated()       // Texture atlas re-allocated, demands re-render
-        || object.state.diffuse         // Diifferent albedo value set on object
+        || object.state.albedo         // Diifferent albedo value set on object
         || object.state.mesh_i          // Diifferent mesh attached to object
         || object.state.uplifting_i     // Different uplifting attached to object
         || uplifting                    // Uplifting was changed
@@ -776,7 +776,7 @@ namespace met {
 
       // Flush relevant data to uniform buffer
       *m_buffer_map = {
-        .object_albedo_data = detail::pack_material_3f(object->diffuse),
+        .object_albedo_data = detail::pack_material_3f(object->albedo),
         .object_i           = m_object_i
       };
       m_buffer.flush();

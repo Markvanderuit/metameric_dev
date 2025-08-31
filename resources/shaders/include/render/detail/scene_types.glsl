@@ -17,22 +17,15 @@ struct Object {
 };
 
 // Access packed object data
-bool object_is_active(in Object ob) { return (ob.flags & 0x80000000) != 0;  }
-uint object_brdf_type(in Object ob) { return (ob.flags & 0x70000000) >> 28; }
-uint object_mesh_i(in Object ob)    { return (ob.flags & 0x0FFFFFFF);       }
+bool object_is_active(in Object ob) { return (ob.flags & 0x80000000) != 0; }
+uint object_mesh_i(in Object ob)    { return (ob.flags & 0x7FFFFFFF);      }
 
 // Info object to gather surface brdf data
 struct BRDF {
-  #define BRDFTypeNull       0
-  #define BRDFTypeDiffuse    1
-  #define BRDFTypeMicrofacet 2
-  #define BRDFTypeDielectric 3
-
-  uint  type;         // One of the above values
   vec4  r;            // Albedo for 4 wavelengths
   uvec4 data;         // Compressed data pack containing most BRDF parameters
-  bool  is_spectral;  // Is the BRDF wavelength-dependent?
   float eta;          // Precomputed index of refraction for the hero wavelength
+  bool  is_spectral;  // Is the BRDF wavelength-dependent?
 };
 
 // Access packed brdf data

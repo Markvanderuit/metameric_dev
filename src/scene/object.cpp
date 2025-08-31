@@ -20,15 +20,15 @@ namespace met {
   bool Object::operator==(const Object &o) const {
     met_trace();
 
-    guard(std::tie(is_active,   transform,   mesh_i,   uplifting_i,   brdf_type, absorption, clearcoat, clearcoat_alpha) == 
-          std::tie(o.is_active, o.transform, o.mesh_i, o.uplifting_i, o.brdf_type, o.absorption, o.clearcoat, o.clearcoat_alpha), 
+    guard(std::tie(is_active,   transform,   mesh_i,   uplifting_i, absorption, clearcoat, clearcoat_alpha) == 
+          std::tie(o.is_active, o.transform, o.mesh_i, o.uplifting_i, o.absorption, o.clearcoat, o.clearcoat_alpha), 
           false);
     guard(eta_minmax.isApprox(o.eta_minmax), false);
 
-    guard(diffuse.index() == o.diffuse.index(), false);
-    switch (diffuse.index()) {
-      case 0: guard(std::get<Colr>(diffuse).isApprox(std::get<Colr>(o.diffuse)), false); break;
-      case 1: guard(std::get<uint>(diffuse) == std::get<uint>(o.diffuse), false); break;
+    guard(albedo.index() == o.albedo.index(), false);
+    switch (albedo.index()) {
+      case 0: guard(std::get<Colr>(albedo).isApprox(std::get<Colr>(o.albedo)), false); break;
+      case 1: guard(std::get<uint>(albedo) == std::get<uint>(o.albedo), false); break;
     }
 
     guard(metallic.index() == o.metallic.index(), false);
@@ -37,10 +37,10 @@ namespace met {
       case 1: guard(std::get<uint>(metallic) == std::get<uint>(o.metallic), false); break;
     }
 
-    guard(roughness.index() == o.roughness.index(), false);
-    switch (roughness.index()) {
-      case 0: guard(std::get<float>(roughness) == std::get<float>(o.roughness), false); break;
-      case 1: guard(std::get<uint>(roughness) == std::get<uint>(o.roughness), false); break;
+    guard(alpha.index() == o.alpha.index(), false);
+    switch (alpha.index()) {
+      case 0: guard(std::get<float>(alpha) == std::get<float>(o.alpha), false); break;
+      case 1: guard(std::get<uint>(alpha) == std::get<uint>(o.alpha), false); break;
     }
 
     guard(transmission.index() == o.transmission.index(), false);
@@ -148,8 +148,7 @@ namespace met {
           m_object_info_map->data[i] = {  
             .trf   = trf,
             .flags = (object.is_active ? 0x80000000 : 0)
-                   | ((static_cast<uint>(object.brdf_type) & 0x7) << 28)
-                   | ((static_cast<uint>(object.mesh_i) & 0x0FFFFFFF))
+                   | ((static_cast<uint>(object.mesh_i) & 0x7FFFFFFF))
           };
         } // for (uint i)
         
@@ -181,7 +180,7 @@ namespace met {
             [&](uint  i) { return images.gl.m_texture_info_map->data[i].size; },
             [&](float f) { return eig::Array2u { 16, 16 }; },
           };
-          auto roughness_size = object->roughness | visit {
+          auto alpha_size = object->alpha | visit {
             [&](uint  i) { return images.gl.m_texture_info_map->data[i].size; },
             [&](float f) { return eig::Array2u { 16, 16 }; },
           };
@@ -189,7 +188,7 @@ namespace met {
             [&](uint i) { return images.gl.m_texture_info_map->data[i].size; },
             [&]()       { return eig::Array2u { 16, 16 }; }
           };
-          return metallic_size.cwiseMax(roughness_size).cwiseMax(normal_size).eval();
+          return metallic_size.cwiseMax(alpha_size).cwiseMax(normal_size).eval();
         });
 
         // Scale atlas inputs to respect the maximum texture size set in Settings::texture_size
@@ -266,7 +265,7 @@ namespace met {
       bool is_active 
          = m_is_first_update            // First run, demands render anyways
         || atlas.is_invalitated()       // Texture atlas re-allocated, demands re-render
-        || object.state.roughness       // Different albedo value set on object
+        || object.state.alpha       // Different albedo value set on object
         || object.state.metallic        // Different value set on object
         || object.state.normalmap       // Different value set on object
         || object.state.eta_minmax      // Different value set on object
@@ -287,9 +286,9 @@ namespace met {
       *m_buffer_map = {
         .object_i                 = m_object_i,
         .object_metallic_data     = detail::pack_material_1f(object->metallic),
-        .object_roughness_data    = detail::pack_material_1f(object->roughness),
+        .object_roughness_data    = detail::pack_material_1f(object->alpha),
         .object_transmission_data = detail::pack_material_1f(object->transmission),
-        .object_albedo_data       = detail::pack_material_3f(object->diffuse),
+        .object_albedo_data       = detail::pack_material_3f(object->albedo),
         .object_normalmap_data    = detail::pack_optional_1u(object->normalmap),
         .object_data_y            = ((to_8b((object->eta_minmax.x() - 1.f) / 3.f) & 0x00FFu)      )  // 8b for eta (minimum)
                                   | ((to_8b((object->eta_minmax.y() - 1.f) / 3.f) & 0x00FFu) <<  8)  // 8b for eta (maximum)

@@ -25,15 +25,6 @@ namespace met {
   // A shape represented by a surface mesh, material data, 
   // and underlying uplifting to handle spectral reflectance.
   struct Object {
-    // BRDF type; only very basic BRDFs are supported
-    enum class BRDFType {
-      eNull       = 0,  // null does not interact with scene
-      eDiffuse    = 1,  // diffuse is simple lambertian
-      eMicrofacet = 2,  // microfacet is simple conductor/dielectric mixture built on ggx
-      eDielectric = 3,  // simple dielectric glass with spectral component
-    };
-    
-  public:
     // Scene placement
     bool      is_active = true;
     Transform transform;
@@ -44,10 +35,9 @@ namespace met {
 
     // Material data is packed with object; 
     // Most values are a variant; either a specified value, or a texture index
-    BRDFType                  brdf_type       = BRDFType::eDiffuse;
-    std::variant<Colr,  uint> diffuse         = Colr(.5f);        // for diffuse/microfacet/dielectric with absorption
+    std::variant<Colr,  uint> albedo         = Colr(.5f);        // for albedo/microfacet/dielectric with absorption
     std::variant<float, uint> metallic        = 0.0f;             // for microfacet brdf
-    std::variant<float, uint> roughness       = 1.0f;             // for microfacet brdf
+    std::variant<float, uint> alpha       = 1.0f;             // for microfacet brdf
     std::variant<float, uint> transmission    = 0.0f;             // for microfacet brdf
     eig::Array2f              eta_minmax      = { 1.25f, 1.25f }; // for dielectric brdf
     float                     absorption      = 0.f;              // for dielectric brdf
@@ -122,7 +112,7 @@ namespace met {
       // Stores one instance of BlockLayout per object component
       gl::Buffer object_info;
 
-      // Stores packing of some brdf parameters (roughness, metallic, normalmap)
+      // Stores packing of some brdf parameters (alpha, metallic, normalmap)
       detail::TextureAtlas2d4f texture_brdf; 
     
     public:
@@ -139,10 +129,9 @@ namespace met {
       SceneStateHandler<decltype(Object::transform)>          transform;
       SceneStateHandler<decltype(Object::mesh_i)>             mesh_i;
       SceneStateHandler<decltype(Object::uplifting_i)>        uplifting_i;
-      SceneStateHandler<decltype(Object::brdf_type)>          brdf_type;
-      SceneStateHandler<decltype(Object::diffuse)>            diffuse;
+      SceneStateHandler<decltype(Object::albedo)>             albedo;
       SceneStateHandler<decltype(Object::metallic)>           metallic;
-      SceneStateHandler<decltype(Object::roughness)>          roughness;
+      SceneStateHandler<decltype(Object::alpha)>              alpha;
       SceneStateHandler<decltype(Object::transmission)>       transmission;
       SceneStateHandler<decltype(Object::eta_minmax)>         eta_minmax;
       SceneStateHandler<decltype(Object::absorption)>         absorption;
@@ -158,10 +147,9 @@ namespace met {
         | transform.update(o.transform)
         | mesh_i.update(o.mesh_i)
         | uplifting_i.update(o.uplifting_i)
-        | brdf_type.update(o.brdf_type)
-        | diffuse.update(o.diffuse)
+        | albedo.update(o.albedo)
         | metallic.update(o.metallic)
-        | roughness.update(o.roughness)
+        | alpha.update(o.alpha)
         | transmission.update(o.transmission)
         | eta_minmax.update(o.eta_minmax)
         | absorption.update(o.absorption)
@@ -173,24 +161,3 @@ namespace met {
     };
   } // namespace detail
 } // namespace met
-
-template<>
-struct fmt::formatter<met::Object::BRDFType>{
-  template <typename context_ty>
-  constexpr auto parse(context_ty& ctx) { 
-    return ctx.begin(); 
-  }
-
-  template <typename fmt_context_ty>
-  constexpr auto format(const met::Object::BRDFType& ty, fmt_context_ty& ctx) const {
-    std::string s;
-    switch (ty) {
-      case met::Object::BRDFType::eNull        : s = "null"; break;
-      case met::Object::BRDFType::eDiffuse     : s = "diffuse"; break;
-      case met::Object::BRDFType::eMicrofacet  : s = "microfacet"; break;
-      case met::Object::BRDFType::eDielectric  : s = "dielectric"; break;
-      default                                  : s = "undefined"; break;
-    }
-    return fmt::format_to(ctx.out(), "{}", s);
-  }
-};
