@@ -61,6 +61,8 @@ vec3 surface_offset(in Interaction si, in vec3 d) {
 // Shorthands for frame transformation
 vec3 to_local(in Interaction si, in vec3 v) { return to_local(get_frame(si.n), v); }
 vec3 to_world(in Interaction si, in vec3 v) { return to_world(get_frame(si.n), v); }
+// vec3 to_local(in BRDF brdf, in vec3 v)      { return to_local(get_frame(brdf.n), v); }
+// vec3 to_world(in BRDF brdf, in vec3 v)      { return to_world(get_frame(brdf.n), v); }
 
 Ray ray_towards_direction(in Interaction si, in vec3 d) {
   return init_ray(surface_offset(si, d), d);

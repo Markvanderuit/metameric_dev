@@ -53,7 +53,7 @@ float eval_ggx(in vec3 wi, in vec3 wh, in vec3 wo, in float alpha) {
   return ggx_D(wh, alpha) * ggx_G(wi, wh, wo, alpha);
 }
 
-MicrofacetSample sample_ggx(in vec3 wi, in float alpha, in vec2 sample_2d) {
+vec3 sample_ggx(in vec3 wi, in float alpha, in vec2 sample_2d) {
   // Ensure inputs are in upper hemisphere
   wi = to_upper_hemisphere(wi);
 
@@ -67,10 +67,12 @@ MicrofacetSample sample_ggx(in vec3 wi, in float alpha, in vec2 sample_2d) {
   vec3 wh = normalize(vec3(wh_p.xy * alpha, wh_p.z));
 
   // Step 4; assemble sample object
-  MicrofacetSample ms;
-  ms.n   = normalize(reflect(-wi, wh) + wi);
-  ms.pdf = pdf_ggx(wi, ms.n, alpha);
-  return ms;
+  return normalize(reflect(-wi, wh) + wi);
+  
+  // MicrofacetSample ms;
+  // ms.n   = normalize(reflect(-wi, wh) + wi);
+  // ms.pdf = pdf_ggx(wi, ms.n, alpha);
+  // return ms;
 }
 
 #endif // RENDER_GGX_GLSL_GUARD

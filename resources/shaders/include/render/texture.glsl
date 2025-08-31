@@ -69,7 +69,7 @@ vec4 texture_reflectance(in Interaction si, in vec4 wvls, in vec2 sample_2d) {
   return r;
 }
 
-vec4 texture_brdf(in Interaction si, in vec2 sample_2d) {
+uvec4 texture_brdf(in Interaction si, in vec2 sample_2d) {
   // Translate surface uv data to texture atlas uv
   vec3 tx = si_to_object_brdf_atlas_tx(si);
 
@@ -78,7 +78,7 @@ vec4 texture_brdf(in Interaction si, in vec2 sample_2d) {
   uint i = hsum(mix(uvec2(0), uvec2(1, 2), greaterThanEqual(sample_2d, vec2(1) - fract(tx.xy))));
   
   // Sample brdf data for a particular corner
-  return scene_texture_object_brdf_fetch(ivec3(tx) + ivec3(tx_offsets[i], 0));
+  return floatBitsToUint(scene_texture_object_brdf_fetch(ivec3(tx) + ivec3(tx_offsets[i], 0)));
 }
 
 vec4 texture_illuminant(in Interaction si, in vec4 wvls, in vec2 sample_2d) {

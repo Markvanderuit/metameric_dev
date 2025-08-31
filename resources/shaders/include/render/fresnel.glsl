@@ -1,8 +1,8 @@
 #ifndef RENDER_FRESNEL_GLSL_GUARD
 #define RENDER_FRESNEL_GLSL_GUARD
 
-float schlick_F0(in float eta) {
-  return sdot((1.f - eta) / (1.f + eta));
+float schlick_F0(in float eta_a, in float eta_b) {
+  return sdot((eta_a - eta_b) / (eta_a + eta_b));
 }
 
 float schlick_fresnel(in float F0, in float F90, in float cos_theta_i) {

@@ -44,14 +44,16 @@ namespace met {
 
     // Material data is packed with object; 
     // Most values are a variant; either a specified value, or a texture index
-    BRDFType                  brdf_type    = BRDFType::eDiffuse;
-    std::variant<Colr,  uint> diffuse      = Colr(.5f);        // for diffuse/microfacet/dielectric with absorption
-    std::variant<float, uint> metallic     = 0.0f;             // for microfacet brdf
-    std::variant<float, uint> roughness    = 0.1f;             // for microfacet brdf
-    std::variant<float, uint> transmission = 0.0f;             // for microfacet brdf
-    eig::Array2f              eta_minmax   = { 1.25f, 1.25f }; // for dielectric brdf
-    float                     absorption = 0.f;                // for dielectric brdf
-    std::optional<uint>       normalmap;                       // optional normalmap texture inndex
+    BRDFType                  brdf_type       = BRDFType::eDiffuse;
+    std::variant<Colr,  uint> diffuse         = Colr(.5f);        // for diffuse/microfacet/dielectric with absorption
+    std::variant<float, uint> metallic        = 0.0f;             // for microfacet brdf
+    std::variant<float, uint> roughness       = 1.0f;             // for microfacet brdf
+    std::variant<float, uint> transmission    = 0.0f;             // for microfacet brdf
+    eig::Array2f              eta_minmax      = { 1.25f, 1.25f }; // for dielectric brdf
+    float                     absorption      = 0.f;              // for dielectric brdf
+    std::optional<uint>       normalmap       = { };              // optional normalmap texture inndex
+    float                     clearcoat       = 0.f;              // for clearcoat layer
+    float                     clearcoat_alpha = 0.f;              // for clearcoat layer
 
   public: // Boilerplate
     bool operator==(const Object &o) const;
@@ -76,9 +78,10 @@ namespace met {
           // ---
           alignas(8) eig::Array2u object_albedo_data; 
           alignas(4) uint         object_normalmap_data; 
-          alignas(4) uint         object_misc_data; 
+          alignas(4) uint         object_data_y; 
+          alignas(4) uint         object_data_z; 
         };
-        static_assert(sizeof(BlockLayout) == 32);
+        static_assert(sizeof(BlockLayout) == 40);
 
         // Objects for texture bake
         std::string  m_program_key;
@@ -132,18 +135,20 @@ namespace met {
     // state tracking for object members in the program view
     template <>
     struct SceneStateHandler<Object> : public SceneStateHandlerBase<Object> {    
-      SceneStateHandler<decltype(Object::is_active)>    is_active;
-      SceneStateHandler<decltype(Object::transform)>    transform;
-      SceneStateHandler<decltype(Object::mesh_i)>       mesh_i;
-      SceneStateHandler<decltype(Object::uplifting_i)>  uplifting_i;
-      SceneStateHandler<decltype(Object::brdf_type)>    brdf_type;
-      SceneStateHandler<decltype(Object::diffuse)>      diffuse;
-      SceneStateHandler<decltype(Object::metallic)>     metallic;
-      SceneStateHandler<decltype(Object::roughness)>    roughness;
-      SceneStateHandler<decltype(Object::transmission)> transmission;
-      SceneStateHandler<decltype(Object::eta_minmax)>   eta_minmax;
-      SceneStateHandler<decltype(Object::absorption)>   absorption;
-      SceneStateHandler<decltype(Object::normalmap)>    normalmap;
+      SceneStateHandler<decltype(Object::is_active)>          is_active;
+      SceneStateHandler<decltype(Object::transform)>          transform;
+      SceneStateHandler<decltype(Object::mesh_i)>             mesh_i;
+      SceneStateHandler<decltype(Object::uplifting_i)>        uplifting_i;
+      SceneStateHandler<decltype(Object::brdf_type)>          brdf_type;
+      SceneStateHandler<decltype(Object::diffuse)>            diffuse;
+      SceneStateHandler<decltype(Object::metallic)>           metallic;
+      SceneStateHandler<decltype(Object::roughness)>          roughness;
+      SceneStateHandler<decltype(Object::transmission)>       transmission;
+      SceneStateHandler<decltype(Object::eta_minmax)>         eta_minmax;
+      SceneStateHandler<decltype(Object::absorption)>         absorption;
+      SceneStateHandler<decltype(Object::normalmap)>          normalmap;
+      SceneStateHandler<decltype(Object::clearcoat)>          clearcoat;
+      SceneStateHandler<decltype(Object::clearcoat_alpha)>    clearcoat_alpha;
 
     public:
       bool update(const Object &o) override {
@@ -160,6 +165,8 @@ namespace met {
         | transmission.update(o.transmission)
         | eta_minmax.update(o.eta_minmax)
         | absorption.update(o.absorption)
+        | clearcoat.update(o.clearcoat)
+        | clearcoat_alpha.update(o.clearcoat_alpha)
         | normalmap.update(o.normalmap)
         );
       }

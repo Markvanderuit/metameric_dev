@@ -122,37 +122,24 @@ namespace met {
       float _scaling = value.transform.scaling.x();
       ImGui::DragFloat("Scaling", &_scaling, 0.01f, 0.001f, 100.f);
       value.transform.scaling = std::max(_scaling, 0.001f);
+      
+      // BRDF parameters
+      ImGui::Separator();
+
+      push_texture_variant_selector_3f("Albedo",   scene.resources.images, value.diffuse);
+      push_texture_variant_selector_1f("Alpha",    scene.resources.images, value.roughness);
+      push_texture_variant_selector_1f("Metallic", scene.resources.images, value.metallic);
+      ImGui::SliderFloat2("Eta (min, max)", value.eta_minmax.data(), 1.001f, 4.f);
 
       ImGui::Separator();
 
-      // Type selector
-      if (ImGui::BeginCombo("BRDF Type", fmt::format("{}", value.brdf_type).c_str())) {
-        for (uint i = 0; i < 4; ++i) {
-          auto type = static_cast<Object::BRDFType>(i);
-          auto name = fmt::format("{}", type);
-          if (ImGui::Selectable(name.c_str(), value.brdf_type == type)) {
-            value.brdf_type = type;
-          }
-        } // for (uint i)
-        ImGui::EndCombo();
-      }
-        
-      // Texture selectors
-      if (value.brdf_type != Object::BRDFType::eNull) {
-        push_texture_variant_selector_3f("Albedo", scene.resources.images, value.diffuse);
-      }
-      if (value.brdf_type == Object::BRDFType::eMicrofacet) {
-        push_texture_variant_selector_1f("Roughness",    scene.resources.images, value.roughness);
-        push_texture_variant_selector_1f("Metallic",     scene.resources.images, value.metallic);
-        push_texture_variant_selector_1f("Transmission", scene.resources.images, value.transmission);
-        ImGui::SliderFloat2("Eta (min, max)", value.eta_minmax.data(), 1.001f, 4.f);
-        ImGui::SliderFloat("Absorption", &value.absorption, 0.f, 1.f);
-      }
-      if (value.brdf_type == Object::BRDFType::eDielectric) {
-        push_texture_variant_selector_1f("Roughness", scene.resources.images, value.roughness);
-        ImGui::SliderFloat2("Eta (min, max)", value.eta_minmax.data(), 1.001f, 4.f);
-        ImGui::SliderFloat("Absorption", &value.absorption, 0.f, 1.f);
-      }
+      push_texture_variant_selector_1f("Transmission", scene.resources.images, value.transmission);
+      ImGui::SliderFloat("Absorption", &value.absorption, 0.f, 1.f);
+
+      ImGui::Separator();
+
+      ImGui::SliderFloat("Clearcoat",       &value.clearcoat, 0.f, 1.f);
+      ImGui::SliderFloat("Clearcoat alpha", &value.clearcoat_alpha, 0.f, 1.f);
 
       ImGui::Separator();
       

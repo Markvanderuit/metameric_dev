@@ -15,6 +15,8 @@ struct Object {
   mat4 trf;   // Transform and inverse transform data
   uint flags; // Object flags, see functions below
 };
+
+// Access packed object data
 bool object_is_active(in Object ob) { return (ob.flags & 0x80000000) != 0;  }
 uint object_brdf_type(in Object ob) { return (ob.flags & 0x70000000) >> 28; }
 uint object_mesh_i(in Object ob)    { return (ob.flags & 0x0FFFFFFF);       }
@@ -27,14 +29,28 @@ struct BRDF {
   #define BRDFTypeDielectric 3
 
   uint  type;         // One of the above values
-  vec4  r;            // Albedo for 4 wavelengthss
+  vec4  r;            // Albedo for 4 wavelengths
+  uvec4 data;         // Compressed data pack containing most BRDF parameters
   bool  is_spectral;  // Is the BRDF wavelength-dependent?
-  float metallic;
-  float alpha;        // Squared surface roughness
-  float eta;          // Potentially wavelength-dependent index of refraction
-  float transmission;
-  float absorption;
+  float eta;          // Precomputed index of refraction for the hero wavelength
 };
+
+// Access packed brdf data
+float brdf_metallic(in BRDF brdf)     { return unpack_unorm_10((brdf.data.x) & 0x03FF); }
+float brdf_transmission(in BRDF brdf) { return unpack_unorm_10((brdf.data.x >> 20) & 0x03FF); }
+float brdf_absorption(in BRDF brdf)   { return unpackHalf2x16(((brdf.data.y >> 16) & 0xFFFFu)).x * 100.f; }
+float brdf_clearcoat(in BRDF brdf)    { return unpack_unorm_10((brdf.data.z) & 0x03FF); }
+float brdf_alpha(in BRDF brdf) { 
+  float alpha = unpack_unorm_10((brdf.data.x >> 10) & 0x03FF); 
+  return max(1e-3, alpha * alpha);
+}
+float brdf_clearcoat_alpha(in BRDF brdf)  { 
+  float alpha = unpack_unorm_10((brdf.data.z >> 10) & 0x03FF);
+  return max(1e-3, alpha * alpha);
+}
+vec3 brdf_normalmap(in BRDF brdf) {
+  return unpack_normal_octahedral(unpackUnorm2x16(brdf.data.w));
+}
 
 // Info object to gather Scene::Emitter data
 // Given the lack of unions, emitters store additional data
@@ -53,9 +69,11 @@ struct Emitter {
   float illuminant_scale; // Scalar multiplier  
   uint  illuminant_i;     // Index of spd
 };
+
+// Access packed emitter data
 bool emitter_is_active(in Emitter em)  { return (em.flags & 0x80000000) != 0; }
 uint emitter_spec_type(in Emitter em)  { return (em.flags & 0x0000FF00) >> 8; }
-uint emitter_shape_type(in Emitter em) { return (em.flags & 0x000000FF);      }
+uint emitter_shape_type(in Emitter em) { return (em.flags & 0x000000FF); }
 
 // Info object for referred patch from texture atlas
 struct TextureInfo {

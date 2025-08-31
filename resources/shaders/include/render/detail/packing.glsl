@@ -199,8 +199,6 @@ uvec4 pack_basis_coeffs(in float[wavelength_bases] v) {
 }
 
 vec2 pack_normal_octahedral(vec3 n) {
-  // return vec2(uintBitsToFloat(packHalf2x16(n.xy)), n.z);
-
   n /= hsum(abs(n));
   n.xy = n.z >= 0.f
        ? n.xy
@@ -210,13 +208,11 @@ vec2 pack_normal_octahedral(vec3 n) {
 }
 
 vec3 unpack_normal_octahedral(vec2 p) {
-  // return normalize(vec3(unpackHalf2x16(floatBitsToUint(p.x)), p.y)/*  * 2.f - 1.f */);
-  
   p = p * 2.f - 1.f;
   vec3  n = vec3(p.xy, 1.f - hsum(abs(p.xy)));
   float t = clamp(-n.z, 0.f, 1.f);
   n.xy += mix(vec2(-t), vec2(t), greaterThanEqual(n.xy, vec2(0)));
-  return normalize(n);
+  return normalize(n);  
 }
 
 #endif // RENDER_DETAIL_PACKING_GLSL_GUARD

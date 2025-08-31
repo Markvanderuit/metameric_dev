@@ -147,13 +147,15 @@ namespace met {
 
   void to_json(json &js, const Object &object) {
     met_trace();
-    js = {{ "is_active",   object.is_active   },
-          { "transform",   object.transform   },
-          { "mesh_i",      object.mesh_i      },
-          { "uplifting_i", object.uplifting_i },
-          { "brdf_type",   object.brdf_type   },
-          { "eta_minmax",  object.eta_minmax  },
-          { "absorption",  object.absorption  }};
+    js = {{ "is_active",       object.is_active       },
+          { "transform",       object.transform       },
+          { "mesh_i",          object.mesh_i          },
+          { "uplifting_i",     object.uplifting_i     },
+          { "brdf_type",       object.brdf_type       },
+          { "eta_minmax",      object.eta_minmax      },
+          { "absorption",      object.absorption      },
+          { "clearcoat",       object.clearcoat       },
+          { "clearcoat_alpha", object.clearcoat_alpha }};
     js["diffuse"]      = {{ "index", object.diffuse.index()      },  { "variant", object.diffuse      }};
     js["roughness"]    = {{ "index", object.roughness.index()    },  { "variant", object.roughness    }};
     js["metallic"]     = {{ "index", object.metallic.index()     },  { "variant", object.metallic     }};
@@ -206,6 +208,12 @@ namespace met {
     }
     if (js.contains("normalmap") && js.at("normalmap").at("has_value").get<bool>()) {
       object.normalmap = js.at("normalmap").at("value").get<uint>();
+    }
+    if (js.contains("clearcoat")) {
+      js.at("clearcoat").get_to(object.clearcoat);
+    }
+    if (js.contains("clearcoat_alpha")) {
+      js.at("clearcoat_alpha").get_to(object.clearcoat_alpha);
     }
   }
 
@@ -572,15 +580,18 @@ namespace met {
 
       // 3 - create an object component referring to mesh/texture
       met::Object object = {
-        .mesh_i       = static_cast<uint>(scene.resources.meshes.size()),
-        .uplifting_i  = 0,
-        .brdf_type    = brdf_type,
-        .diffuse      = diffuse,
-        .metallic     = metallic,
-        .roughness    = roughness,
-        .transmission = transmission,
-        .eta_minmax   = { 1.25f, 1.25f },
-        .normalmap    = normalmap
+        .mesh_i         = static_cast<uint>(scene.resources.meshes.size()),
+        .uplifting_i    = 0,
+        .brdf_type      = brdf_type,
+        .diffuse        = diffuse,
+        .metallic       = metallic,
+        .roughness      = roughness,
+        .transmission   = transmission,
+        .eta_minmax     = { 1.25f, 1.25f },
+        .absorption     = 0.f,
+        .normalmap      = normalmap,
+        .clearcoat      = 0.f,
+        .clearcoat_alpha = 0.f
       };
 
       // 4 - store mesh and object in scene

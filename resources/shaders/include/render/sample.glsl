@@ -24,7 +24,10 @@ struct BRDFSample {
 
   // Exitant sampled direction, local space
   vec3 wo;
-  
+
+  // Relative index of refraction
+  float eta;
+
   // Sampling density
   float pdf;
 };
@@ -50,6 +53,7 @@ BRDFSample brdf_sample_zero() {
   bs.is_delta    = false;
   bs.is_spectral = false;
   bs.pdf         = 0.f;
+  bs.eta         = 1.f;
   return bs;
 }
 

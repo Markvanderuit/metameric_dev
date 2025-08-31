@@ -47,8 +47,8 @@ void detail_fill_interaction_object(inout Interaction si, in Ray ray) {
   } */
 
   // Transform relevant data to world-space
-  si.p =          (object_info.trf * vec4(si.p, 1)).xyz;
-  si.n = normalize(object_info.trf * vec4(si.n, 0)).xyz;
+  si.p  =          (object_info.trf * vec4(si.p, 1)).xyz;
+  si.n  = normalize(object_info.trf * vec4(si.n, 0)).xyz;
 
   // Store incident ray data
   si.wi = to_local(get_frame(si.n), -ray.d);

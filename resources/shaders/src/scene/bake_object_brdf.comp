@@ -18,7 +18,8 @@ layout(binding = 0) uniform b_buff_unif {
 
   uvec2 object_albedo_data;
   uint  object_normalmap_data;
-  uint  object_misc_data;
+  uint  object_data_y;
+  uint  object_data_z;
 } buff_unif;
 layout(binding = 1) uniform b_buff_atlas {
   uint n;
@@ -99,8 +100,9 @@ void main() {
   brdf_data.x = ((pack_unorm_10(metallic)     & 0x03FF)      )
               | ((pack_unorm_10(roughness)    & 0x03FF) << 10)
               | ((pack_unorm_10(transmission) & 0x03FF) << 20);
-  brdf_data.y = buff_unif.object_misc_data; // forwarded
-  brdf_data.zw = floatBitsToUint(pack_normal_octahedral(normalmap));
+  brdf_data.y = buff_unif.object_data_y; // forwarded
+  brdf_data.z = buff_unif.object_data_z; // forwarded
+  brdf_data.w = packUnorm2x16(pack_normal_octahedral(normalmap));
 
   // Finally, write packed result out to atlas
   imageStore(b_atlas, ivec3(px_out, atlas.layer), uintBitsToFloat(brdf_data));

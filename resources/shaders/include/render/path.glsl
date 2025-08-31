@@ -18,10 +18,22 @@ vec4 Li_debug(in SensorSample ss, in SamplerState state) {
   if (!is_object(si))
     return vec4(1);
 
-  // Construct the underlying BRDF at the intersected surface
-  BRDF brdf = get_brdf(si, ss.wvls, next_2d(state));
+  // Read data pack from brdf parameter bake
+  uvec4 data = floatBitsToUint(texture_brdf(si, next_2d(state)));
   
-  return vec4(si.n, 1);
+  // // Construct the underlying BRDF at the intersected surface
+  // BRDF brdf = get_brdf(si, ss.wvls, next_2d(state));
+  
+  vec2 p = uintBitsToFloat(data.zw);
+  p = unpackUnorm2x16(packUnorm2x16(p));
+  vec3 n = unpack_normal_octahedral(p);
+
+  // if (all(lessThanEqual(p, vec2(1)))) {
+  //   return vec4(0, 0, 1, 1);
+  // } else {
+  //   return vec4(1, 0, 0, 1);
+  // }
+  return vec4(n, 1);
 }
 
 vec4 Li(in SensorSample ss, in SamplerState state, out float alpha) {
@@ -31,6 +43,7 @@ vec4 Li(in SensorSample ss, in SamplerState state, out float alpha) {
   // Path throughput information; we track 4 wavelengths simultaneously
   vec4 Li   = vec4(0);           // Accumulated spectrum
   vec4 Beta = vec4(1 / ss.pdfs); // Path throughput over density
+  float eta = 1.f;               // Relative index of refraction of path
 
   // Prior brdf sample data, default-initialized, kept for NEE and MIS
   float prev_bs_pdf      = 1.f;
@@ -83,7 +96,7 @@ vec4 Li(in SensorSample ss, in SamplerState state, out float alpha) {
       
       // BRDF sample density for exitant direction in local frame
       vec3  wo     = to_local(si, es.ray.d);
-      float bs_pdf = pdf_brdf(brdf, si, wo, ss.wvls);
+      float bs_pdf = pdf_brdf(brdf, si, wo);
 
       // If the sample has throughput, test for occluder closer 
       // than sample position and add contribution
@@ -93,7 +106,7 @@ vec4 Li(in SensorSample ss, in SamplerState state, out float alpha) {
 
         // Assemble path throughput
         vec4 s = Beta                                      // path throughput
-               * eval_brdf(brdf, si, wo, ss.wvls)          // brdf throughput
+               * eval_brdf(brdf, si, wo)                   // brdf throughput
                * eval_emitter(es, ss.wvls, next_2d(state)) // emitter contribution
                * mis_weight                                // mis weight
                * abs_cos_theta(wo)                         // cosine attenuation
@@ -110,16 +123,19 @@ vec4 Li(in SensorSample ss, in SamplerState state, out float alpha) {
     // BRDF sampling
     {
       // Importance sample brdf direction
-      BRDFSample bs = sample_brdf(brdf, next_3d(state), si, ss.wvls);
+      BRDFSample bs = sample_brdf(brdf, next_3d(state), si);
 
       // Early exit on zero brdf density
       if (bs.pdf == 0.f)
         break;
       
       // Update path throughput
-      Beta *= eval_brdf(brdf, si, bs.wo, ss.wvls) // brdf throughput
-            * abs_cos_theta(bs.wo)                // cosine attenuation
-            / bs.pdf;                             // sample density
+      Beta *= eval_brdf(brdf, si, bs.wo) // brdf throughput
+            * abs_cos_theta(bs.wo)       // cosine attenuation
+            / bs.pdf;                    // sample density
+
+      // Update path index of refraction
+      eta *= bs.eta;
 
       // Retain last brdf density for direct emitter MIS weight
       prev_bs_pdf      = bs.pdf;
@@ -137,7 +153,8 @@ vec4 Li(in SensorSample ss, in SamplerState state, out float alpha) {
 
     // Russian Roulette
     if (rr_depth != 0 && depth >= rr_depth) {
-      float q = min(0.95, hmax(Beta));
+      float decay = pow(2.f, -float(depth - rr_depth));
+      float q     = min(0.95, decay * hmax(Beta) * sdot(eta));
       guard_break(next_1d(state) < q);
       Beta /= q;
     }

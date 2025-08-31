@@ -20,8 +20,8 @@ namespace met {
   bool Object::operator==(const Object &o) const {
     met_trace();
 
-    guard(std::tie(is_active,   transform,   mesh_i,   uplifting_i,   brdf_type, absorption) == 
-          std::tie(o.is_active, o.transform, o.mesh_i, o.uplifting_i, o.brdf_type, o.absorption), 
+    guard(std::tie(is_active,   transform,   mesh_i,   uplifting_i,   brdf_type, absorption, clearcoat, clearcoat_alpha) == 
+          std::tie(o.is_active, o.transform, o.mesh_i, o.uplifting_i, o.brdf_type, o.absorption, o.clearcoat, o.clearcoat_alpha), 
           false);
     guard(eta_minmax.isApprox(o.eta_minmax), false);
 
@@ -274,6 +274,8 @@ namespace met {
         || object.state.absorption      // Different value set on object
         || object.state.transmission    // Different value set on object
         || object.state.eta_minmax      // Different value set on object
+        || object.state.clearcoat       // Different value set on object
+        || object.state.clearcoat_alpha // Different value set on object
         || scene.resources.meshes       // User loaded/deleted a mesh;
         || scene.resources.images       // User loaded/deleted an image;
         || settings.state.texture_size; // Texture size setting changed
@@ -289,9 +291,11 @@ namespace met {
         .object_transmission_data = detail::pack_material_1f(object->transmission),
         .object_albedo_data       = detail::pack_material_3f(object->diffuse),
         .object_normalmap_data    = detail::pack_optional_1u(object->normalmap),
-        .object_misc_data         = ((to_8b((object->eta_minmax.x() - 1.f) / 3.f) & 0x00FFu)      ) // 8b for eta (minimum)
-                                  | ((to_8b((object->eta_minmax.y() - 1.f) / 3.f) & 0x00FFu) <<  8) // 8b for eta (maximum)
-                                  | ((detail::to_float16(object->absorption)      & 0xFFFFu) << 16) // 16b for fp16 
+        .object_data_y            = ((to_8b((object->eta_minmax.x() - 1.f) / 3.f) & 0x00FFu)      )  // 8b for eta (minimum)
+                                  | ((to_8b((object->eta_minmax.y() - 1.f) / 3.f) & 0x00FFu) <<  8)  // 8b for eta (maximum)
+                                  | ((detail::to_float16(object->absorption)      & 0xFFFFu) << 16), // 16b for fp16
+        .object_data_z            = (to_10b(object->clearcoat)            )
+                                  | (to_10b(object->clearcoat_alpha) << 10)
       };
       m_buffer.flush();
 
