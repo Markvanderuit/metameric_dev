@@ -21,11 +21,11 @@ vec4 detail_get_lobe_pdf(in BRDF brdf, in Interaction si, in vec4 F) {
   float F_avg = hsum(F) * .25f;
 
   if (is_upper_hemisphere(si.wi)) {
-    // From upper; we skip computation of coat fresnel and simply use 1/4th like mitsuba
+    // From upper; we skip computation of coat fresnel and simply use 1/2 of scaling
     v[LOBE_SPEC_REFLECT] = F_avg * (1.f - brdf_metallic(brdf)) + brdf_metallic(brdf);
     v[LOBE_SPEC_REFRACT] = (1.f - F_avg) * (1.f - brdf_metallic(brdf)) * brdf_transmission(brdf);
     v[LOBE_DIFF_REFLECT] = (1.f - F_avg) * (1.f - brdf_metallic(brdf)) * (1.f - brdf_transmission(brdf));
-    v[LOBE_COAT_REFLECT] = .25 * brdf_clearcoat(brdf);
+    v[LOBE_COAT_REFLECT] = .5f * brdf_clearcoat(brdf);
   } else {
     // From lower, we don't apply transmission twice, metallic doesn't even get here, nor does coat
     v[LOBE_SPEC_REFLECT] = F_avg;
@@ -225,7 +225,7 @@ BRDFSample sample_brdf(in BRDF brdf, in vec3 sample_3d, in Interaction si) {
     // Refract on microfacet normal
     bs.wo          = to_world(local_fr, local_refract(local_wi, cos_theta_t, inv_eta));
     bs.is_spectral = brdf.is_spectral;
-    bs.eta         = inv_eta; //cos_theta(si.i) > 0 ?  cos_theta_t < 0.f ? eta : inv_eta;
+    bs.eta         = inv_eta;
 
     if (cos_theta(bs.wo) * cos_theta(si.wi) >= 0)
       return brdf_sample_zero();

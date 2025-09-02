@@ -68,7 +68,7 @@ vec3 read_record_data_vec3(in uint rc) {
     if (txtr.is_3f) {
       const vec2 tx_in = clamp((vec2(px_in) + 0.5f)
                        / textureSize(b_txtr_3f, 0).xy, vec2(0), vec2(1));
-      v = normalize(texture(b_txtr_3f, vec3(tx_in, txtr.layer)).xyz * 2.f - 1.f);
+      v = normalize(texture(b_txtr_3f, vec3(tx_in, txtr.layer)).xyz /* * 2.f - 1.f */);
     } else {
       // Fallback
       v = vec3(0, 0, 1);
@@ -102,7 +102,7 @@ void main() {
               | ((pack_unorm_10(transmission) & 0x03FF) << 20);
   brdf_data.y = buff_unif.object_data_y; // forwarded
   brdf_data.z = buff_unif.object_data_z; // forwarded
-  brdf_data.w = packUnorm2x16(pack_normal_octahedral(normalmap));
+  brdf_data.w = packSnorm2x16(pack_normal_octahedral(normalmap));
 
   // Finally, write packed result out to atlas
   imageStore(b_atlas, ivec3(px_out, atlas.layer), uintBitsToFloat(brdf_data));

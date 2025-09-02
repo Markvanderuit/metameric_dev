@@ -8,15 +8,32 @@ struct Frame {
 
 // Src: https://people.compute.dtu.dk/jerf/code/hairy/HairAndDirections.pdf
 Frame get_frame(in vec3 n) {
-  Frame fr;
+  /* Frame fr;
 
-  const float a = -1.f / (1.f + n.z);
+  const float a = -safe_rcp(1.f + n.z);
   const float b = n.x * n.y * a;
   
   fr.n = n;
   fr.s = vec3(fma(n.x * n.x, a, 1.f), b, -n.x);
   fr.t = vec3(b, fma(n.y * n.y, a, 1.f), -n.y);
 
+  return fr; */
+
+  /* Frame fr;
+
+  float s = n.z >= 0.f ? 1.f : -1.f;
+  float a = -1.f / (s + n.z);
+  vec3  m = n.xyy * n.xyx * a;
+  
+  fr.n = n;
+  fr.s = vec3(fma(m.x, s, 1), m.z * s, -n.x * s);
+  fr.t = vec3(m.z, m.y + s, -n.y); */
+
+  // Stupid, but at least it's stable for textures
+  Frame fr;
+  fr.n = n;
+  fr.s = n == vec3(1, 0, 0) ? vec3(0, 1, 0) : normalize(cross(n, vec3(1, 0, 0)));
+  fr.t = normalize(cross(fr.n, fr.s));
   return fr;
 }
 
