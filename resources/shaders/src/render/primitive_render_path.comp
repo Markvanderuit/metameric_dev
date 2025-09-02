@@ -34,10 +34,7 @@ struct EmitterDistribution {
 
 // Uniform buffer declarations
 layout(binding = 0) uniform b_buff_sensor_info {
-  mat4  full_trf;
-  mat4  proj_trf;
-  mat4  view_trf;
-  uvec2 film_size; 
+  FilmSensor data;
 } buff_sensor_info;
 layout(binding = 1) uniform b_buff_sampler_state {
   uint spp_per_iter;
@@ -156,7 +153,7 @@ void main() {
 
     // Generate a sensor sample; initial ray and such
     SensorSample sensor_sample = sample_sensor(
-      FilmSensor(buff_sensor_info.proj_trf, buff_sensor_info.view_trf, buff_sensor_info.film_size), 
+      buff_sensor_info.data, 
       xy(), i, next_3d(state));
 
     vec4 L;
@@ -178,7 +175,7 @@ void main() {
     
     // Ignore invocations above requested film size; we keep invocations
     // alive and path-tracing - even outside the exact film size - for subgroup shenanigans
-    guard_continue(all(lessThan(xy(), buff_sensor_info.film_size)));
+    guard_continue(all(lessThan(xy(), buff_sensor_info.data.film_size)));
 
     // The accumulated rgba measure is the current value in the film. We integrate
     // over the color system and add to this measure in a running average.

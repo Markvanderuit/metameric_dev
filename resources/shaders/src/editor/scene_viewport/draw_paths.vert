@@ -8,7 +8,6 @@ layout(std430) buffer;
 
 // Uniform buffer declarations
 layout(binding = 0) uniform b_buff_sensor_info {
-  mat4  full_trf;
   mat4  proj_trf;
   mat4  view_trf;
   uvec2 film_size; 
@@ -32,6 +31,7 @@ declare_scene_cmfs_data(b_cmfs_3f);
 
 // All includes from and in here rely on buffers/samplers to be declared
 #include <render/ray.glsl>
+#include <render/sample.glsl>
 #include <render/sensor.glsl>
 
 void main() {
@@ -44,5 +44,5 @@ void main() {
                              buff_paths.data[path_i].L);
 
   // Generate output vertex position
-  gl_Position = buff_sensor_info.full_trf * vec4(buff_paths.data[path_i].data[vert_i].p, 1);
+  gl_Position = buff_sensor_info.proj_trf * buff_sensor_info.view_trf * vec4(buff_paths.data[path_i].data[vert_i].p, 1);
 }

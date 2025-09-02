@@ -27,16 +27,21 @@ namespace met {
     eig::Matrix4f view_trf = eig::Matrix4f::Identity();
 
     // Target film resolution
-    eig::Array2u  film_size = { 1, 1 };
+    eig::Array2u film_size = { 1, 1 };
     
+    // Thin lens parameters
+    float focus_distance  = 0.f; // Ignored if 0
+    float aperture_radius = .1f;
+
   private:
     struct UnifLayout {
-      alignas(16) eig::Matrix4f full_trf; 
       alignas(16) eig::Matrix4f proj_trf; 
       alignas(16) eig::Matrix4f view_trf; 
       alignas(8)  eig::Array2u  film_size; 
+      alignas(4)  float         focus_distance;
+      alignas(4)  float         aperture_radius;
     };
-    static_assert(sizeof(UnifLayout) == 208);
+    static_assert(sizeof(UnifLayout) == 144);
 
     gl::Buffer  m_unif;
     UnifLayout *m_unif_map;
@@ -62,16 +67,21 @@ namespace met {
 
     // Target pixel
     eig::Array2u pixel;
+    
+    // Thin lens parameters
+    float focus_distance  = 0.f; // Ignored if 0
+    float aperture_radius = .1f;
 
   private:
     struct UnifLayout {
-      alignas(16) eig::Matrix4f full_trf; 
       alignas(16) eig::Matrix4f proj_trf; 
       alignas(16) eig::Matrix4f view_trf; 
       alignas(8)  eig::Array2u  film_size; 
       alignas(8)  eig::Array2u  pixel;
+      alignas(4)  float         focus_distance;
+      alignas(4)  float         aperture_radius;
     };
-    static_assert(sizeof(UnifLayout) == 208);
+    static_assert(sizeof(UnifLayout) == 160);
 
     gl::Buffer  m_unif;
     UnifLayout *m_unif_map;

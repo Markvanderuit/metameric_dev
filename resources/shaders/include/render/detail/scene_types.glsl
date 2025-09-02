@@ -31,7 +31,7 @@ struct BRDF {
 // Access packed brdf data
 float brdf_metallic(in BRDF brdf)     { return unpack_unorm_10((brdf.data.x) & 0x03FF); }
 float brdf_transmission(in BRDF brdf) { return unpack_unorm_10((brdf.data.x >> 20) & 0x03FF); }
-float brdf_absorption(in BRDF brdf)   { return unpackHalf2x16(((brdf.data.y >> 16) & 0xFFFFu)).x * 100.f; }
+float brdf_absorption(in BRDF brdf)   { return unpackHalf2x16(((brdf.data.y >> 16) & 0xFFFFu)).x * 10.f; }
 float brdf_clearcoat(in BRDF brdf)    { return unpack_unorm_10((brdf.data.z) & 0x03FF); }
 float brdf_alpha(in BRDF brdf) { 
   float alpha = unpack_unorm_10((brdf.data.x >> 10) & 0x03FF); 
@@ -42,7 +42,7 @@ float brdf_clearcoat_alpha(in BRDF brdf)  {
   return max(1e-3, alpha * alpha);
 }
 vec3 brdf_normalmap(in BRDF brdf) {
-  return unpack_normal_octahedral(unpackUnorm2x16(brdf.data.w));
+  return unpack_normal_octahedral(unpackSnorm2x16(brdf.data.w));
 }
 
 // Info object to gather Scene::Emitter data
@@ -96,6 +96,31 @@ struct BLASInfo {
 // Info object for the TLAS
 struct TLASInfo {
   mat4 trf; // Transform to project ray from TLAS to world
+};
+
+// Simple sensor definition based on matrices
+struct FilmSensor {
+  mat4  proj_trf;
+  mat4  view_trf;
+  uvec2 film_size;
+  float focus_distance;
+  float aperture_radius;
+};
+
+// Simple sensor definition based on matrices,
+// for a specific pixel
+struct PixelSensor {
+  mat4  proj_trf;
+  mat4  view_trf;
+  uvec2 film_size;
+  uvec2 pixel;
+  float focus_distance;
+  float aperture_radius;
+};
+
+// Simple sensor definition, for a single ray
+struct RaySensor {
+  vec3 o, d;
 };
 
 #endif // RENDER_DETAIL_SCENE_TYPES_GLSL_GUARD

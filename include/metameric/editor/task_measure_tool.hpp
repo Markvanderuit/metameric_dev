@@ -47,10 +47,12 @@ namespace met {
       met_trace_full();
 
       // Get shared resources
-      const auto &e_window  = info.global("window").getr<gl::Window>(); // TODO remove
-      const auto &e_scene   = info.global("scene").getr<Scene>();
-      const auto &io        = ImGui::GetIO();
-      const auto &e_arcball = info.parent().relative("viewport_input_camera")("arcball").getr<detail::Arcball>();
+      const auto &e_window   = info.global("window").getr<gl::Window>(); // TODO remove
+      const auto &e_scene    = info.global("scene").getr<Scene>();
+      const auto &io         = ImGui::GetIO();
+      const auto &e_arcball  = info.parent().relative("viewport_input_camera")("arcball").getr<detail::Arcball>();
+      const auto &e_settings = e_scene.components.settings;
+      const auto &e_view     = e_scene.components.views[e_settings->view_i];
 
       // Escape for empty scenes
       guard(!e_scene.components.objects.empty());
@@ -62,10 +64,12 @@ namespace met {
                                  - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
 
       // Update pixel sensor
-      m_query_sensor.proj_trf  = e_arcball.proj().matrix();
-      m_query_sensor.view_trf  = e_arcball.view().matrix();
-      m_query_sensor.film_size = viewport_size.cast<uint>();
-      m_query_sensor.pixel     = eig::window_to_pixel(io.MousePos, viewport_offs, viewport_size);
+      m_query_sensor.proj_trf        = e_arcball.proj().matrix();
+      m_query_sensor.view_trf        = e_arcball.view().matrix();
+      m_query_sensor.film_size       = viewport_size.cast<uint>();
+      m_query_sensor.pixel           = eig::window_to_pixel(io.MousePos, viewport_offs, viewport_size);
+      m_query_sensor.aperture_radius = e_view->camera_aperture_r;
+      m_query_sensor.focus_distance  = e_view->camera_focus_distance;
       m_query_sensor.flush();
       
       // Perform path query and obtain path data

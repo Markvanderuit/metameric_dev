@@ -92,7 +92,7 @@ namespace met {
 
     // Prepare program state
     program.bind();
-    program.bind("b_buff_sensor_info",   m_sensor.buffer());
+    program.bind("b_buff_sensor_info", m_sensor.buffer());
     program.bind("b_buff_settings", m_unif_buffer);
 
     // Prepare draw state

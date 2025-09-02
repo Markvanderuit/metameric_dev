@@ -128,11 +128,13 @@ namespace met {
 
   void to_json(json &js, const View &view) {
     met_trace();
-    js = {{ "draw_frustrum", view.draw_frustrum },
-          { "observer_i",    view.observer_i    },
-          { "camera_trf",    view.camera_trf    },
-          { "camera_fov_y",  view.camera_fov_y  },
-          { "film_size",     view.film_size     }};
+    js = {{ "draw_frustrum",         view.draw_frustrum         },
+          { "observer_i",            view.observer_i            },
+          { "camera_trf",            view.camera_trf            },
+          { "camera_fov_y",          view.camera_fov_y          },
+          { "camera_focus_distance", view.camera_focus_distance },
+          { "camera_aperture_r",     view.camera_aperture_r     },
+          { "film_size",             view.film_size             }};
   }
 
   void from_json(const json &js, View &view) {
@@ -143,6 +145,10 @@ namespace met {
     js.at("camera_trf").get_to(view.camera_trf);
     js.at("camera_fov_y").get_to(view.camera_fov_y);
     js.at("film_size").get_to(view.film_size);
+    if (js.contains("camera_focus_distance"))
+      js.at("camera_focus_distance").get_to(view.camera_focus_distance);
+    if (js.contains("camera_focus_distance"))
+      js.at("camera_aperture_r").get_to(view.camera_aperture_r);
   }
 
   void to_json(json &js, const Object &object) {

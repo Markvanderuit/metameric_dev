@@ -7,7 +7,6 @@ layout(std430) buffer;
 
 // Uniform buffer declaration
 layout(binding = 0) uniform b_buff_sensor_info {
-  mat4  full_trf;
   mat4  proj_trf;
   mat4  view_trf;
   uvec2 film_size; 
@@ -23,5 +22,5 @@ void main() {
   color_out = color_in;
   
   // Vertex position is transformed color position
-  gl_Position = buff_sensor_info.full_trf * vec4(value_in.xyz, 1);
+  gl_Position = buff_sensor_info.proj_trf * buff_sensor_info.view_trf  * vec4(value_in.xyz, 1);
 }

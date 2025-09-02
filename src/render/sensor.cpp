@@ -23,10 +23,11 @@ namespace met {
     if (!m_unif.is_init())
       std::tie(m_unif, m_unif_map) = gl::Buffer::make_flusheable_object<UnifLayout>();
 
-    m_unif_map->full_trf  = proj_trf * view_trf;
-    m_unif_map->proj_trf  = proj_trf;
-    m_unif_map->view_trf  = view_trf;
-    m_unif_map->film_size = film_size;
+    m_unif_map->proj_trf        = proj_trf;
+    m_unif_map->view_trf        = view_trf;
+    m_unif_map->film_size       = film_size;
+    m_unif_map->focus_distance  = focus_distance;
+    m_unif_map->aperture_radius = aperture_radius;
     
     m_unif.flush();
   }
@@ -37,11 +38,12 @@ namespace met {
     if (!m_unif.is_init())
       std::tie(m_unif, m_unif_map) = gl::Buffer::make_flusheable_object<UnifLayout>();
 
-    m_unif_map->full_trf  = proj_trf * view_trf;
-    m_unif_map->proj_trf  = proj_trf;
-    m_unif_map->view_trf  = view_trf;
-    m_unif_map->film_size = film_size;
-    m_unif_map->pixel     = pixel;
+    m_unif_map->proj_trf        = proj_trf;
+    m_unif_map->view_trf        = view_trf;
+    m_unif_map->film_size       = film_size;
+    m_unif_map->pixel           = pixel;
+    m_unif_map->focus_distance  = focus_distance;
+    m_unif_map->aperture_radius = aperture_radius;
     
     m_unif.flush();
   }

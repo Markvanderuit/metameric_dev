@@ -322,8 +322,8 @@ namespace met {
 
     // Prepare program state
     program.bind("b_buff_sensor_info", e_sensor.buffer());
-    program.bind("b_buff_paths",  e_query.output());
-    program.bind("b_cmfs_3f",     e_scene.resources.observers.gl.cmfs_texture);
+    program.bind("b_buff_paths",       e_query.output());
+    program.bind("b_cmfs_3f",          e_scene.resources.observers.gl.cmfs_texture);
 
     uint n_dispatch = 2 
                     * PathRecord::path_max_depth

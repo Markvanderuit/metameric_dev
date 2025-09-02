@@ -33,11 +33,7 @@ struct EmitterDistribution {
 
 // Uniform buffer declarations
 layout(binding = 0) uniform b_buff_sensor_info {
-  mat4  full_trf;
-  mat4  proj_trf;
-  mat4  view_trf;
-  uvec2 film_size;
-  uvec2 pixel;
+  PixelSensor data;
 } buff_sensor_info;
 layout(binding = 1) uniform b_buff_query {
   uint spp;
@@ -120,12 +116,7 @@ void main() {
 
   // Initialize sampler and generate sensor sample
   SamplerState state         = gl_GlobalInvocationID.x;
-  SensorSample sensor_sample = sample_sensor(PixelSensor(
-    buff_sensor_info.proj_trf,
-    buff_sensor_info.view_trf,
-    buff_sensor_info.film_size,
-    buff_sensor_info.pixel
-  ), next_3d(state));
+  SensorSample sensor_sample = sample_sensor(buff_sensor_info.data, next_3d(state));
   
   // Sample incident radiance along ray for given wavelengths, weighted by probability
   // Discard return value; path query statements will handle output

@@ -35,6 +35,7 @@ namespace met {
       bool show_add           = true;     // Allow adding of components to lists
       bool show_del           = true;     // Allow deletion of component/resource
       bool show_dupl          = true;     // Allow duplication of component/resource
+      bool show_move          = false;    // Allow reordering of component/resource data
       bool edit_name          = true;     // Allow editing of component/resource name
       bool edit_data          = true;     // Allow editing of component/resource data
     };
@@ -190,6 +191,51 @@ namespace met {
       } // if (inside_tree && edit_data)
     } // if (detail::has_active_value)
 
+    // Duplicate button, on same line as tree node if available
+    if (edit_info.inside_tree && edit_info.show_move) {
+      if (data_i > 0) {
+        ImGui::SameLine(ImGui::GetContentRegionMax().x - 104.f);
+        if (ImGui::SmallButton("U")) {
+          if (section_open && edit_info.inside_tree) ImGui::TreePop();
+          info.global("scene").getw<Scene>().touch({
+            .name = "Move component up",
+            .redo = [data_i] (auto &scene) {
+              auto &data = scene_data_by_type<Ty>(scene);
+              std::swap(data[data_i], data[data_i - 1]);
+            },
+            .undo = [data_i](auto &scene) {
+              auto &data = scene_data_by_type<Ty>(scene);
+              std::swap(data[data_i], data[data_i - 1]);
+            }
+          });
+          return; // Exit early as iterators are invalidated
+        }
+        if (ImGui::IsItemHovered())
+          ImGui::SetTooltip("Move component up");
+      }
+      
+      if (data_i < scene_data_by_type<Ty>(scene).size() - 1) {
+        ImGui::SameLine(ImGui::GetContentRegionMax().x - 82.f);
+        if (ImGui::SmallButton("V")) {
+          if (section_open && edit_info.inside_tree) ImGui::TreePop();
+          info.global("scene").getw<Scene>().touch({
+            .name = "Move component down",
+            .redo = [data_i] (auto &scene) {
+              auto &data = scene_data_by_type<Ty>(scene);
+              std::swap(data[data_i], data[data_i + 1]);
+            },
+            .undo = [data_i](auto &scene) {
+              auto &data = scene_data_by_type<Ty>(scene);
+              std::swap(data[data_i], data[data_i + 1]);
+            }
+          });
+          return; // Exit early as iterators are invalidated
+        }
+        if (ImGui::IsItemHovered())
+          ImGui::SetTooltip("Move component down");
+      }
+    } // if (inside_tree && show_dupl)
+    
     // Duplicate button, on same line as tree node if available
     if (edit_info.inside_tree && edit_info.show_dupl) {
       ImGui::SameLine(ImGui::GetContentRegionMax().x - 60.f);

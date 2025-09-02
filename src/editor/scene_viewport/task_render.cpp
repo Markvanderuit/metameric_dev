@@ -53,6 +53,7 @@ namespace met {
     auto sensor_handle     = info("sensor");
     const auto &e_scene    = info.global("scene").getr<Scene>();
     const auto &e_settings = e_scene.components.settings;
+    const auto &e_view     = e_scene.components.views[e_settings->view_i];
 
     // (Re-)initialize renderer
     if (is_first_eval() || e_settings.state.renderer_type) {
@@ -104,10 +105,12 @@ namespace met {
       const auto &e_camera = camera_handle.getr<detail::Arcball>();
 
       // Push new sensor data
-      auto &i_sensor     = sensor_handle.getw<Sensor>();
-      i_sensor.film_size = (e_target.size().cast<float>() * e_settings->view_scale).cast<uint>().eval();
-      i_sensor.proj_trf  = e_camera.proj().matrix();
-      i_sensor.view_trf  = e_camera.view().matrix();
+      auto &i_sensor           = sensor_handle.getw<Sensor>();
+      i_sensor.film_size       = (e_target.size().cast<float>() * e_settings->view_scale).cast<uint>().eval();
+      i_sensor.proj_trf        = e_camera.proj().matrix();
+      i_sensor.view_trf        = e_camera.view().matrix();
+      i_sensor.aperture_radius = e_view->camera_aperture_r;
+      i_sensor.focus_distance  = e_view->camera_focus_distance;
       i_sensor.flush();
 
       // Forward to underlying type dependent on setting

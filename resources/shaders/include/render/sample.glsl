@@ -40,6 +40,12 @@ struct MicrofacetSample {
   float pdf;
 };
 
+struct SensorSample {
+  Ray  ray;  // Sensor ray
+  vec4 wvls; // Packet of wavelengths along ray
+  vec4 pdfs; // Packet of pdfs for each ray/wavelength pair
+};
+
 EmitterSample emitter_sample_zero() {
   EmitterSample ps;
   ps.is_delta = false;

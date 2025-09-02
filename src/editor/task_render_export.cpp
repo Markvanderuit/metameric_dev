@@ -129,9 +129,11 @@ namespace met {
 
         // Initialize sensor and renderer primitives
         m_sensor = {};
-        m_sensor.film_size = e_view.film_size;
-        m_sensor.proj_trf  = m_arcball.proj().matrix();
-        m_sensor.view_trf  = m_arcball.view().matrix();
+        m_sensor.film_size       = e_view.film_size;
+        m_sensor.proj_trf        = m_arcball.proj().matrix();
+        m_sensor.view_trf        = m_arcball.view().matrix();
+        m_sensor.aperture_radius = e_view.camera_aperture_r;
+        m_sensor.focus_distance  = e_view.camera_focus_distance;
         m_sensor.flush();
 
         // Initialize renderer

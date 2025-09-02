@@ -59,9 +59,9 @@ namespace met {
       met_trace();
       if (ImGui::Begin("Scene components")) {
         push_editor<detail::Component<Uplifting>>(info, { .editor_name = "Upliftings" });
-        push_editor<detail::Component<Object>>(info,    { .editor_name = "Objects"    });
-        push_editor<detail::Component<Emitter>>(info,   { .editor_name = "Emitters"   });
-        push_editor<detail::Component<View>>(info,      { .editor_name = "Views"      });
+        push_editor<detail::Component<Object>>(info,    { .editor_name = "Objects",  .show_move = true });
+        push_editor<detail::Component<Emitter>>(info,   { .editor_name = "Emitters", .show_move = true });
+        push_editor<detail::Component<View>>(info,      { .editor_name = "Views",    .show_move = true });
       }
       ImGui::End();
     });
