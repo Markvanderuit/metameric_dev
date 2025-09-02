@@ -32,7 +32,7 @@ Frame get_frame(in vec3 n) {
   // Stupid, but at least it's stable for textures
   Frame fr;
   fr.n = n;
-  fr.s = n == vec3(1, 0, 0) ? vec3(0, 1, 0) : normalize(cross(n, vec3(1, 0, 0)));
+  fr.s = abs(n.x - mulsign(1, n.x)) <= M_EPS ? vec3(0, n.x, 0) : normalize(cross(n, vec3(1, 0, 0)));
   fr.t = normalize(cross(fr.n, fr.s));
   return fr;
 }

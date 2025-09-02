@@ -38,7 +38,7 @@ vec4 Li_debug(in SensorSample ss, in SamplerState state) {
   // // vec3 n = vec3(0, 0, 1);
   Frame fr = get_frame(si.n);
   // // float a = -1.f / (1.f + si.n.z);
-  return vec4(abs(fr.t), 1);
+  return vec4(abs(fr.s), 1);
 }
 
 vec4 Li(in SensorSample ss, in SamplerState state, out float alpha) {
