@@ -436,7 +436,6 @@ namespace met {
       for (uint i = emitter_data.size(); i > scene.components.emitters.size(); --i)
         emitter_data.pop_back();
       
-
       // Generate spectral uplifting data and per-object spectral texture
       for (auto &data : uplifting_data)
         data.update(scene);
@@ -763,9 +762,11 @@ namespace met {
       bool is_active 
          = m_is_first_update            // First run, demands render anyways
         || atlas.is_invalitated()       // Texture atlas re-allocated, demands re-render
-        || object.state.albedo         // Diifferent albedo value set on object
+        || object.state.albedo          // Diifferent albedo value set on object
         || object.state.mesh_i          // Diifferent mesh attached to object
         || object.state.uplifting_i     // Different uplifting attached to object
+        || object.state.uv_offset       // Different value set on object
+        || object.state.uv_extent       // Different value set on object
         || uplifting                    // Uplifting was changed
         || scene.resources.meshes       // User loaded/deleted a mesh;
         || scene.resources.images       // User loaded/deleted a image;
@@ -777,6 +778,8 @@ namespace met {
       // Flush relevant data to uniform buffer
       *m_buffer_map = {
         .object_albedo_data = detail::pack_material_3f(object->albedo),
+        .uv_offset          = object->uv_offset,
+        .uv_extent          = object->uv_extent,
         .object_i           = m_object_i
       };
       m_buffer.flush();

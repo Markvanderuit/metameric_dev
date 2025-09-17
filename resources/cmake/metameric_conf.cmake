@@ -8,7 +8,7 @@ set(MET_WAVELENGTH_BASES    12) # Maximum nr. of bases used in generative functi
 
 # Some object limits for renderer; inserted in code/shaders as preprocessor defines
 set(MET_SUPPORTED_MESHES        32) # Maximum supported scene meshes
-set(MET_SUPPORTED_OBJECTS       32) # Maximum supported scene objects
+set(MET_SUPPORTED_OBJECTS       64) # Maximum supported scene objects
 set(MET_SUPPORTED_EMITTERS      32) # Maximum supported scene emitters
 set(MET_SUPPORTED_TEXTURES     128) # Maximum supported scene textures
 set(MET_SUPPORTED_CONSTRAINTS  512) # Maximum supported boundary + interior spectra per uplifting

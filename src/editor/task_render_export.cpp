@@ -22,7 +22,7 @@
 #include <metameric/editor/detail/component_edit.hpp>
 
 namespace met {
-  constexpr static uint export_spp_per_iter = 4u;
+  constexpr static uint export_spp_per_iter = 1u;
 
   void RenderExportTask::init(SchedulerHandle &info) {
     met_trace();    

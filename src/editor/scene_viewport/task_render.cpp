@@ -67,7 +67,7 @@ namespace met {
           break;
         case Settings::RendererType::eDirect:
           render_handle.init<PathRenderPrimitive>({ .spp_per_iter        = render_spp_per_iter,
-                                                    .max_depth           = 2u,
+                                                    .max_depth           = 1u,
                                                     .pixel_checkerboard  = true,
                                                     .enable_alpha        = false,
                                                     .enable_debug        = false,
@@ -75,7 +75,7 @@ namespace met {
           break;
         case Settings::RendererType::eDebug:
           render_handle.init<PathRenderPrimitive>({ .spp_per_iter        = render_spp_per_iter,
-                                                    .max_depth           = 2u,
+                                                    .max_depth           = 1u,
                                                     .pixel_checkerboard  = true,
                                                     .enable_alpha        = false,
                                                     .enable_debug        = true,

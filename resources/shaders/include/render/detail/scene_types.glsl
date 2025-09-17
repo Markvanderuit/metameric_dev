@@ -33,13 +33,10 @@ float brdf_metallic(in BRDF brdf)     { return unpack_unorm_10((brdf.data.x) & 0
 float brdf_transmission(in BRDF brdf) { return unpack_unorm_10((brdf.data.x >> 20) & 0x03FF); }
 float brdf_absorption(in BRDF brdf)   { return unpackHalf2x16(((brdf.data.y >> 16) & 0xFFFFu)).x * 10.f; }
 float brdf_clearcoat(in BRDF brdf)    { return unpack_unorm_10((brdf.data.z) & 0x03FF); }
-float brdf_alpha(in BRDF brdf) { 
-  float alpha = unpack_unorm_10((brdf.data.x >> 10) & 0x03FF); 
-  return max(1e-3, alpha * alpha);
-}
+float brdf_alpha(in BRDF brdf)        { return unpack_unorm_10((brdf.data.x >> 10) & 0x03FF); }
 float brdf_clearcoat_alpha(in BRDF brdf)  { 
   float alpha = unpack_unorm_10((brdf.data.z >> 10) & 0x03FF);
-  return max(1e-3, alpha * alpha);
+  return max(1e-3, alpha * alpha * alpha);
 }
 vec3 brdf_normalmap(in BRDF brdf) {
   return unpack_normal_octahedral(unpackSnorm2x16(brdf.data.w));

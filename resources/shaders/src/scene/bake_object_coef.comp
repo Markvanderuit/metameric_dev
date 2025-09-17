@@ -17,6 +17,8 @@ layout(std140) uniform;
 // Uniform buffer declarations
 layout(binding = 0) uniform b_buff_unif {
   uvec2 object_albedo_data;
+  vec2  uv_offset;
+  vec2  uv_extent;
   uint  object_i;
 } buff_unif;
 layout(binding = 1) uniform b_buff_atlas {
@@ -47,7 +49,12 @@ vec3 read_record_data_vec3(in uvec2 rc) {
   if (record_is_index(rc)) {
     // Determine pixel location in texture atlas
     TextureInfo txtr  = buff_textures.data[record_get_index(rc)];
-    const uvec2 px_in = clamp(gl_GlobalInvocationID.xy + txtr.offs, txtr.offs, txtr.offs + txtr.size - 1);
+
+    // Apply object uv scaling overrides
+    txtr.offs += uvec2(buff_unif.uv_offset * vec2(txtr.size));
+    txtr.size  = uvec2(buff_unif.uv_extent * vec2(txtr.size));
+    const uvec2 px_in = clamp(uvec2(vec2(gl_GlobalInvocationID.xy) * buff_unif.uv_extent) + txtr.offs, 
+                              txtr.offs, txtr.offs + txtr.size - 1);
 
     // Color value is supplied by scene texture; could be b_txtr_3f or b_txtr_1f
     if (txtr.is_3f) {

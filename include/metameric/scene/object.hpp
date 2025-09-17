@@ -45,6 +45,10 @@ namespace met {
     float                     clearcoat       = 0.f;              // for clearcoat layer
     float                     clearcoat_alpha = 0.f;              // for clearcoat layer
 
+    // Scalar modifiers to uv for wrapping; factored out during uplift bake
+    eig::Array2f uv_offset = { 0, 0 };
+    eig::Array2f uv_extent = { 1, 1 };
+
   public: // Boilerplate
     bool operator==(const Object &o) const;
   };
@@ -66,12 +70,15 @@ namespace met {
           alignas(4) uint         object_roughness_data; 
           alignas(4) uint         object_transmission_data; 
           // ---
+          alignas(8) eig::Array2f uv_offset;
+          alignas(8) eig::Array2f uv_extent;
+          // ---
           alignas(8) eig::Array2u object_albedo_data; 
           alignas(4) uint         object_normalmap_data; 
           alignas(4) uint         object_data_y; 
           alignas(4) uint         object_data_z; 
         };
-        static_assert(sizeof(BlockLayout) == 40);
+        static_assert(sizeof(BlockLayout) == 56);
 
         // Objects for texture bake
         std::string  m_program_key;
@@ -138,6 +145,8 @@ namespace met {
       SceneStateHandler<decltype(Object::normalmap)>          normalmap;
       SceneStateHandler<decltype(Object::clearcoat)>          clearcoat;
       SceneStateHandler<decltype(Object::clearcoat_alpha)>    clearcoat_alpha;
+      SceneStateHandler<decltype(Object::uv_offset)>          uv_offset;
+      SceneStateHandler<decltype(Object::uv_extent)>           uv_extent;
 
     public:
       bool update(const Object &o) override {
@@ -156,6 +165,8 @@ namespace met {
         | clearcoat.update(o.clearcoat)
         | clearcoat_alpha.update(o.clearcoat_alpha)
         | normalmap.update(o.normalmap)
+        | uv_offset.update(o.uv_offset)
+        | uv_extent.update(o.uv_extent)
         );
       }
     };

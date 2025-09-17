@@ -231,9 +231,11 @@ namespace met {
         // Layout for data written to std140 buffer
         struct BlockLayout { 
           alignas(8) eig::Array2u object_albedo_data;  
+          alignas(8) eig::Array2f uv_offset;  
+          alignas(8) eig::Array2f uv_extent;  
           alignas(4) uint         object_i; 
         };
-        static_assert(sizeof(BlockLayout) == 16);
+        static_assert(sizeof(BlockLayout) == 32);
 
         // Objects for texture bake
         std::string  m_program_key;

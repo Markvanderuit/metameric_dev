@@ -21,24 +21,9 @@ vec4 Li_debug(in SensorSample ss, in SamplerState state) {
   // Construct the underlying BRDF at the intersected surface
   BRDF brdf = get_brdf(si, ss.wvls, next_2d(state));
 
-  // float cos_theta_t;
-  // vec4 F0 = mix(vec4(schlick_F0(1.f, brdf.eta)), brdf.r, brdf_metallic(brdf));
-  // vec4  F = schlick_fresnel(F0, dot((si.wi), vec3(0, 0, 1)), cos_theta_t, brdf.eta); 
-  
-  // float inv_eta = is_upper_hemisphere(si.wi) ? 1.f / brdf.eta : brdf.eta;
-  // vec3 wo = local_refract(si.wi, cos_theta_t, inv_eta);
-  // vec3 m  = vec3(0, 0, 1);
-  // float weight = sdot(inv_eta) * dot(wo, m) 
-  //               / sdot(dot(wo, m) + dot(si.wi, m) * inv_eta);
-  // return (si.n == vec3(0, 0, -1) ? vec4(0, 0, 1, 1) : vec4(1, 0, 0, 1));
-
-  // vec3 up = to_local(get_frame(ss.ray.d), vec3(0, 0, 1));
-  // vec3 n  = to_local(get_frame(si.n), ss.ray.d);
-
-  // // vec3 n = vec3(0, 0, 1);
-  Frame fr = get_frame(si.n);
-  // // float a = -1.f / (1.f + si.n.z);
-  return vec4(abs(fr.s), 1);
+  // return vec4(vec3(brdf_alpha(brdf)), 1);
+  return vec4(si.n, 1);
+  // return vec4(brdf.r);
 }
 
 vec4 Li(in SensorSample ss, in SamplerState state, out float alpha) {

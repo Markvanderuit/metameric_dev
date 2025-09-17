@@ -24,6 +24,8 @@ namespace met {
           std::tie(o.is_active, o.transform, o.mesh_i, o.uplifting_i, o.absorption, o.clearcoat, o.clearcoat_alpha), 
           false);
     guard(eta_minmax.isApprox(o.eta_minmax), false);
+    guard(uv_offset.isApprox(o.uv_offset), false);
+    guard(uv_extent.isApprox(o.uv_extent), false);
 
     guard(albedo.index() == o.albedo.index(), false);
     switch (albedo.index()) {
@@ -275,6 +277,8 @@ namespace met {
         || object.state.eta_minmax      // Different value set on object
         || object.state.clearcoat       // Different value set on object
         || object.state.clearcoat_alpha // Different value set on object
+        || object.state.uv_offset       // Different value set on object
+        || object.state.uv_extent       // Different value set on object
         || scene.resources.meshes       // User loaded/deleted a mesh;
         || scene.resources.images       // User loaded/deleted an image;
         || settings.state.texture_size; // Texture size setting changed
@@ -288,6 +292,8 @@ namespace met {
         .object_metallic_data     = detail::pack_material_1f(object->metallic),
         .object_roughness_data    = detail::pack_material_1f(object->alpha),
         .object_transmission_data = detail::pack_material_1f(object->transmission),
+        .uv_offset                = object->uv_offset,
+        .uv_extent                 = object->uv_extent,
         .object_albedo_data       = detail::pack_material_3f(object->albedo),
         .object_normalmap_data    = detail::pack_optional_1u(object->normalmap),
         .object_data_y            = ((to_8b((object->eta_minmax.x() - 1.f) / 3.f) & 0x00FFu)      )  // 8b for eta (minimum)

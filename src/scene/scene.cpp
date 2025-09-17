@@ -160,7 +160,9 @@ namespace met {
           { "eta_minmax",      object.eta_minmax      },
           { "absorption",      object.absorption      },
           { "clearcoat",       object.clearcoat       },
-          { "clearcoat_alpha", object.clearcoat_alpha }};
+          { "clearcoat_alpha", object.clearcoat_alpha },
+          { "uv_offset",       object.uv_offset       },
+          { "uv_extent",        object.uv_extent        }};
     js["diffuse"]      = {{ "index", object.albedo.index()      },  { "variant", object.albedo      }};
     js["roughness"]    = {{ "index", object.alpha.index()    },  { "variant", object.alpha    }};
     js["metallic"]     = {{ "index", object.metallic.index()     },  { "variant", object.metallic     }};
@@ -214,6 +216,12 @@ namespace met {
     }
     if (js.contains("clearcoat_alpha")) {
       js.at("clearcoat_alpha").get_to(object.clearcoat_alpha);
+    }
+    if (js.contains("uv_offset")) {
+      js.at("uv_offset").get_to(object.uv_offset);
+    }
+    if (js.contains("uv_extent")) {
+      js.at("uv_extent").get_to(object.uv_extent);
     }
   }
 

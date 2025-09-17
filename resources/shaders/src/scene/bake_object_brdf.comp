@@ -10,16 +10,16 @@ layout(std140) uniform;
 
 // Uniform buffer declarations
 layout(binding = 0) uniform b_buff_unif {
-  uint object_i;
-
-  uint  object_metallic_data;
-  uint  object_roughness_data;
-  uint  object_transmission_data;
-
-  uvec2 object_albedo_data;
-  uint  object_normalmap_data;
-  uint  object_data_y;
-  uint  object_data_z;
+  uint  object_i;
+  uint  metallic_data;
+  uint  roughness_data;
+  uint  transmission_data;
+  vec2  uv_offset;
+  vec2  uv_extent;
+  uvec2 albedo_data;
+  uint  normalmap_data;
+  uint  data_y;
+  uint  data_z;
 } buff_unif;
 layout(binding = 1) uniform b_buff_atlas {
   uint n;
@@ -40,7 +40,12 @@ float read_record_data_float(in uint rc) {
   if (record_is_index(rc)) {
     // Determine pixel location in texture atlas
     TextureInfo txtr = buff_textures.data[record_get_index(rc)];
-    const uvec2 px_in = clamp(gl_GlobalInvocationID.xy + txtr.offs, txtr.offs, txtr.offs + txtr.size - 1);
+
+    // Apply object uv scaling overrides
+    txtr.offs += uvec2(buff_unif.uv_offset * vec2(txtr.size));
+    txtr.size  = uvec2(buff_unif.uv_extent * vec2(txtr.size));
+    const uvec2 px_in = clamp(uvec2(vec2(gl_GlobalInvocationID.xy) * buff_unif.uv_extent) + txtr.offs, 
+                              txtr.offs, txtr.offs + txtr.size - 1);
 
     // Value is supplied by scene texture; could be b_txtr_3f or b_txtr_1f
     if (txtr.is_3f) {
@@ -62,13 +67,18 @@ vec3 read_record_data_vec3(in uint rc) {
   vec3 v;
   if (record_is_optional_set(rc)) {
     TextureInfo txtr  = buff_textures.data[record_get_optional_value(rc)];
-    const uvec2 px_in = clamp(gl_GlobalInvocationID.xy + txtr.offs, txtr.offs, txtr.offs + txtr.size - 1);
+
+    // Apply object uv scaling overrides
+    txtr.offs += uvec2(buff_unif.uv_offset * vec2(txtr.size));
+    txtr.size  = uvec2(buff_unif.uv_extent * vec2(txtr.size));
+    const uvec2 px_in = clamp(uvec2(vec2(gl_GlobalInvocationID.xy) * buff_unif.uv_extent) + txtr.offs, 
+                              txtr.offs, txtr.offs + txtr.size - 1);
     
     // Value is supplied by scene texture; should only allow b_txtr_3f
     if (txtr.is_3f) {
       const vec2 tx_in = clamp((vec2(px_in) + 0.5f)
                        / textureSize(b_txtr_3f, 0).xy, vec2(0), vec2(1));
-      v = normalize(texture(b_txtr_3f, vec3(tx_in, txtr.layer)).xyz /* * 2.f - 1.f */);
+      v = normalize(texture(b_txtr_3f, vec3(tx_in, txtr.layer)).xyz);
     } else {
       // Fallback
       v = vec3(0, 0, 1);
@@ -90,18 +100,21 @@ void main() {
   guard(clamp(px_out, atlas.offs, atlas.offs + atlas.size - 1) == px_out);
 
   // Read brdf data records, then sample texture or extract scalar from said records
-  float metallic     = read_record_data_float(buff_unif.object_metallic_data);
-  float roughness    = read_record_data_float(buff_unif.object_roughness_data);
-  float transmission = read_record_data_float(buff_unif.object_transmission_data);
-  vec3  normalmap    = read_record_data_vec3(buff_unif.object_normalmap_data);
+  float metallic     = read_record_data_float(buff_unif.metallic_data);
+  float roughness    = read_record_data_float(buff_unif.roughness_data);
+  float transmission = read_record_data_float(buff_unif.transmission_data);
+  vec3  normalmap    = read_record_data_vec3(buff_unif.normalmap_data);
+
+  // Remap roughness
+  float alpha = max(1e-3, roughness * roughness * roughness);
 
   // Repack sampled brdf data
   uvec4 brdf_data;
   brdf_data.x = ((pack_unorm_10(metallic)     & 0x03FF)      )
-              | ((pack_unorm_10(roughness)    & 0x03FF) << 10)
+              | ((pack_unorm_10(alpha)        & 0x03FF) << 10)
               | ((pack_unorm_10(transmission) & 0x03FF) << 20);
-  brdf_data.y = buff_unif.object_data_y; // forwarded
-  brdf_data.z = buff_unif.object_data_z; // forwarded
+  brdf_data.y = buff_unif.data_y; // forwarded
+  brdf_data.z = buff_unif.data_z; // forwarded
   brdf_data.w = packSnorm2x16(pack_normal_octahedral(normalmap));
 
   // Finally, write packed result out to atlas

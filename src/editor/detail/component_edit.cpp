@@ -111,24 +111,27 @@ namespace met {
       push_resource_selector("Uplifting", scene.components.upliftings, value.uplifting_i);
       push_resource_selector("Mesh",      scene.resources.meshes, value.mesh_i);
       
-      ImGui::Separator();
+      ImGui::SeparatorText("Transform");
 
       // Object transforms
       ImGui::DragFloat3("Position", value.transform.position.data(), 0.01f, -100.f, 100.f);
       ImGui::DragFloat3("Rotation", value.transform.rotation.data(), 0.01f, -10.f, 10.f);
+      ImGui::DragFloat3("Scaling",  value.transform.scaling.data(), 0.01f, 0.001f, 10.f);
 
       // We handle scaling on one slider;
       // Important catch; prevent scale from falling to 0, something somewhere breaks :D
-      float _scaling = value.transform.scaling.x();
-      ImGui::DragFloat("Scaling", &_scaling, 0.01f, 0.001f, 100.f);
-      value.transform.scaling = std::max(_scaling, 0.001f);
+      // float _scaling = value.transform.scaling.x();
+      // ImGui::DragFloat("Scaling", &_scaling, 0.01f, 0.001f, 100.f);
+      // value.transform.scaling = std::max(_scaling, 0.001f);
       
       // BRDF parameters
-      ImGui::Separator();
+      ImGui::SeparatorText("BRDF");
 
-      push_texture_variant_selector_3f("Albedo",   scene.resources.images, value.albedo);
-      push_texture_variant_selector_1f("Alpha",    scene.resources.images, value.alpha);
-      push_texture_variant_selector_1f("Metallic", scene.resources.images, value.metallic);
+      push_texture_variant_selector_3f("Albedo",    scene.resources.images, value.albedo);
+      push_texture_variant_selector_1f("Roughness", scene.resources.images, value.alpha);
+      push_texture_variant_selector_1f("Metallic",  scene.resources.images, value.metallic);
+      push_texture_optional_selector("Normalmap",   scene.resources.images, value.normalmap);
+
       ImGui::SliderFloat2("Eta (min, max)", value.eta_minmax.data(), 1.001f, 4.f);
 
       ImGui::Separator();
@@ -142,8 +145,12 @@ namespace met {
       ImGui::SliderFloat("Clearcoat alpha", &value.clearcoat_alpha, 0.f, 1.f);
 
       ImGui::Separator();
-      
-      push_texture_optional_selector("Normalmap", scene.resources.images, value.normalmap);
+
+      ImGui::SeparatorText("UV");
+
+      ImGui::SliderFloat2("Offset", value.uv_offset.data(), 0.f, 1.f);
+      ImGui::SliderFloat2("Extent", value.uv_extent.data(), 0.f, 1.f);
+      value.uv_extent = value.uv_extent.cwiseMin(eig::Array2f(1) - value.uv_offset).eval();
     };
 
     // Default implementation of editing visitor for Emitter components
