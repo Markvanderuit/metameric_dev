@@ -169,7 +169,7 @@ namespace met {
 
     // Rebuild target texture if necessary
     if (!m_film.is_init() || !m_film.size().isApprox(sensor.film_size)) {
-      m_film = {{ .size = sensor.film_size.max(1).eval() }};
+      m_film = {{ .size = sensor.film_size.max(1u).eval() }};
 
       // Set dispatch size
       if (m_pixel_checkerboard) {

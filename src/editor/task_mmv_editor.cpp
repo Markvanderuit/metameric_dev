@@ -144,9 +144,9 @@ namespace met {
       i_frame_buffer.clear(gl::FramebufferType::eDepth, 1.f);
 
       // Place texture view using draw target
-      ImGui::Image(ImGui::to_ptr(i_srgb_target.object()), 
+      ImGui::Image(i_srgb_target.object(), 
         i_srgb_target.size().cast<float>().eval(), 
-        eig::Vector2f(0, 1), eig::Vector2f(1, 0));
+        eig::Vector2f(0.f, 1.f), eig::Vector2f(1.f, 0.f));
     }
   };
 
